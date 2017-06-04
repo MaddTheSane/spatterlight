@@ -38,9 +38,25 @@
 - (void) drawRect: (NSRect)rect
 {
     NSRect bounds = self.bounds;
+    //NSColor *color = nil;
     
     if (!transparent)
     {
+# if 0
+        if ([Preferences stylesEnabled])
+        {
+            color = [styles[style_Normal] attributes][NSBackgroundColorAttributeName];
+            
+            if (bgnd != 0)
+            {
+                color = [Preferences backgroundColor: (int)(bgnd - 1)];
+            }
+        }
+
+        if (!color)
+            color = [Preferences bufferBackground];
+#endif
+        //[color set];
         [[NSColor whiteColor] set];
         NSRectFill(rect);
     }
@@ -48,13 +64,14 @@
     [image drawAtPoint: bounds.origin
               fromRect: NSMakeRect(0, 0, bounds.size.width, bounds.size.height)
              operation: NSCompositeSourceOver
-              fraction: 1.0];
+              fraction: 1.0
+     ];
 }
 
 - (void) setFrame: (NSRect)frame
 {
     int w, h;
-    
+
     if (NSEqualRects(frame, self.frame))
         return;
     
@@ -174,20 +191,25 @@
     if (h == 0)
         h = srcsize.height;
     
-    //NSLog(@"  drawimage in gfx x=%d y=%d w=%d h=%d\n", x, y, w, h);
+    NSLog(@"  drawimage in gfx x=%ld y=%ld w=%ld h=%ld\n", (long)x, (long)y, (long)w, (long)h);
     
-    [image lockFocus];
+    if ( image.size.width > 0 && image.size.height > 0  )
+        [image lockFocus];
     
     [NSGraphicsContext currentContext].imageInterpolation = NSImageInterpolationHigh;
     
     [src drawInRect: [self florpCoords: NSMakeRect(x, y, w, h)]
            fromRect: NSMakeRect(0, 0, srcsize.width, srcsize.height)
           operation: NSCompositeSourceOver
-           fraction: 1.0];
+           fraction: 1.0
+     respectFlipped:YES
+              hints:nil];
     
-    [image unlockFocus];
+    if ( image.size.width > 0 && image.size.height > 0  )
+        [image unlockFocus];
     
     dirty = YES;
+    
 }
 
 - (void) flushDisplay
