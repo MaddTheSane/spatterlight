@@ -30,6 +30,10 @@
 
 - (BOOL)isMenu {
     GlkController *glkctl = _glkctl;
+    if (glkctl.gameID == kGameIsJuniorArithmancer) {
+        return NO;
+    }
+
     NSString *format = glkctl.game.detectedFormat;
     unichar initialChar;
 
@@ -40,7 +44,7 @@
     } else if (_isTads3) {
         // If Tads 3: look for a cluster of lines where all start with a '>'.
         // '•' is only used in Thaumistry: Charm's Way.
-        if (glkctl.thaumistry)
+        if (glkctl.gameID == kGameIsThaumistry)
             initialChar = u'•';
         else
             initialChar = '>';
@@ -64,16 +68,16 @@
     NSString *pattern = nil;
 
     // Thaumistry has no pattern and uses bullets instead of greater than. Check window setup: Two buffer windows, one with only one line
-    if (glkctl.thaumistry) {
+    if (glkctl.gameID == kGameIsThaumistry) {
         if (![self checkForThaumistryMenu])
             return NO;
     } else {
         // Now we look for instructions pattern: " = ", "[N]ext" etc, depending on system
         if ([format isEqualToString:@"glulx"] || [format isEqualToString:@"zcode"]) {
-            if (glkctl.beyondZork) {
+            if (glkctl.gameID == kGameIsBeyondZork) {
                 pattern = @"(Use the (↑ and ↓) keys(?s).+?(?=>))";
-            } else if (glkctl.anchorheadOrig) {
-                    pattern = @"\\[press (BACKSPACE) (to return to .+)\\]";
+            } else if (glkctl.gameID == kGameIsAnchorheadOriginal) {
+                pattern = @"\\[press (BACKSPACE) (to return to .+)\\]";
             } else {
                 // First group: word before " = ". Second group: anything after " = "
                 // until two spaces or newline or space + newline
@@ -92,7 +96,7 @@
 
         if (!_menuCommands.count) {
             // Extra check and hacks for Beyond Zork Function Key Definitions menu
-            if (glkctl.beyondZork) {
+            if (glkctl.gameID == kGameIsBeyondZork) {
                 // Definitions menu
                 _menuCommands = [self extractMenuCommandsUsingRegex:@"(Function (Key) Definitions)"];
                 if (!_menuCommands.count) {
@@ -114,16 +118,19 @@
                     }
                 }
             } else {
-                // The Unforgotten has no instructions, so check for title
-                if ([format isEqualToString:@"zcode"]) {
+                if (glkctl.gameID == kGameIsVespers) {
+                    // Vespers have some menus with instructions like "P=Go up", i.e. no spaces around the "="
+                    _menuCommands = [self extractMenuCommandsUsingRegex:@"(\\w+)=(.+?(?=  |\\n| \\n|$))"];
+                } else if ([format isEqualToString:@"zcode"]) {
+                    // The Unforgotten has no instructions, so check for title
                     _menuCommands = [self extractMenuCommandsUsingRegex:@"(Unforgotten)\\s+(By Quintin Pan)"];
+                    // Hack to skip the empty fourth line in The Unforgotten
+                    if (_menuCommands.count)
+                        [_lines removeObjectAtIndex:3];
                 }
                 if (!_menuCommands.count) {
                     // If we didn't find a pattern, decide this is not a menu
                     return NO;
-                } else {
-                    // Hack to remove the empty line in The Unforgotten
-                    [_lines removeObjectAtIndex:3];
                 }
             }
         }
@@ -340,7 +347,13 @@
         } else {
             viewString = nil;
         }
-        if (viewString && view.frame.size.height > 0 && viewString.length < 4000) {
+        NSUInteger maxLength;
+        if ([view isKindOfClass:[GlkTextGridWindow class]]) {
+            maxLength = 10000;
+        } else {
+            maxLength = 4000;
+        }
+        if (viewString.length > 0 && viewString.length < maxLength && view.frame.size.height > 0) {
             [_viewStrings addObject:viewString];
             NSArray *lines = viewString.lineRanges;
             NSUInteger line = 0;
@@ -499,6 +512,7 @@
     return substring;
 }
 
+// Returns the length of any prefix consisting of space characters (including '>')
 - (NSInteger)leftMarginInRange:(NSValue *)rangeValue andString:(NSString *)string {
     NSRange range = rangeValue.rangeValue;
     NSRange allText = NSMakeRange(0, string.length);
@@ -542,10 +556,12 @@
             [regex matchesInString:string
                            options:0
                              range:NSMakeRange(0, string.length)];
+            NSRange valueRange;
+            NSString *key;
             for (NSTextCheckingResult *match in matches) {
-                NSRange valueRange = [match rangeAtIndex:1];
+                valueRange = [match rangeAtIndex:1];
                 NSRange keyRange = [match rangeAtIndex:2];
-                NSString *key = [string substringWithRange:keyRange];
+                key = [string substringWithRange:keyRange];
                 NSString *value = [string substringWithRange:valueRange];
 
                 if (key.length) {
@@ -575,6 +591,7 @@
                             [_lines removeObjectAtIndex:0];
                     }
                 }
+
                 break;
             }
         }
@@ -611,7 +628,7 @@
 }
 
 - (void)speakSelectedLine {
-    [self performSelector:@selector(deferredSpeakSelectedLine:) withObject:nil afterDelay:0.2];
+    [self performSelector:@selector(deferredSpeakSelectedLine:) withObject:nil afterDelay:0.1];
 }
 
 -(void)deferredSpeakSelectedLine:(id)sender {
@@ -620,6 +637,7 @@
         return;
     NSString *selectedLineString;
     [NSObject cancelPreviousPerformRequestsWithTarget:self];
+
     // We use the number of menu lines as a proxy to see if we have just switched to a new menu
     if (_lastNumberOfItems && _lastNumberOfItems != _lines.count)
         _haveSpokenMenu = NO;
@@ -627,28 +645,30 @@
 
     GlkController *glkctl = _glkctl;
     if (!_haveSpokenMenu) {
-        NSString *titleString = [self constructMenuTitleString];
-        if (titleString.length) {
-            titleString = [NSString stringWithFormat:@"We are in a menu, \"%@.\"\n", titleString];
-        } else {
-            titleString = @"We are in a menu.\n";
-        }
-        selectedLineString = [titleString stringByAppendingString:[self menuLineStringWithIndex:YES total:YES instructions:YES]];
         _haveSpokenMenu = YES;
-        [self speakString:selectedLineString];
+        [self speakString:[self menuLineStringWithTitle:YES Index:YES total:YES instructions:YES]];
         return;
     } else if (sender == glkctl) {
         selectedLineString = [self menuLineStringWithIndex:YES total:YES instructions:YES];
     } else {
         selectedLineString = [self menuLineStringWithIndex:(glkctl.theme.vOSpeakMenu >= kVOMenuIndex) total:(glkctl.theme.vOSpeakMenu == kVOMenuTotal) instructions:NO];
+
+        // Speak the instructions after 5 seconds, which is assumed to be long enough
+        // to not interrupt the speaking of the selected line
         [self performSelector:@selector(speakInstructions:) withObject:nil afterDelay:5];
-        if (glkctl.beyondZork && _lastSpokenString && [selectedLineString isEqualToString:_lastSpokenString]) {
+
+        // If we have chosen Quit from the Beyond Zork start menu,
+        // this makes sure that the text "Are you sure you want
+        // to leave the story now?" is spoken instead of the selected
+        // menu line (which is still just "Quit".)
+        if (glkctl.gameID == kGameIsBeyondZork && _lastSpokenString && [selectedLineString isEqualToString:_lastSpokenString]) {
             for (GlkWindow *view in glkctl.gwindows.allValues) {
                 if ([view isKindOfClass:[GlkTextBufferWindow class]]) {
                     GlkTextBufferWindow *bufWin = (GlkTextBufferWindow *)view;
                     NSString *string = bufWin.textview.string;
                     if ([string rangeOfString:@"Are you sure you want to leave the story now?"].location != NSNotFound) {
                         [bufWin performSelector:@selector(repeatLastMove:) withObject:nil afterDelay:0.1];
+                        return;
                     }
                 }
             }
@@ -658,7 +678,22 @@
     [self speakString:selectedLineString];
 }
 
-- (NSString *)menuLineStringWithIndex:(BOOL)index total:(BOOL)total instructions:(BOOL)instructions {
+- (NSString *)menuLineStringWithTitle:(BOOL)useTitle Index:(BOOL)useIndex total:(BOOL)useTotal instructions:(BOOL)useInstructions {
+    NSString *menuLineString = [self menuLineStringWithIndex:useIndex total:useTotal instructions:useInstructions];
+    if (useTitle) {
+        NSString *titleString = [self constructMenuTitleString];
+        if (titleString.length) {
+            titleString = [NSString stringWithFormat:@"We are in a menu, \"%@.\"\n", titleString];
+        } else {
+            titleString = @"We are in a menu.\n";
+        }
+        menuLineString = [titleString stringByAppendingString:menuLineString];
+    }
+    return menuLineString;
+}
+
+
+- (NSString *)menuLineStringWithIndex:(BOOL)useIndex total:(BOOL)useTotal instructions:(BOOL)useInstructions {
     NSRange selectedLineRange = _lines[_selectedLine].rangeValue;
     NSRange allText = NSMakeRange(0, _attrStr.length);
     selectedLineRange = NSIntersectionRange(allText, selectedLineRange);
@@ -677,16 +712,16 @@
         menuItemString = @"Empty line.";
 
     // Add pre-loaded input field text to Beyond Zork definitions menu
-    if (_glkctl.beyondZork) {
+    if (_glkctl.gameID == kGameIsBeyondZork) {
         id delegate = ((NSTextStorage *)_attrStr).delegate;
         if ([delegate isKindOfClass:[GlkTextGridWindow class]] && ((GlkTextGridWindow *)delegate).input) {
             menuItemString = [menuItemString stringByAppendingString:((GlkTextGridWindow *)delegate).enteredTextSoFar];
         }
     }
 
-    if (index) {
+    if (useIndex) {
         NSString *indexString = [NSString stringWithFormat:@".\nMenu item %ld", _selectedLine + 1];
-        if (total) {
+        if (useTotal) {
             indexString = [indexString stringByAppendingString:
                            [NSString stringWithFormat:@" of %ld", _lines.count]];
         }
@@ -694,7 +729,7 @@
         menuItemString = [menuItemString stringByAppendingString:indexString];
     }
 
-    if (instructions) {
+    if (useInstructions) {
         menuItemString = [menuItemString stringByAppendingString:[self constructMenuInstructionString]];
     }
 
@@ -707,36 +742,16 @@
         NSAccessibilityAnnouncementKey : [self constructMenuInstructionString]
     };
 
-    NSWindow *mainWin = NSApp.mainWindow;
-
-    if (mainWin) {
-        NSAccessibilityPostNotificationWithUserInfo(
-                                                    mainWin,
-                                                    NSAccessibilityAnnouncementRequestedNotification, announcementInfo);
-    }
-//    [self performSelector:@selector(speakEscape:) withObject:nil afterDelay:6];
-}
-
-- (void)speakEscape:(id)sender {
-    NSDictionary *announcementInfo = @{
-        NSAccessibilityPriorityKey : @(NSAccessibilityPriorityLow),
-        NSAccessibilityAnnouncementKey : @"If this is NOT a menu, press ESCAPE to DISMISS."
-    };
-
-    NSWindow *mainWin = NSApp.mainWindow;
-
-    if (mainWin) {
-        NSAccessibilityPostNotificationWithUserInfo(
-                                                    mainWin,
-                                                    NSAccessibilityAnnouncementRequestedNotification, announcementInfo);
-    }
+    NSAccessibilityPostNotificationWithUserInfo(
+                                                _glkctl.window,
+                                                NSAccessibilityAnnouncementRequestedNotification, announcementInfo);
 }
 
 - (void)speakString:(NSString *)string {
     if (!string || string.length == 0)
         return;
     [NSObject cancelPreviousPerformRequestsWithTarget:self];
-    if (_glkctl.beyondZork) {
+    if (_glkctl.gameID == kGameIsBeyondZork) {
         // Delete graphic indicator
         NSRegularExpression *trimRegEx =
         [NSRegularExpression regularExpressionWithPattern:@"X[O-W]{13}Y"
@@ -749,23 +764,12 @@
 
     }
 
-    NSDictionary *announcementInfo = @{
-        NSAccessibilityPriorityKey : @(NSAccessibilityPriorityHigh),
-        NSAccessibilityAnnouncementKey : string
-    };
-
-    NSWindow *mainWin = NSApp.mainWindow;
-
-    if (mainWin) {
-        NSAccessibilityPostNotificationWithUserInfo(
-                                                    mainWin,
-                                                    NSAccessibilityAnnouncementRequestedNotification, announcementInfo);
-    }
+    [_glkctl speakStringNow:string];
 }
 
 - (NSString *)constructMenuInstructionString {
     NSString *string = @"";
-    if (_glkctl.beyondZork) {
+    if (_glkctl.gameID == kGameIsBeyondZork) {
         string = _menuCommands[_menuKeys.firstObject];
         if (!string.length)
             return @"";
@@ -824,7 +828,7 @@
     string = [string stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     if ([string rangeOfString:@"    "].location != NSNotFound)
         string = @"";
-    if (_glkctl.beyondZork && string.length == 0) {
+    if (_glkctl.gameID == kGameIsBeyondZork && string.length == 0) {
         NSRange range = _lines.firstObject.rangeValue;
         NSString *topString = [_attrStr.string substringWithRange:range];
         topString = [topString stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];

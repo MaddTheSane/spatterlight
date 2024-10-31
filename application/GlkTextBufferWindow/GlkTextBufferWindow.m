@@ -137,6 +137,7 @@ fprintf(stderr, "%s\n",                                                    \
         [[BufferTextView alloc] initWithFrame:NSMakeRect(0, 0, 0, 10000000)
                                 textContainer:container];
 
+        _textview.editable = NO;
         _textview.minSize = NSMakeSize(1, 10000000);
         _textview.maxSize = NSMakeSize(10000000, 10000000);
 
@@ -194,7 +195,7 @@ fprintf(stderr, "%s\n",                                                    \
 - (void)setFrame:(NSRect)frame {
     GlkController *glkctl = self.glkctl;
 
-    if (glkctl.curses && glkctl.quoteBoxes.count && glkctl.turns > 0) {
+    if (glkctl.gameID == kGameIsCurses && glkctl.quoteBoxes.count && glkctl.turns > 0) {
         // When we extend the height of the status
         // line in Curses in order to make the second line
         // visible when showing quote boxes, we also need to
@@ -365,7 +366,7 @@ fprintf(stderr, "%s\n",                                                    \
         [self restoreScrollBarStyle];
 
         line_request = [decoder decodeBoolForKey:@"line_request"];
-        _textview.editable = line_request;
+        _textview.editable = NO;
         hyper_request = [decoder decodeBoolForKey:@"hyper_request"];
 
         echo_toggle_pending = [decoder decodeBoolForKey:@"echo_toggle_pending"];
@@ -474,6 +475,7 @@ fprintf(stderr, "%s\n",                                                    \
     NSRange allText = NSMakeRange(0, textstorage.length + 1);
     _restoredSelection = NSIntersectionRange(allText, _restoredSelection);
     _textview.selectedRange = _restoredSelection;
+    _textview.editable = line_request;
 
     _restoredFindBarVisible = restoredWin.restoredFindBarVisible;
     _restoredSearch = restoredWin.restoredSearch;
@@ -578,7 +580,7 @@ fprintf(stderr, "%s\n",                                                    \
     GlkController *glkctl = self.glkctl;
 
     // Adjust terminators for Beyond Zork arrow keys hack
-    if (glkctl.beyondZork) {
+    if (glkctl.gameID == kGameIsBeyondZork || [glkctl zVersion6]) {
         [self adjustBZTerminators:self.pendingTerminators];
         [self adjustBZTerminators:self.currentTerminators];
     }
@@ -862,7 +864,7 @@ fprintf(stderr, "%s\n",                                                    \
 
     [self printToWindow:str style:stylevalue];
 
-    if (self.glkctl.deadCities && line_request && [[str substringFromIndex:str.length - 1] isEqualToString:@"\n"]) {
+    if (self.glkctl.gameID == kGameIsDeadCities && line_request && [[str substringFromIndex:str.length - 1] isEqualToString:@"\n"]) {
         // This is against the Glk spec but makes
         // hyperlinks in Dead Cities work.
         // Turn this off by disabling game specific hacks in preferences.
@@ -1034,7 +1036,7 @@ fprintf(stderr, "%s\n",                                                    \
     NSNumber *key = @(ch);
     BOOL scrolled = NO;
 
-    if (!scrolling && !_pendingScroll && !self.scrolledToBottom) {
+    if (!scrolling && !_pendingScroll && !self.scrolledToBottom && !self.glkctl.voiceOverActive) {
         //        NSLog(@"Not scrolled to the bottom, pagedown or navigate scrolling on each key instead");
         switch (ch) {
             case keycode_PageUp:
@@ -1079,11 +1081,11 @@ fprintf(stderr, "%s\n",                                                    \
         return;
     } else if (line_request && (ch == keycode_Up ||
                                 // Use Home to travel backward in history when Beyond Zork eats up arrow
-                                (self.glkctl.beyondZork && self.theme.bZTerminator != kBZArrowsSwapped && ch == keycode_Home))) {
+                                ((self.glkctl.gameID == kGameIsBeyondZork || [self.glkctl zVersion6]) && self.theme.bZTerminator != kBZArrowsSwapped && ch == keycode_Home))) {
         [self travelBackwardInHistory];
     } else if (line_request && (ch == keycode_Down ||
                                 // Use End to travel forward in history when Beyond Zork eats down arrow
-                                (self.glkctl.beyondZork && self.theme.bZTerminator != kBZArrowsSwapped && ch == keycode_End))) {
+                                ((self.glkctl.gameID == kGameIsBeyondZork || [self.glkctl zVersion6]) && self.theme.bZTerminator != kBZArrowsSwapped && ch == keycode_End))) {
         [self travelForwardInHistory];
     } else if (line_request && ch == keycode_PageUp &&
                fence == textstorage.length) {
@@ -1159,7 +1161,7 @@ fprintf(stderr, "%s\n",                                                    \
     line = [line scrubInvalidCharacters];
     line = [line stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
 
-    if (self.glkctl.beyondZork) {
+    if (self.glkctl.gameID == kGameIsBeyondZork || [self.glkctl zVersion6]) {
         if (terminator == keycode_Home) {
             terminator = keycode_Up;
         } else if (terminator == keycode_End) {
@@ -1301,24 +1303,37 @@ fprintf(stderr, "%s\n",                                                    \
 
     cx = [history travelBackwardInHistory:cx];
 
-    if (!cx)
-        return;
+    if (cx) {
+        [textstorage
+         replaceCharactersInRange:self.editableRange
+         withString:cx];
+        [_textview resetTextFinder];
+    }
 
-    [textstorage
-     replaceCharactersInRange:self.editableRange
-     withString:cx];
-    [_textview resetTextFinder];
+   if (!cx.length) {
+        if ([history empty])
+            [self.glkctl speakStringNow:@"No commands entered"];
+        else
+            [self.glkctl speakStringNow:@"Start of command history"];
+    }
 }
 
 - (void)travelForwardInHistory {
     NSString *cx = [history travelForwardInHistory];
-    if (!cx)
-        return;
-    [self flushDisplay];
-    [textstorage
-     replaceCharactersInRange:self.editableRange
-     withString:cx];
-    [_textview resetTextFinder];
+    if (cx) {
+        [self flushDisplay];
+        [textstorage
+         replaceCharactersInRange:self.editableRange
+         withString:cx];
+        [_textview resetTextFinder];
+    }
+
+    if (!cx.length) {
+        if ([history empty])
+            [self.glkctl speakStringNow:@"No commands entered"];
+        else
+            [self.glkctl speakStringNow:@"End of command history"];
+    }
 }
 
 #pragma mark Beyond Zork font
@@ -1661,9 +1676,8 @@ replacementString:(id)repl {
     [_textview resetTextFinder];
 
     // NSLog(@"adding flowbreak");
-    unichar uc[1];
-    uc[0] = NSAttachmentCharacter;
-    [textstorage.mutableString appendString:[NSString stringWithCharacters:uc
+    unichar uc = NSAttachmentCharacter;
+    [textstorage.mutableString appendString:[NSString stringWithCharacters:&uc
                                                                     length:1]];
     [container flowBreakAt:textstorage.length - 1];
 }
@@ -1750,7 +1764,7 @@ replacementString:(id)repl {
     GlkController *glkctl = self.glkctl;
     // Send an arrange event to The Colder Light in order
     // to make it update its title bar
-    if (glkctl.colderLight) {
+    if (glkctl.gameID == kGameIsAColderLight) {
         GlkEvent *gev = [[GlkEvent alloc] initArrangeWidth:(NSInteger)glkctl.gameView.frame.size.width
                                                     height:(NSInteger)glkctl.gameView.frame.size.height
                                                      theme:glkctl.theme
@@ -1771,8 +1785,9 @@ replacementString:(id)repl {
     NSRect line;
 
     _printPositionOnInput = textstorage.length;
-    if (fence > 0)
+    if (fence > 0 && !char_request) {
         _printPositionOnInput = fence;
+    }
 
     if (textstorage.length == 0) {
         _lastseen = 0;
@@ -1816,7 +1831,8 @@ replacementString:(id)repl {
                                         inTextContainer:container
                fractionOfDistanceBetweenInsertionPoints:nil];
 
-    lastVisible--;
+    if (lastVisible != 0)
+        lastVisible--;
     if (lastVisible >= textstorage.length) {
         NSLog(@"lastCharacter index (%ld) is outside textstorage length (%ld)",
               lastVisible, textstorage.length);
@@ -1967,6 +1983,8 @@ replacementString:(id)repl {
         scrolling = YES;
         [NSAnimationContext runAnimationGroup:^(NSAnimationContext *context){
             context.duration = MAX(0.002 * diff, 0.3);
+            if (context.duration > 1)
+                context.duration = 1;
             clipView.animator.boundsOrigin = newBounds.origin;
         } completionHandler:^{
             self->scrolling = NO;
@@ -2104,7 +2122,7 @@ replacementString:(id)repl {
     }
 
     if (!str.length) {
-        [glkctl speakString:@"No last move to speak"];
+        [glkctl speakStringNow:@"No last move to speak"];
         return;
     }
 
@@ -2123,7 +2141,7 @@ replacementString:(id)repl {
         moveRangeIndex = 0;
     }
     NSString *str = [prefix stringByAppendingString:[self stringFromRangeVal:self.moveRanges[moveRangeIndex]]];
-    [self.glkctl speakString:str];
+    [self.glkctl speakStringNow:str];
 }
 
 - (void)speakNext {
@@ -2144,8 +2162,18 @@ replacementString:(id)repl {
     }
 
     NSString *str = [prefix stringByAppendingString:[self stringFromRangeVal:self.moveRanges[moveRangeIndex]]];
-    [self.glkctl speakString:str];
+    [self.glkctl speakStringNow:str];
 }
+
+- (void)speakStatus {
+    GlkController *glkctl = self.glkctl;
+    if (glkctl.zmenu)
+        [NSObject cancelPreviousPerformRequestsWithTarget:glkctl.zmenu];
+    if (glkctl.form)
+        [NSObject cancelPreviousPerformRequestsWithTarget:glkctl.form];
+    [glkctl speakStringNow:textstorage.string];
+}
+
 
 #pragma mark Accessibility
 

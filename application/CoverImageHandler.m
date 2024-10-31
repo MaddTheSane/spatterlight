@@ -137,7 +137,7 @@
         NSWindow *backgroundColorWin  = [self backgroundColorWindow];
         backgroundColorWin.alphaValue = 0;
 
-        if (!(glkctl.narcolepsy && glkctl.theme.doStyles && glkctl.theme.doGraphics))
+        if (!(glkctl.gameID == kGameIsNarcolepsy && glkctl.theme.doStyles && glkctl.theme.doGraphics))
             [glkctl.window addChildWindow: backgroundColorWin
                                    ordered: NSWindowAbove];
 
@@ -181,6 +181,7 @@
         fadeOutAnimation.fillMode = kCAFillModeForwards;
 
         glkctl.showingCoverImage = NO;
+        glkctl.gameState = kGameJustStartedNormally;
         // FIXME: Just fork the interpreter NSTask here instead
         glkctl.borderView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
         glkctl.gameView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;

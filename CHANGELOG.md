@@ -1,4 +1,35 @@
 # Change log
+## Unreleased
+- Fixes mouse support in Bocfel for the v6 games.
+- Extends arrow key settings for Beyond Zork to the v6 games.
+- Makes the Old settings theme possible to delete.
+- Duplicating a theme set as designated dark or light theme would make the copy designated dark or light theme as well.
+- Fixes a problem where the Z-machine interpreter number could be set to an illegal value.
+
+## Release 1.2.5
+- A save file with a garbage single-character name would be written to the user directory when a save request was cancelled.
+- Limits the duration of smooth scrolling.
+- Adds a preference to open the save dialog in the game file directory by default.
+- The VoiceOver Command History rotor would be confused by char requests, and by Glk graphic windows.
+- Thumbnailer extension would generate a crash report when no Core Data library was found.
+- The library view "Like" buttons have more descriptive accessibility labels.
+- Improves VoiceOver feedback when stepping through the command history (not to be confused with the Command History custom rotor).
+- *Junior Arithmancer* is no longer detected by VoiceOver as showing a menu.
+- Menu detection now works even if the game window is large.
+- Improves menu detection in *Vespers*.
+- Switching off menu detection manually would sometimes not have any effect until restart.
+- New settings for when to interrupt VoiceOver. When a game window gets focus, the standard behaviour of VoiceOver is to start speaking the entire scrollback from the very beginning, which can be a lot. We have always tried to interrupt this by speaking just the text of the latest move instead, but there are now controls to set how long to wait before the interruption, and also a way to turn this hack off entirely.
+- When selecting the preferences panel, VoiceOver would speak the sample text even if it was hidden.
+- Spatterlight's invisible "more prompt" mode was confusing to VoiceOver users, and is now disabled while VoiceOver is active.
+- When multiple games were running, VoiceOver would sometimes speak text from backgrounded games.
+- Default name of input recording files would be named "Recordning[sic] of [game title]".
+- The "Add to library" option when opening a game file was truncated.
+- Unrelated error messaged would sometimes be displayed on game crash.
+- Adds patches that fix crashes in the Z-code games *Transporter* and *Unforgotten*.
+- Turns on abbreviation expansion in Scare, which fixes *The Cellar* and maybe others.
+- Updates Glulxe to 0.6.1, with an improved random number generator.
+- Updates Bocfel to 2.2. Includes fixes for missing text in *Trinity* and *Beyond Zork*, and improved support for version 6 games.
+- Updates Magnetic to 2.3.1. No functional changes.
 
 ## Release 1.1
 - Themes can be designated for use in Dark and Light mode, overriding all other theme settings. New checkboxes and menu items in the preferences window are added for this.

@@ -163,8 +163,13 @@ fprintf(stderr, "%s\n",                                                    \
 
     BOOL windowRestoredBySystem;
     BOOL shouldRestoreUI;
+
+    // When a game supports autosave, but is still on its first turn,
+    // so that no interpreter autosave file exists, we still restore the UI
+    // to catch entered text and scroll position
     BOOL restoredUIOnly;
 
+    // Used for fullscreen animation
     NSWindowController *snapshotController;
 
     BOOL windowClosedAlready;
@@ -185,14 +190,17 @@ fprintf(stderr, "%s\n",                                                    \
     // To fix scrolling in the Adrian Mole games
     NSInteger lastRequest;
 
+    // Command script handling
     BOOL skipNextScriptCommand;
-    //    NSDate *lastFlushTimestamp;
     NSDate *lastScriptKeyTimestamp;
     NSDate *lastKeyTimestamp;
-    NSDate *lastResetTimestamp;
+
+    kVOMenuPrefsType lastVOSpeakMenu;
+    BOOL shouldAddTitlePrefixToSpeech;
 }
 
 @property BOOL shouldShowAutorestoreAlert;
+@property NSURL *saveDir;
 
 @end
 
@@ -244,13 +252,15 @@ fprintf(stderr, "%s\n",                                                    \
 
     skipNextScriptCommand = NO;
 
+    _gameState = kGameStateUnknown;
+
     _game = game_;
     Game *game = _game;
 
     [Preferences changeCurrentGlkController:self];
     [self noteColorModeChanged:nil];
 
-    libcontroller = ((AppDelegate *)[NSApplication sharedApplication].delegate).tableViewController;
+    libcontroller = ((AppDelegate *)NSApp.delegate).tableViewController;
 
     [self.window registerForDraggedTypes:@[ NSPasteboardTypeURL, NSPasteboardTypeString]];
 
@@ -350,38 +360,45 @@ fprintf(stderr, "%s\n",                                                    \
             _windowPreFullscreenFrame = self.window.frame;
         }
         [self forkInterpreterTask];
+        _gameState = kGameJustStartedNormally;
         return;
     }
 
-    NSNotificationCenter *notifications = [NSNotificationCenter defaultCenter];
     _voiceOverActive = [NSWorkspace sharedWorkspace].voiceOverEnabled;
-    [notifications addObserver:self
-                      selector:@selector(noteAccessibilityStatusChanged:)
-                          name:@"NSApplicationDidChangeAccessibilityEnhancedUserInterfaceNotification"
-                        object:nil];
+
+    [[NSWorkspace sharedWorkspace] addObserver:self forKeyPath:@"voiceOverEnabled" options:(NSKeyValueObservingOptionNew | NSKeyValueObservingOptionOld) context:nil];
+
+    NSNotificationCenter *notifications = [NSNotificationCenter defaultCenter];
 
     [notifications
      addObserver:self
      selector:@selector(notePreferencesChanged:)
      name:@"PreferencesChanged"
      object:nil];
+
     [notifications
      addObserver:self
      selector:@selector(noteDefaultSizeChanged:)
      name:@"DefaultSizeChanged"
      object:nil];
+
     [notifications
      addObserver:self
      selector:@selector(noteBorderChanged:)
      name:@"BorderChanged"
      object:nil];
+
     [notifications
      addObserver:self
      selector:@selector(noteManagedObjectContextDidChange:)
      name:NSManagedObjectContextObjectsDidChangeNotification
      object:game.managedObjectContext];
 
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(noteColorModeChanged:) name:@"ColorModeChanged" object:nil];
+    [notifications
+     addObserver:self
+     selector:@selector(noteColorModeChanged:)
+     name:@"ColorModeChanged"
+     object:nil];
 
     lastContentResize = NSZeroRect;
     _inFullscreen = NO;
@@ -407,7 +424,7 @@ fprintf(stderr, "%s\n",                                                    \
     lastScriptKeyTimestamp = [NSDate distantPast];
     lastKeyTimestamp = [NSDate distantPast];
 
-    if (self.narcolepsy && _theme.doGraphics && _theme.doStyles) {
+    if (self.gameID == kGameIsNarcolepsy && _theme.doGraphics && _theme.doStyles) {
         [self adjustMaskLayer:nil];
     }
 
@@ -420,6 +437,7 @@ fprintf(stderr, "%s\n",                                                    \
 }
 
 - (void)runTerpWithAutorestore {
+    _gameState = kGameJustAutorestored;
     @try {
         restoredController =
         [NSKeyedUnarchiver unarchiveObjectWithFile:self.autosaveFileGUI];
@@ -645,7 +663,6 @@ fprintf(stderr, "%s\n",                                                    \
 
     [self adjustContentView];
     shouldRestoreUI = YES;
-    _mustBeQuiet = YES;
     [self forkInterpreterTask];
 
     // The game has to run to its third(?) NEXTEVENT
@@ -702,14 +719,17 @@ fprintf(stderr, "%s\n",                                                    \
     lastSizeInChars = [self contentSizeToCharCells:_gameView.frame.size];
     [self showWindow:nil];
     if (_theme.coverArtStyle != kDontShow && _game.metadata.cover.data) {
+        _gameState = kGameIsShowingCoverImage;
         [self deleteAutosaveFiles];
         _gameView.autoresizingMask =
         NSViewMinXMargin | NSViewMaxXMargin | NSViewHeightSizable;
         restoredController = nil;
         _coverController = [[CoverImageHandler alloc] initWithController:self];
         [_coverController showLogoWindow];
-    } else
+    } else {
         [self forkInterpreterTask];
+        _gameState = kGameIsRunning;
+    }
 }
 
 - (void)restoreWindowWhenDead {
@@ -721,6 +741,7 @@ fprintf(stderr, "%s\n",                                                    \
     }
 
     dead = YES;
+    _gameState = kGameIsDead;
 
     [self.window setFrame:restoredController.storedWindowFrame display:NO];
 
@@ -743,7 +764,7 @@ fprintf(stderr, "%s\n",                                                    \
     dispatch_after(popTime, dispatch_get_main_queue(), ^(void) {
         NotificationBezel *bezel = [[NotificationBezel alloc] initWithScreen:screen];
         [bezel showGameOver];
-        [weakSelf speakString:title];
+        [weakSelf speakStringNow:title];
     });
 
     restoredController = nil;
@@ -756,57 +777,117 @@ fprintf(stderr, "%s\n",                                                    \
     if ([l9Substring isEqualToString:@"LEVEL9-001"] || // The Secret Diary of Adrian Mole
         [l9Substring isEqualToString:@"LEVEL9-002"] || // The Growing Pains of Adrian Mole
         [l9Substring isEqualToString:@"LEVEL9-019"]) { // The Archers
-        _adrianMole = YES;
+        _gameID = kGameIsAdrianMole;
     } else if ([ifid isEqualToString:@"ZCODE-5-990206-6B48"]) {
-        _anchorheadOrig = YES;
+        _gameID = kGameIsAnchorheadOriginal;
     } else if ([ifid isEqualToString:@"ZCODE-47-870915"] ||
                [ifid isEqualToString:@"ZCODE-49-870917"] ||
                [ifid isEqualToString:@"ZCODE-51-870923"] ||
                [ifid isEqualToString:@"ZCODE-57-871221"] ||
                [ifid isEqualToString:@"ZCODE-60-880610"]) {
-        _beyondZork = YES;
+        _gameID = kGameIsBeyondZork;
     } else if ([ifid isEqualToString:@"ZCODE-86-870212"] ||
                [ifid isEqualToString:@"ZCODE-116-870602"] ||
                [ifid isEqualToString:@"ZCODE-160-880521"]) {
-        _bureaucracy = YES;
+        _gameID = kGameIsBureaucracy;
     } else if ([ifid isEqualToString:@"BFDE398E-C724-4B9B-99EB-18EE4F26932E"]) {
-        _colderLight = YES;
+        _gameID = kGameIsAColderLight;
     } else if ([ifid isEqualToString:@"ZCODE-7-930428-0000"] ||
                [ifid isEqualToString:@"ZCODE-8-930603-0000"] ||
                [ifid isEqualToString:@"ZCODE-10-940120-BD9E"] ||
                [ifid isEqualToString:@"ZCODE-12-940604-6035"] ||
                [ifid isEqualToString:@"ZCODE-16-951024-4DE6"]) {
-        _curses = YES;
+        _gameID = kGameIsCurses;
     } else if ([ifid isEqualToString:@"303E9BDC-6D86-4389-86C5-B8DCF01B8F2A"]) {
-        _deadCities = YES;
+        _gameID = kGameIsDeadCities;
     } else if ([ifid isEqualToString:@"AC0DAF65-F40F-4A41-A4E4-50414F836E14"]) {
-        _kerkerkruip = YES;
+        _gameID = kGameIsKerkerkruip;
     } else if ([ifid isEqualToString:@"GLULX-1-040108-D8D78266"]) {
-        _narcolepsy = YES;
+        _gameID = kGameIsNarcolepsy;
     } else if ([ifid isEqualToString:@"afb163f4-4d7b-0dd9-1870-030f2231e19f"]) {
-        _thaumistry = YES;
+        _gameID = kGameIsThaumistry;
     } else if ([ifid isEqualToString:@"ZCODE-1-851202"] ||
                [ifid isEqualToString:@"ZCODE-1-860221"] ||
                [ifid isEqualToString:@"ZCODE-14-860313"] ||
                [ifid isEqualToString:@"ZCODE-11-860509"] ||
                [ifid isEqualToString:@"ZCODE-12-860926"] ||
                [ifid isEqualToString:@"ZCODE-15-870628"]) {
-        _trinity = YES;
+        _gameID = kGameIsTrinity;
+    } else if ([ifid isEqualToString:@"ZCODE-1-050929-F8AB"] ||
+               [ifid isEqualToString:@"ZCODE-1-051128-B5AA"]) {
+        _gameID = kGameIsVespers;
+    } else if ([ifid isEqualToString:@"CF619423-EEC7-4E83-8C66-AE7182D55C89"]) {
+        _gameID = kGameIsJuniorArithmancer;
+    } else if ([ifid isEqualToString:@"ZCODE-0-870831"] ||
+               [ifid isEqualToString:@"ZCODE-1-871030"] ||
+               [ifid isEqualToString:@"ZCODE-74-880114"] ||
+               [ifid isEqualToString:@"ZCODE-96-880224"] ||
+               [ifid isEqualToString:@"ZCODE-153-880510"] ||
+               [ifid isEqualToString:@"ZCODE-242-880830"] ||
+               [ifid isEqualToString:@"ZCODE-242-880901"] ||
+               [ifid isEqualToString:@"ZCODE-296-881019"] ||
+               [ifid isEqualToString:@"ZCODE-66-890111"] ||
+               [ifid isEqualToString:@"ZCODE-343-890217"] ||
+               [ifid isEqualToString:@"ZCODE-366-890323"] ||
+               [ifid isEqualToString:@"ZCODE-383-890602"] ||
+               [ifid isEqualToString:@"ZCODE-387-890612"] ||
+               [ifid isEqualToString:@"ZCODE-392-890714"] ||
+               [ifid isEqualToString:@"ZCODE-393-890714"]) {
+        _gameID = kGameIsZorkZero;
+    } else if ([ifid isEqualToString:@"ZCODE-0-870831"] ||
+               [ifid isEqualToString:@"ZCODE-40-890502"] ||
+               [ifid isEqualToString:@"ZCODE-41-890504"] ||
+               [ifid isEqualToString:@"ZCODE-54-890606"] ||
+               [ifid isEqualToString:@"ZCODE-63-890622"] ||
+               [ifid isEqualToString:@"ZCODE-74-890714"] ) {
+        _gameID = kGameIsArthur;
+    } else if ([ifid isEqualToString:@"ZCODE-0-870831"] ||
+               [ifid isEqualToString:@"ZCODE-278-890209"] ||
+               [ifid isEqualToString:@"ZCODE-278-890211"] ||
+               [ifid isEqualToString:@"ZCODE-279-890217"] ||
+               [ifid isEqualToString:@"ZCODE-280-890217"] ||
+               [ifid isEqualToString:@"ZCODE-281-890222"] ||
+               [ifid isEqualToString:@"ZCODE-282-890224"] ||
+               [ifid isEqualToString:@"ZCODE-283-890238"] ||
+               [ifid isEqualToString:@"ZCODE-284-890302"] ||
+               [ifid isEqualToString:@"ZCODE-286-890306"] ||
+               [ifid isEqualToString:@"ZCODE-288-890308"] ||
+               [ifid isEqualToString:@"ZCODE-289-890309"] ||
+               [ifid isEqualToString:@"ZCODE-290-890311"] ||
+               [ifid isEqualToString:@"ZCODE-291-890313"] ||
+               [ifid isEqualToString:@"ZCODE-292-890314"] ||
+               [ifid isEqualToString:@"ZCODE-295-890321"] ||
+               [ifid isEqualToString:@"ZCODE-311-890510"] ||
+               [ifid isEqualToString:@"ZCODE-320-890627"] ||
+               [ifid isEqualToString:@"ZCODE-321-891629"] ||
+               [ifid isEqualToString:@"ZCODE-322-890706"]) {
+        _gameID = kGameIsShogun;
+    } else if ([ifid isEqualToString:@"ZCODE-142-890205"] ||
+               [ifid isEqualToString:@"ZCODE-2-890303"] ||
+               [ifid isEqualToString:@"ZCODE-11-890304"] ||
+               [ifid isEqualToString:@"ZCODE-3-890310"] ||
+               [ifid isEqualToString:@"ZCODE-5-890310"] ||
+               [ifid isEqualToString:@"ZCODE-10-890313"] ||
+               [ifid isEqualToString:@"ZCODE-26-890316"] ||
+               [ifid isEqualToString:@"ZCODE-30-890322"] ||
+               [ifid isEqualToString:@"ZCODE-51-890322"] ||
+               [ifid isEqualToString:@"ZCODE-54-890526"] ||
+               [ifid isEqualToString:@"ZCODE-76-890615"] ||
+               [ifid isEqualToString:@"ZCODE-77-890616"] ||
+               [ifid isEqualToString:@"ZCODE-79-890627"] ||
+               [ifid isEqualToString:@"ZCODE-83-890706"]) {
+        _gameID = kGameIsJourney;
+    } else {
+        _gameID = kGameIsGeneric;
     }
 }
 
 - (void)resetGameDetection {
-    _adrianMole = NO;
-    _anchorheadOrig = NO;
-    _beyondZork = NO;
-    _bureaucracy = NO;
-    _colderLight = NO;
-    _curses = NO;
-    _deadCities = NO;
-    _kerkerkruip = NO;
-    _narcolepsy = NO;
-    _thaumistry = NO;
-    _trinity = NO;
+    _gameID = kGameIsGeneric;
+}
+
+- (BOOL)zVersion6 {
+    return (_gameID == kGameIsArthur || _gameID == kGameIsJourney || _gameID == kGameIsShogun ||  _gameID == kGameIsZorkZero);
 }
 
 - (void)forkInterpreterTask {
@@ -1495,7 +1576,7 @@ fprintf(stderr, "%s\n",                                                    \
 }
 
 - (IBAction)reset:(id)sender {
-    if (lastResetTimestamp && lastResetTimestamp.timeIntervalSinceNow < -1) {
+    if (_lastResetTimestamp && _lastResetTimestamp.timeIntervalSinceNow < -1) {
         restartingAlready = NO;
     }
 
@@ -1503,7 +1584,7 @@ fprintf(stderr, "%s\n",                                                    \
         return;
 
     restartingAlready = YES;
-    lastResetTimestamp = [NSDate date];
+    _lastResetTimestamp = [NSDate date];
     _mustBeQuiet = YES;
 
     [[NSNotificationCenter defaultCenter]
@@ -1598,16 +1679,17 @@ fprintf(stderr, "%s\n",                                                    \
 
 - (void)windowDidBecomeKey:(NSNotification *)notification {
     [Preferences changeCurrentGlkController:self];
+
+    // dead is YES before the interpreter process has started
     if (!dead) {
-        if (_eventcount > 1 && !_shouldShowAutorestoreAlert)
-            _mustBeQuiet = NO;
         [self guessFocus];
-        [self noteAccessibilityStatusChanged:nil];
-        if (_voiceOverActive) {
-            [self checkZMenu];
-            if (!_zmenu)
-                [self speakMostRecent:self];
+        if (_eventcount > 1 && !_shouldShowAutorestoreAlert) {
+            _mustBeQuiet = NO;
         }
+        [self speakOnBecomingKey];
+    } else if (_gameState == kGameIsDead && _theme.vODelayOn) {
+        // Game did become key while dead / game over
+        [self speakMostRecentAfterDelay];
     }
 }
 
@@ -1681,11 +1763,13 @@ fprintf(stderr, "%s\n",                                                    \
     [self autoSaveOnExit];
     [_soundHandler stopAllAndCleanUp];
 
+    [[NSWorkspace sharedWorkspace] removeObserver:self forKeyPath:@"voiceOverEnabled"];
+
     if (_game && [Preferences instance].currentGame == _game) {
         GlkController *remainingGameSession = nil;
         if (libcontroller) {
             for (GlkController *session in
-            libcontroller.gameSessions.allValues)
+                 libcontroller.gameSessions.allValues)
                 if (session != self) {
                     remainingGameSession = session;
                     break;
@@ -1727,7 +1811,7 @@ fprintf(stderr, "%s\n",                                                    \
         [_gameView addSubview:win];
     }
 
-    if (self.narcolepsy && _theme.doGraphics && _theme.doStyles) {
+    if (self.gameID == kGameIsNarcolepsy && _theme.doGraphics && _theme.doStyles) {
         [self adjustMaskLayer:nil];
     }
 
@@ -1742,12 +1826,17 @@ fprintf(stderr, "%s\n",                                                    \
         win.glkctl = nil;
     }
 
-    [self checkZMenu];
-
-    if (_shouldSpeakNewText && !_mustBeQuiet && !_zmenu && !_form) {
-        [self speakNewText];
+    if (_shouldSpeakNewText) {
+        if (_voiceOverActive && !_mustBeQuiet) {
+            [self checkZMenuAndSpeak:YES];
+            if (!_zmenu && !_form) {
+                [self forceSpeech];
+                [self speakNewText];
+            }
+            _shouldSpeakNewText = NO;
+        }
+        _gameState = kGameIsRunning;
     }
-    _shouldSpeakNewText = NO;
 
     _windowsToBeRemoved = [[NSMutableArray alloc] init];
 }
@@ -2017,7 +2106,6 @@ fprintf(stderr, "%s\n",                                                    \
         return;
     }
     Theme *theme = _theme;
-    NSUInteger lastVOSpeakMenu = (NSUInteger)theme.vOSpeakMenu;
 
     if (_game) {
         if (!_stashedTheme) {
@@ -2045,7 +2133,7 @@ fprintf(stderr, "%s\n",                                                    \
         [self detectGame:_game.ifid];
     }
 
-    if (!theme.vOSpeakMenu && lastVOSpeakMenu) { // Check for menu was switched off
+    if (theme.vOSpeakMenu == kVOMenuNone) { // "Check for menu" was switched off
         if (_zmenu) {
             [NSObject cancelPreviousPerformRequestsWithTarget:_zmenu];
             _zmenu = nil;
@@ -2054,12 +2142,20 @@ fprintf(stderr, "%s\n",                                                    \
             [NSObject cancelPreviousPerformRequestsWithTarget:_form];
             _form = nil;
         }
-    } else if (theme.vOSpeakMenu && !lastVOSpeakMenu) { // Check for menu was switched on
-        [self checkZMenu];
+    } else if (lastVOSpeakMenu == kVOMenuNone && theme.vOSpeakMenu != kVOMenuNone) { // "Check for menu" was switched on
+        [self checkZMenuAndSpeak:NO];
+    }
+
+    lastVOSpeakMenu = theme.vOSpeakMenu;
+
+    NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
+
+    if (![defaults boolForKey:@"SaveInGameDirectory"]) {
+        self.saveDir = nil;
     }
 
     _shouldStoreScrollOffset = NO;
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"AdjustSize"]) {
+    if ([defaults boolForKey:@"AdjustSize"]) {
         if (lastTheme != theme && !NSEqualSizes(lastSizeInChars, NSZeroSize)) { // Theme changed
             NSSize newContentSize = [self charCellsToContentSize:lastSizeInChars];
             NSUInteger borders = (NSUInteger)theme.border * 2;
@@ -2124,7 +2220,7 @@ fprintf(stderr, "%s\n",                                                    \
     // Reset any Narcolepsy window mask
     _gameView.layer.mask = nil;
 
-    if (self.narcolepsy && theme.doGraphics && theme.doStyles) {
+    if (self.gameID == kGameIsNarcolepsy && theme.doGraphics && theme.doStyles) {
         [self adjustMaskLayer:nil];
     }
 
@@ -2390,10 +2486,20 @@ fprintf(stderr, "%s\n",                                                    \
 - (void)handleSavePrompt:(int)fileusage {
     _commandScriptRunning = NO;
     _commandScriptHandler = nil;
-    NSURL *directory =
-    [NSURL fileURLWithPath:[[NSUserDefaults standardUserDefaults]
-                            objectForKey:@"SaveDirectory"]
-               isDirectory:YES];
+    NSURL *directory;
+    NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
+    if ([defaults boolForKey:@"SaveInGameDirectory"]) {
+        if (!_saveDir) {
+            directory = [[_game urlForBookmark] URLByDeletingLastPathComponent];
+        } else {
+            directory = _saveDir;
+        }
+    } else {
+        directory = [NSURL fileURLWithPath:
+                     [defaults objectForKey:@"SaveDirectory"]
+                                isDirectory:YES];
+    }
+
     NSSavePanel *panel = [NSSavePanel savePanel];
     NSString *prompt;
     NSString *ext;
@@ -2420,7 +2526,7 @@ fprintf(stderr, "%s\n",                                                    \
         case fileusage_InputRecord:
             prompt = @"Save recording: ";
             ext = @"rec";
-            filename = @"Recordning of ";
+            filename = @"Recording of ";
             break;
         default:
             prompt = @"Save: ";
@@ -2466,16 +2572,21 @@ fprintf(stderr, "%s\n",                                                    \
 
         if (result == NSModalResponseOK) {
             NSURL *theFile = panel.URL;
-            [[NSUserDefaults standardUserDefaults]
+            if ([defaults boolForKey:@"SaveInGameDirectory"]) {
+                self.saveDir = theFile.URLByDeletingLastPathComponent;
+            }
+            [defaults
              setObject:theFile.path
                 .stringByDeletingLastPathComponent
              forKey:@"SaveDirectory"];
             s = (theFile.path).UTF8String;
-        } else
-            s = "";
+            reply.len = strlen(s);
+        } else {
+            s = nil;
+            reply.len = 0;
+        }
 
         reply.cmd = OKAY;
-        reply.len = strlen(s);
 
         write((int)sendfd, &reply, sizeof(struct message));
         if (reply.len)
@@ -2553,7 +2664,7 @@ fprintf(stderr, "%s\n",                                                    \
             //                  (unsigned long)millisecs, (unsigned long)minTimer);
             millisecs = minTimer;
         }
-        if (_kerkerkruip && millisecs == 10) {
+        if (_gameID == kGameIsKerkerkruip && millisecs == 10) {
             [timer invalidate];
             NSLog(@"Kerkerkruip tried to start a 10 millisecond timer.");
             return;
@@ -2774,7 +2885,7 @@ fprintf(stderr, "%s\n",                                                    \
         key = @(buf[i]);
 
         // Convert input terminator keys for Beyond Zork arrow keys hack
-        if (_beyondZork && _theme.bZTerminator == kBZArrowsSwapped && [gwindow isKindOfClass:[GlkTextBufferWindow class]]) {
+        if ((_gameID == kGameIsBeyondZork || [self zVersion6]) && _theme.bZTerminator == kBZArrowsSwapped && [gwindow isKindOfClass:[GlkTextBufferWindow class]]) {
             if (buf[i] == keycode_Up) {
                 key = @(keycode_Home);
             } else if (buf[i] == keycode_Down) {
@@ -2787,7 +2898,7 @@ fprintf(stderr, "%s\n",                                                    \
             myDict[key] = @(YES);
         } else {
             // Convert input terminator keys for Beyond Zork arrow keys hack
-            if (_beyondZork) {
+            if (_gameID == kGameIsBeyondZork || [self zVersion6]) {
                 if (_theme.bZTerminator != kBZArrowsOriginal) {
                     if (buf[i] == keycode_Left) {
                         myDict[@"storedLeft"] = @(YES);
@@ -2832,6 +2943,7 @@ fprintf(stderr, "%s\n",                                                    \
         return;
     if (_theme.errorHandling == IGNORE_ERRORS) {
         _pendingErrorMessage = str;
+        _errorTimeStamp = [NSDate date];
         return;
     }
     _pendingErrorMessage = nil;
@@ -2855,7 +2967,7 @@ fprintf(stderr, "%s\n",                                                    \
     uniglyph[0] = glyph;
     NSData *data = [NSData dataWithBytes:uniglyph length:4];
     NSString *str  = [[NSString alloc] initWithData:data
-                                encoding:NSUTF32LittleEndianStringEncoding];
+                                           encoding:NSUTF32LittleEndianStringEncoding];
     return [GlkController unicodeAvailableForChar:str];
 }
 
@@ -3349,7 +3461,7 @@ fprintf(stderr, "%s\n",                                                    \
                 [self restoreUI];
                 reqWin = _gwindows[@(req->a1)];
             }
-            if (reqWin && !_colderLight && !skipNextScriptCommand) {
+            if (reqWin && _gameID != kGameIsAColderLight && !skipNextScriptCommand) {
                 NSString *preloaded = [NSString stringWithCharacters:(unichar *)buf length:(NSUInteger)req->len / sizeof(unichar)];
                 if (!preloaded.length || [preloaded characterAtIndex:0] == '\0')
                     preloaded = @"";
@@ -3362,7 +3474,7 @@ fprintf(stderr, "%s\n",                                                    \
                 _shouldSpeakNewText = YES;
 
                 // Check if we are in Beyond Zork Definitions menu
-                if (_beyondZork)
+                if (_gameID == kGameIsBeyondZork)
                     _shouldCheckForMenu = YES;
             }
             skipNextScriptCommand = NO;
@@ -3425,7 +3537,7 @@ fprintf(stderr, "%s\n",                                                    \
             if (reqWin && !skipNextScriptCommand) {
                 [reqWin initChar];
                 if (_commandScriptRunning) {
-                    if (!_adrianMole || lastScriptKeyTimestamp.timeIntervalSinceNow < -0.5) {
+                    if (_gameID != kGameIsAdrianMole || lastScriptKeyTimestamp.timeIntervalSinceNow < -0.5) {
                         [self.commandScriptHandler sendCommandKeyPressToWindow:reqWin];
                         lastScriptKeyTimestamp = [NSDate date];
                     }
@@ -3589,6 +3701,7 @@ static BOOL pollMoreData(int fd) {
         return;
 
     dead = YES;
+    _gameState = kGameIsDead;
     restartingAlready = NO;
 
     if (timer) {
@@ -3603,7 +3716,7 @@ static BOOL pollMoreData(int fd) {
         NSAlert *alert = [[NSAlert alloc] init];
         alert.messageText = NSLocalizedString(@"The game has unexpectedly terminated.", nil);
         alert.informativeText = [NSString stringWithFormat:NSLocalizedString(@"Error code: %@.", nil), signalToName(task)];
-        if (_pendingErrorMessage)
+        if (_pendingErrorMessage && _errorTimeStamp.timeIntervalSinceNow > -3)
             alert.informativeText = _pendingErrorMessage;
         _pendingErrorMessage = nil;
         _mustBeQuiet = YES;
@@ -3612,7 +3725,7 @@ static BOOL pollMoreData(int fd) {
     } else {
         NotificationBezel *bezel = [[NotificationBezel alloc] initWithScreen:self.window.screen];
         [bezel showGameOver];
-        [self performSelector:@selector(speakString:) withObject:[NSString stringWithFormat:@"%@ has finished.", _game.metadata.title] afterDelay:1];
+        [self performSelector:@selector(speakStringNow:) withObject:[NSString stringWithFormat:@"%@ has finished.", _game.metadata.title] afterDelay:1];
     }
 
     for (GlkWindow *win in _gwindows.allValues)
@@ -3791,7 +3904,7 @@ again:
 
     _bgcolor = color;
     // The Narcolepsy window mask overrides all border colors
-    if (_narcolepsy && theme.doStyles && theme.doGraphics) {
+    if (_gameID == kGameIsNarcolepsy && theme.doStyles && theme.doGraphics) {
         _borderView.layer.backgroundColor = CGColorGetConstantColor(kCGColorClear);
         return;
     }
@@ -4217,7 +4330,7 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
     inFullScreenResize = NO;
     [self contentDidResize:_gameView.frame];
     [self restoreScrollOffsets];
-    if (self.narcolepsy && _theme.doGraphics && _theme.doStyles) {
+    if (self.gameID == kGameIsNarcolepsy && _theme.doGraphics && _theme.doStyles) {
         // FIXME: Very ugly hack to fix the Narcolepsy mask layer
         // It breaks when exiting fullscreen after the player
         // manually has resized the window in windowed mode.
@@ -4486,30 +4599,23 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
     return @[speakStatus, speakNext, speakPrevious, speakMostRecent];
 }
 
-- (void)noteAccessibilityStatusChanged:(NSNotification *)notify {
-    NSWorkspace * ws = [NSWorkspace sharedWorkspace];
-    _voiceOverActive = ws.voiceOverEnabled;
-    if (_voiceOverActive) {
-        if (_eventcount > 2 && !_mustBeQuiet) {
-            [self checkZMenu];
-            if (_zmenu) {
-                [_zmenu performSelector:@selector(deferredSpeakSelectedLine:) withObject:nil afterDelay:1];
-            } else {
-                GlkWindow *largest = self.largestWithMoves;
-                if (largest) {
-                    [largest setLastMove];
-                    [largest performSelector:@selector(repeatLastMove:) withObject:nil afterDelay:2];
-                }
-            }
-        }
-    } else {
-        _zmenu = nil;
-        _form = nil;
-    }
-}
 
-- (void)deferredSpeakLargest:(id)sender {
-    [self speakLargest:_gwindows.allValues];
+- (void)observeValueForKeyPath:(NSString *)keyPath
+                      ofObject:(id)object
+                        change:(NSDictionary *)change
+                       context:(void *)context {
+
+    if ([keyPath isEqualToString:@"voiceOverEnabled"]) {
+        NSWorkspace * ws = [NSWorkspace sharedWorkspace];
+        _voiceOverActive = ws.voiceOverEnabled;
+        [self speakOnBecomingKey];
+    } else {
+        // Any unrecognized context must belong to super
+        [super observeValueForKeyPath:keyPath
+                             ofObject:object
+                               change:change
+                              context:context];
+    }
 }
 
 - (IBAction)saveAsRTF:(id)sender {
@@ -4540,9 +4646,10 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
 
 #pragma mark ZMenu
 
-- (void)checkZMenu {
-    if (!_voiceOverActive || _mustBeQuiet || !_theme.vOSpeakMenu)
+- (void)checkZMenuAndSpeak:(BOOL)speak {
+    if (!_voiceOverActive || _mustBeQuiet || _theme.vOSpeakMenu == kVOMenuNone) {
         return;
+    }
     if (_shouldCheckForMenu) {
         _shouldCheckForMenu = NO;
         if (!_zmenu) {
@@ -4555,7 +4662,7 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
         }
 
         // Bureaucracy form accessibility
-        if (!_zmenu && _bureaucracy) {
+        if (!_zmenu && _gameID == kGameIsBureaucracy) {
             if (!_form) {
                 _form = [[BureaucracyForm alloc] initWithGlkController:self];
             }
@@ -4563,8 +4670,7 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
                 [NSObject cancelPreviousPerformRequestsWithTarget:_form];
                 _form.glkctl = nil;
                 _form = nil;
-            }
-            if (_form) {
+            } else if (speak) {
                 [_form speakCurrentField];
             }
         }
@@ -4574,7 +4680,8 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
             if ([view isKindOfClass:[GlkTextBufferWindow class]])
                 [view setLastMove];
         }
-        [_zmenu speakSelectedLine];
+        if (speak)
+            [_zmenu speakSelectedLine];
     }
 }
 
@@ -4583,14 +4690,15 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
 - (void)speakNewText {
     // Find a "main text window"
     NSMutableArray *windowsWithText = _gwindows.allValues.mutableCopy;
-    if (_quoteBoxes.count)
-        [windowsWithText addObject:_quoteBoxes.lastObject];
     for (GlkWindow *view in _gwindows.allValues) {
         if ([view isKindOfClass:[GlkGraphicsWindow class]] || ![(GlkTextBufferWindow *)view setLastMove]) {
             // Remove all Glk window objects with no new text to speak
             [windowsWithText removeObject:view];
         }
     }
+
+    if (_quoteBoxes.count)
+        [windowsWithText addObject:_quoteBoxes.lastObject];
 
     if (!windowsWithText.count) {
         return;
@@ -4625,40 +4733,85 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
             }
         }
     }
-    if (largest)
-    {
-        if (largest != _spokeLast && _speechTimeStamp.timeIntervalSinceNow  > -0.5)
-            return;
-        _speechTimeStamp = [NSDate date];
-        _spokeLast = largest;
-        [largest performSelector:@selector(repeatLastMove:) withObject:nil afterDelay:0.1];
+    if (largest) {
+        if ([largest isKindOfClass:[GlkTextGridWindow class]] && _quoteBoxes.count) {
+            GlkTextGridWindow *box = _quoteBoxes.lastObject;
+
+            NSString *str = box.textview.string;
+            if (str.length) {
+                str = [@"QUOTE: \n\n" stringByAppendingString:str];
+                [self speakString:str];
+                return;
+            }
+        }
+        [largest repeatLastMove:nil];
+    }
+}
+
+- (void)speakOnBecomingKey {
+    if (_voiceOverActive) {
+        _shouldCheckForMenu = YES;
+        [self checkZMenuAndSpeak:NO];
+        if (_theme.vODelayOn && !_mustBeQuiet) {
+            [self speakMostRecentAfterDelay];
+        }
+    } else {
+        _zmenu = nil;
+        _form = nil;
     }
 }
 
 #pragma mark Speak previous moves
 
+// If sender == self, never announce "No last move to speak!"
 - (IBAction)speakMostRecent:(id)sender {
     if (_zmenu) {
-        [_zmenu deferredSpeakSelectedLine:self];
+        NSString *menuString = [_zmenu menuLineStringWithTitle:YES Index:YES total:YES instructions:YES];
+        _zmenu.haveSpokenMenu = YES;
+        [self speakString:menuString];
         return;
-    }
-    if (_form) {
-        [_form deferredSpeakCurrentField:self];
+    } else if (_form) {
+        NSString *formString = [_form fieldStringWithTitle:YES andIndex:YES andTotal:YES];
+        _form.haveSpokenForm = YES;
+        [self speakString:formString];
         return;
     }
     GlkWindow *mainWindow = self.largestWithMoves;
     if (!mainWindow) {
         if (sender != self)
-            [self speakString:@"No last move to speak!"];
+            [self speakStringNow:@"No last move to speak!"];
         return;
     }
+
+    // Hack to prevent interrupting text if the "interruption text" is the same as Spatterlight is speaking
+    // anyway (because we just became key window or the text was cleared)
+    if ([mainWindow isKindOfClass:[GlkTextBufferWindow class]] && sender == self && [mainWindow wantsFocus] &&
+        (_lastSpokenString == nil || ((GlkTextBufferWindow *)mainWindow).printPositionOnInput == 0)) {
+        if (_lastSpokenString == nil)
+            _lastSpokenString = ((GlkTextBufferWindow *)mainWindow).textview.string;
+        _speechTimeStamp = [NSDate date];
+    }
+
+    if (_quoteBoxes.count) {
+        _speechTimeStamp = [NSDate distantPast];
+    }
+    [mainWindow setLastMove];
     [mainWindow repeatLastMove:nil];
+}
+
+- (void)speakMostRecentAfterDelay {
+    CGFloat delay = _theme.vOHackDelay;
+    shouldAddTitlePrefixToSpeech = (delay < 1);
+    delay *= NSEC_PER_SEC;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)delay), dispatch_get_main_queue(), ^(void) {
+        [self speakMostRecent:self];
+    });
 }
 
 - (IBAction)speakPrevious:(id)sender {
     GlkWindow *mainWindow = self.largestWithMoves;
     if (!mainWindow) {
-        [self speakString:@"No previous move to speak!"];
+        [self speakStringNow:@"No previous move to speak!"];
         return;
     }
     [mainWindow speakPrevious];
@@ -4667,7 +4820,7 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
 - (IBAction)speakNext:(id)sender {
     GlkWindow *mainWindow = self.largestWithMoves;
     if (!mainWindow) {
-        [self speakString:@"No next move to speak!"];
+        [self speakStringNow:@"No next move to speak!"];
         return;
     }
     [mainWindow speakNext];
@@ -4676,6 +4829,21 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
 - (IBAction)speakStatus:(id)sender {
     GlkWindow *win;
 
+    // Lazy heuristic to find Tads 3 status window: if there are more than one window and
+    // only one of them sits at the top, pick that one
+    if ( _gwindows.allValues.count > 1 && [_game.detectedFormat isEqualToString:@"tads3"]) {
+        NSMutableArray<GlkWindow *> *array = [[NSMutableArray alloc] initWithCapacity: _gwindows.allValues.count];
+        for (win in _gwindows.allValues) {
+            if (win.frame.origin.y == 0 && ![win isKindOfClass:[GlkGraphicsWindow class]]) {
+                [array addObject:win];
+            }
+        }
+        if (array.count == 1) {
+            [array.firstObject speakStatus];
+            return;
+        }
+    }
+
     // Try to find status window to pass this on to
     for (win in _gwindows.allValues) {
         if ([win isKindOfClass:[GlkTextGridWindow class]]) {
@@ -4683,30 +4851,53 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
             return;
         }
     }
-    [self speakString:@"No status window found!"];
+    [self speakStringNow:@"No status window found!"];
+}
+
+- (void)forceSpeech {
+    _lastSpokenString = nil;
+    _speechTimeStamp = [NSDate distantPast];
+}
+
+- (void)speakStringNow:(NSString *)string {
+    [self forceSpeech];
+    [self speakString:string];
 }
 
 - (void)speakString:(NSString *)string {
-    if (!string || string.length == 0 || !_voiceOverActive) {
+    NSString *newString = string;
+
+    if (string.length == 0 || !_voiceOverActive)
+        return;
+
+    if ([string isEqualToString: _lastSpokenString] &&_speechTimeStamp.timeIntervalSinceNow > -3) {
         return;
     }
 
+    _speechTimeStamp = [NSDate date];
+    _lastSpokenString = string;
+
     NSString *charSetString = @"\u00A0 >\n_";
     NSCharacterSet *charset = [NSCharacterSet characterSetWithCharactersInString:charSetString];
-    string = [string stringByTrimmingCharactersInSet:charset];
+    newString = [newString stringByTrimmingCharactersInSet:charset];
+
+    if (newString.length == 0)
+        newString = string;
+
+    if (shouldAddTitlePrefixToSpeech) {
+        newString = [NSString stringWithFormat:@"Now in, %@: %@", _game.metadata.title, newString];
+        shouldAddTitlePrefixToSpeech = NO;
+    }
 
     NSDictionary *announcementInfo = @{
-        NSAccessibilityPriorityKey : @(NSAccessibilityPriorityHigh),
-        NSAccessibilityAnnouncementKey : string
+        NSAccessibilityPriorityKey:@(NSAccessibilityPriorityHigh),
+        NSAccessibilityAnnouncementKey:newString
     };
 
-    NSWindow *mainWin = NSApp.mainWindow;
-
-    if (mainWin) {
-        NSAccessibilityPostNotificationWithUserInfo(
-                                                    mainWin,
-                                                    NSAccessibilityAnnouncementRequestedNotification, announcementInfo);
-    }
+    NSAccessibilityPostNotificationWithUserInfo(
+                                                self.window,
+                                                NSAccessibilityAnnouncementRequestedNotification,
+                                                announcementInfo);
 }
 
 - (GlkWindow *)largestWithMoves {
@@ -4714,9 +4905,10 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
     GlkWindow *largest = nil;
     NSMutableArray *windowsWithMoves = _gwindows.allValues.mutableCopy;
     for (GlkWindow *view in _gwindows.allValues) {
+        // Remove all Glk windows without text from array
         if (!view.moveRanges || !view.moveRanges.count) {
-            // Remove all GlkTextBufferWindow objects with no list of previous moves
-            if (!_quoteBoxes && ([view isKindOfClass:[GlkTextBufferWindow class]] && ((GlkTextBufferWindow *)view).quoteBox))
+            // An empty window with an attached quotebox is still considered to have text
+            if (!(_quoteBoxes && ([view isKindOfClass:[GlkTextBufferWindow class]] && ((GlkTextBufferWindow *)view).quoteBox)))
                 [windowsWithMoves removeObject:view];
         }
     }

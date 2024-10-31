@@ -67,7 +67,7 @@ fprintf(stderr, "%s\n",                                                    \
                                @(NO), @keycode_Pad9,
                                nil];
 
-        if (glkctl.beyondZork) {
+        if (_glkctl.gameID == kGameIsBeyondZork || [_glkctl zVersion6]) {
             [self adjustBZTerminators:_pendingTerminators];
         }
 
@@ -650,6 +650,11 @@ fprintf(stderr, "%s\n",                                                    \
 - (void)speakNext {
     NSLog(@"speakNext in %@ not implemented", [self class]);
 }
+
+- (void)speakStatus {
+    NSLog(@"speakStatus in %@ not implemented", [self class]);
+}
+
 
 - (BOOL)setLastMove {
     NSLog(@"setLastMove in %@ not implemented", [self class]);

@@ -306,7 +306,7 @@
     GlkController *glkctl = self.glkctl;
 
     // Adjust terminators for Beyond Zork arrow keys hack
-    if (glkctl.beyondZork) {
+    if ((glkctl.gameID == kGameIsBeyondZork || [glkctl zVersion6])) {
         [self adjustBZTerminators:self.pendingTerminators];
         [self adjustBZTerminators:self.currentTerminators];
     }
@@ -408,7 +408,7 @@
 
 //        [_bufferTextStorage addAttribute:NSCursorAttributeName value:[NSCursor arrowCursor] range:NSMakeRange(0, _bufferTextStorage.length)];
 
-        // Now we can replace the text storager
+        // Now we can replace the text storage
         [textstorage setAttributedString:_bufferTextStorage];
 
         NSMutableDictionary *linkAttributes = [_textview.linkTextAttributes mutableCopy];
@@ -624,7 +624,7 @@
     // Because our quote box hack assumes that the status line is 1 row
     // and Curses status line has 2 rows, we need a Curses-specific hack
     // to prevent the lower line from being cut off.
-    if (newrows == 1 && glkctl.curses && glkctl.quoteBoxes.count && glkctl.turns > 0) {
+    if (newrows == 1 && glkctl.gameID == kGameIsCurses && glkctl.quoteBoxes.count && glkctl.turns > 0) {
         newrows = 2;
         frame.size.height += self.theme.cellHeight;
         self.pendingFrame = frame;
@@ -815,6 +815,7 @@
 }
 
 - (void)clear {
+    _hasNewText = NO;
     NSRange selectedRange = _textview.selectedRange;
     if (!_bufferTextStorage.length)
         return;
@@ -826,8 +827,9 @@
     // Re-fill with spaces
     if (self.framePending) {
         self.frame = self.pendingFrame;
-    } else
+    } else {
         self.frame = self.frame;
+    }
 
 //    if (currentZColor && bgnd != currentZColor.bg) {
 //        if (currentZColor.bg != zcolor_Current && currentZColor.bg != zcolor_Default) {
@@ -837,10 +839,11 @@
 //    }
 
     if (NSMaxRange(selectedRange) > _textview.textStorage.length) {
-        if (_textview.textStorage.length)
+        if (_textview.textStorage.length) {
             selectedRange = NSMakeRange(_textview.textStorage.length - 1, 0);
-        else
+        } else {
             selectedRange = NSMakeRange(0, 0);
+        }
     }
     _textview.selectedRange = selectedRange;
 }
@@ -884,14 +887,14 @@
                && [_lastKeyPress caseInsensitiveCompare:string] == NSOrderedSame) {
         // Don't echo keys if speak command setting is off
         if (glkctl.theme.vOSpeakCommand) {
-            [glkctl speakString:string];
+            [glkctl speakStringNow:string];
         }
         glkctl.form.dontSpeakField = YES;
     }
 
     if (xpos > cols) {
-        ypos += (xpos / cols);
-        xpos = (xpos % cols);
+        ypos += xpos / cols;
+        xpos = xpos % cols;
     }
     NSMutableDictionary *attrDict = [styles[stylevalue] mutableCopy];
 
@@ -1072,7 +1075,7 @@
     if (mouse_request) {
         [self.glkctl markLastSeen];
 
-        NSPoint p, point_in_window;
+        NSPoint point, point_in_window;
         point_in_window = theEvent.locationInWindow;
 
         point_in_window = [_textview convertPoint:point_in_window fromView:nil];
@@ -1085,12 +1088,13 @@
                                        inTextContainer:container
               fractionOfDistanceBetweenInsertionPoints:nil];
 
-        p.y = charIndex / (cols + 1);
-        p.x = charIndex % (cols + 1);
-        if (p.x >= cols)
-            p.x = point_in_window.x / self.theme.cellWidth;
-        if (p.x >= 0 && p.y >= 0 && p.x < cols && p.y < rows) {
-            gev = [[GlkEvent alloc] initMouseEvent:p forWindow:self.name];
+        point.y = charIndex / (cols + 1);
+        point.x = charIndex % (cols + 1);
+        if (point.x >= cols)
+            point.x = point_in_window.x / self.theme.cellWidth;
+        if (point.x >= 0 && point.y >= 0 && point.x < cols && point.y < rows) {
+            [self.glkctl markLastSeen];
+            gev = [[GlkEvent alloc] initMouseEvent:point forWindow:self.name];
             [self.glkctl queueEvent:gev];
             mouse_request = NO;
             return YES;
@@ -1106,7 +1110,7 @@
     dirty = YES;
 
     // Draw Bureaucracy form cursor
-    if (self.glkctl.bureaucracy) {
+    if (self.glkctl.gameID == kGameIsBureaucracy) {
         self.currentReverseVideo = YES;
         [self putString:@" " style:style_Normal];
         self.currentReverseVideo = NO;
@@ -1121,7 +1125,7 @@
     // Remove leftover "cursors"
     // when running command scripts in
     // Bureaucracy form
-    if (self.glkctl.bureaucracy && self.glkctl.commandScriptRunning) {
+    if (self.glkctl.gameID == kGameIsBureaucracy && self.glkctl.commandScriptRunning) {
         self.currentReverseVideo = NO;
         [self putString:@" " style:style_Normal];
         xpos--;
@@ -1138,7 +1142,7 @@
 
     GlkController *glkctl = self.glkctl;
 
-    if ((flags & NSEventModifierFlagNumericPad) && !glkctl.bureaucracy && ch >= '0' && ch <= '9')
+    if ((flags & NSEventModifierFlagNumericPad) && glkctl.gameID != kGameIsBureaucracy && ch >= '0' && ch <= '9')
         ch = keycode_Pad0 - (ch - '0');
 
     GlkWindow *win;
@@ -1154,13 +1158,13 @@
         }
 
     // Stupid hack for Swedish keyboard
-    if (char_request && glkctl.bureaucracy && evt.keyCode == 30)
+    if (char_request && glkctl.gameID == kGameIsBureaucracy && evt.keyCode == 30)
         ch = '^';
 
     if (char_request && ch != keycode_Unknown) {
         [glkctl markLastSeen];
 
-        if (glkctl.bureaucracy) {
+        if (glkctl.gameID == kGameIsBureaucracy) {
             // Bureacracy on Bocfel will try to convert these keycodes
             // to characters and then error out with
             // "fatal error: @print_char called with invalid character"
@@ -1197,7 +1201,7 @@
         if (ch == keycode_Return || [self.currentTerminators[@(ch)] isEqual:@(YES)]) {
             terminator = [self.currentTerminators[@(ch)] isEqual:@(YES)] ? ch : 0;
 
-            if (glkctl.beyondZork) {
+            if (glkctl.gameID == kGameIsBeyondZork || [glkctl zVersion6]) {
                 if (terminator == keycode_Home) {
                     NSLog(@"Gridwin keyDown changed keycode_Home to keycode_Up");
                     terminator = keycode_Up;
@@ -1424,6 +1428,13 @@
     if (cx) {
         self.input.stringValue = cx;
         self.input.fieldEditor.selectedRange = NSMakeRange(cx.length, 0);
+    }  
+
+    if (!cx.length) {
+        if ([history empty])
+            [self.glkctl speakStringNow:@"No commands entered"];
+        else
+            [self.glkctl speakStringNow:@"Start of command history"];
     }
 }
 
@@ -1434,6 +1445,13 @@
     if (cx) {
         self.input.stringValue = cx;
         self.input.fieldEditor.selectedRange = NSMakeRange(cx.length, 0);
+    } 
+
+    if (!cx.length) {
+        if ([history empty])
+            [self.glkctl speakStringNow:@"No commands entered"];
+        else
+            [self.glkctl speakStringNow:@"Start of command history"];
     }
 }
 
@@ -1577,9 +1595,9 @@
 
     NSRect frame = self.frame;
     frame.size = boxSize;
-    frame.origin.x = ceil((bufWin.frame.size.width - boxSize.width) / 2) - self.theme.cellWidth * (2 * (!glkctl.trinity && self.theme.cellWidth == self.theme.bufferCellWidth) );
+    frame.origin.x = ceil((bufWin.frame.size.width - boxSize.width) / 2) - self.theme.cellWidth * (2 * (glkctl.gameID != kGameIsTrinity && self.theme.cellWidth == self.theme.bufferCellWidth) );
     frame.origin.y = ceil(quoteboxParent.contentView.frame.origin.y +
-                          (_quoteboxVerticalOffset + 2 * (glkctl.curses == YES)) * self.theme.cellHeight);
+                          (_quoteboxVerticalOffset + 2 * (glkctl.gameID == kGameIsCurses)) * self.theme.cellHeight);
 
     // Push down buffer window text with newlines if the quote box covers text the player has not read yet.
     if (bufWin.moveRanges.count < 2 && (!bufWin.moveRanges || NSMaxRange(bufWin.moveRanges.lastObject.rangeValue) >= bufWin.textview.string.length)) {
@@ -1619,7 +1637,7 @@
         [NSObject cancelPreviousPerformRequestsWithTarget:glkctl.zmenu];
     if (glkctl.form)
         [NSObject cancelPreviousPerformRequestsWithTarget:glkctl.form];
-    [glkctl speakString:textstorage.string];
+    [glkctl speakStringNow:textstorage.string];
 }
 
 - (BOOL)setLastMove {
@@ -1638,11 +1656,11 @@
     NSString *str = [textstorage.string substringWithRangeValue:self.moveRanges.lastObject];
 
     if (!str.length) {
-        [self.glkctl speakString:@"No last move to speak"];
+        [self.glkctl speakStringNow:@"No last move to speak"];
         return;
     }
 
-    [self.glkctl speakString:str];
+    [self.glkctl speakStringNow:str];
 }
 
 - (void)speakPrevious {
@@ -1656,7 +1674,7 @@
         moveRangeIndex = 0;
     }
     NSString *str = [prefix stringByAppendingString:[textstorage.string substringWithRangeValue:self.moveRanges[moveRangeIndex]]];
-    [self.glkctl speakString:str];
+    [self.glkctl speakStringNow:str];
 }
 
 - (void)speakNext {
@@ -1675,7 +1693,7 @@
     }
 
     NSString *str = [prefix stringByAppendingString:[textstorage.string substringWithRangeValue:self.moveRanges[moveRangeIndex]]];
-    [self.glkctl speakString:str];
+    [self.glkctl speakStringNow:str];
 }
 
 - (NSArray *)links {

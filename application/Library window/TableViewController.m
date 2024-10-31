@@ -205,7 +205,7 @@ enum  {
     _gameSessions = [[NSMutableDictionary alloc] init];
     _gameTableModel = [[NSMutableArray alloc] init];
 
-    AppDelegate *appdelegate = (AppDelegate*)NSApplication.sharedApplication.delegate;
+    AppDelegate *appdelegate = (AppDelegate*)NSApp.delegate;
     appdelegate.tableViewController = self;
 
     _gameTableView.autosaveTableColumns = YES;
@@ -366,7 +366,7 @@ enum  {
 
 - (LibController *)windowController {
     if (_windowController == nil) {
-        _windowController = ((AppDelegate*)NSApplication.sharedApplication.delegate).libctl;
+        _windowController = ((AppDelegate*)NSApp.delegate).libctl;
         if (!_windowController) {
             _windowController = (LibController *)self.view.window.delegate;
         }
@@ -386,14 +386,14 @@ enum  {
 
 - (CoreDataManager *)coreDataManager {
     if (_coreDataManager == nil) {
-        _coreDataManager =  ((AppDelegate*)NSApplication.sharedApplication.delegate).coreDataManager;
+        _coreDataManager =  ((AppDelegate*)NSApp.delegate).coreDataManager;
     }
     return _coreDataManager;
 }
 
 - (NSMenuItem *)mainThemesSubMenu {
     if (_mainThemesSubMenu == nil) {
-        _mainThemesSubMenu = ((AppDelegate*)NSApplication.sharedApplication.delegate).themesMenuItem;
+        _mainThemesSubMenu = ((AppDelegate*)NSApp.delegate).themesMenuItem;
     }
     return _mainThemesSubMenu;
 }
@@ -1868,7 +1868,7 @@ enum  {
                             if (![private save:&error]) {
                                 NSLog(@"Unable to Save Changes of private managed object context!");
                                 if (error) {
-                                    [[NSApplication sharedApplication] presentError:error];
+                                    [NSApp presentError:error];
                                 }
                             }
                         }
@@ -1881,7 +1881,7 @@ enum  {
                     if (![private save:&error]) {
                         NSLog(@"Unable to Save Changes of private managed object context!");
                         if (error) {
-                            [[NSApplication sharedApplication] presentError:error];
+                            [NSApp presentError:error];
                         }
                     } else NSLog(@"Changes in private were saved");
                 } else NSLog(@"No changes to save in private");
@@ -2354,7 +2354,7 @@ static void write_xml_text(FILE *fp, Metadata *info, NSString *key) {
         weakSelf.gameSessions[game.ifid] = gctl;
         game.lastPlayed = [NSDate date];
         [gctl runTerp:terp withGame:game reset:NO winRestore:systemWindowRestoration];
-        [((AppDelegate *)[NSApplication sharedApplication].delegate)
+        [((AppDelegate *)NSApp.delegate)
          addToRecents:@[ url ]];
     }];
 
@@ -2788,11 +2788,12 @@ sortDescriptorsDidChange:(NSArray *)oldDescriptors {
         if ([identifier isEqual:@"found"]) {
             if (!game.found) {
                 if (@available(macOS 11.0, *)) {
-                    cellView.imageView.image = [NSImage imageWithSystemSymbolName:@"exclamationmark.circle" accessibilityDescription:NSLocalizedString(@"Game file not found", nil)];
+                    cellView.imageView.image = [NSImage imageWithSystemSymbolName:@"exclamationmark.circle" accessibilityDescription:NSLocalizedString(@"File not found", nil)];
                 } else {
                     cellView.imageView.image = [NSImage imageNamed:@"exclamationmark.circle"];
+                    cellView.imageView.image.accessibilityDescription = NSLocalizedString(@"File not found", nil);
                 }
-                cellView.imageView.accessibilityLabel = NSLocalizedString(@"Game file not found", nil);
+                cellView.imageView.accessibilityLabel = NSLocalizedString(@"File not found", nil);
             } else {
                 BOOL playing = NO;
                 if (_gameSessions.count < 100) {
@@ -2800,18 +2801,22 @@ sortDescriptorsDidChange:(NSArray *)oldDescriptors {
                         if ([session.game.ifid isEqual:game.ifid]) {
                             if (session.alive) {
                                 if (@available(macOS 11.0, *)) {
-                                    cellView.imageView.image = [NSImage imageWithSystemSymbolName:@"play.fill" accessibilityDescription:NSLocalizedString(@"Game in progress", nil)];
+                                    cellView.imageView.image = [NSImage imageWithSystemSymbolName:@"play.fill" accessibilityDescription:NSLocalizedString(@"In progress", nil)];
                                 } else {
                                     cellView.imageView.image = [NSImage imageNamed:@"play"];
+                                    cellView.imageView.image.accessibilityDescription = NSLocalizedString(@"In progress", nil);
+
                                 }
-                                cellView.imageView.accessibilityLabel = NSLocalizedString(@"Game in progress", nil);
+                                cellView.imageView.accessibilityLabel = NSLocalizedString(@"In progress", nil);
                             } else {
                                 if (@available(macOS 11.0, *)) {
-                                    cellView.imageView.image = [NSImage imageWithSystemSymbolName:@"stop.fill" accessibilityDescription:NSLocalizedString(@"Game stopped", nil)];
+                                    cellView.imageView.image = [NSImage imageWithSystemSymbolName:@"stop.fill" accessibilityDescription:NSLocalizedString(@"Stopped", nil)];
                                 } else {
                                     cellView.imageView.image = [NSImage imageNamed:@"stop"];
+                                    cellView.imageView.image.accessibilityDescription = NSLocalizedString(@"Stopped", nil);
+
                                 }
-                                cellView.imageView.accessibilityLabel = NSLocalizedString(@"Game stopped", nil);
+                                cellView.imageView.accessibilityLabel = NSLocalizedString(@"Stopped", nil);
                             }
                             playing = YES;
                             break;
@@ -2821,11 +2826,12 @@ sortDescriptorsDidChange:(NSArray *)oldDescriptors {
                 if (!playing) {
                     if (game.autosaved) {
                         if (@available(macOS 11.0, *)) {
-                            cellView.imageView.image = [NSImage imageWithSystemSymbolName:@"pause.fill" accessibilityDescription:NSLocalizedString(@"Game is autosaved", nil)];
+                            cellView.imageView.image = [NSImage imageWithSystemSymbolName:@"pause.fill" accessibilityDescription:NSLocalizedString(@"Autosaved", nil)];
                         } else {
                             cellView.imageView.image = [NSImage imageNamed:@"pause.fill"];
+                            cellView.imageView.image.accessibilityDescription = NSLocalizedString(@"Autosaved", nil);
                         }
-                        cellView.imageView.accessibilityLabel = NSLocalizedString(@"Game is autosaved", nil);
+                        cellView.imageView.accessibilityLabel = NSLocalizedString(@"Autosaved", nil);
                     } else {
                         cellView.imageView.image = nil;
                         cellView.imageView.accessibilityLabel = nil;
@@ -2840,16 +2846,20 @@ sortDescriptorsDidChange:(NSArray *)oldDescriptors {
                         likeCellView.likeButton.image = [NSImage imageWithSystemSymbolName:@"heart.slash.fill" accessibilityDescription:NSLocalizedString(@"Disliked", nil)];
                     } else {
                         likeCellView.likeButton.image = [NSImage imageNamed:@"heart.slash.fill"];
+                        likeCellView.likeButton.image.accessibilityDescription = NSLocalizedString(@"Disliked", nil);
                     }
                     likeCellView.toolTip = NSLocalizedString(@"Disliked", nil);
+                    likeCellView.accessibilityLabel = NSLocalizedString(@"Disliked", nil);
                     break;
                 case 1:
                     if (@available(macOS 11.0, *)) {
                         likeCellView.likeButton.image = [NSImage imageWithSystemSymbolName:@"heart.fill" accessibilityDescription:NSLocalizedString(@"Liked", nil)];
                     } else {
                         likeCellView.likeButton.image = [NSImage imageNamed:@"heart.fill"];
+                        likeCellView.likeButton.image.accessibilityDescription = NSLocalizedString(@"Liked", nil);
                     }
                     likeCellView.toolTip = NSLocalizedString(@"Liked", nil);
+                    likeCellView.accessibilityLabel = NSLocalizedString(@"Liked", nil);
                     break;
                 default:
                     if (row == _gameTableView.mouseOverRow) {
@@ -2857,11 +2867,13 @@ sortDescriptorsDidChange:(NSArray *)oldDescriptors {
                             likeCellView.likeButton.image = [NSImage imageWithSystemSymbolName:@"heart" accessibilityDescription:NSLocalizedString(@"Like", nil)];
                         } else {
                             likeCellView.likeButton.image =  [NSImage imageNamed:@"heart"];
+                            likeCellView.likeButton.image.accessibilityDescription = NSLocalizedString(@"Like", nil);
                         }
                     } else {
                         likeCellView.likeButton.image = nil;
                     }
                     likeCellView.toolTip = NSLocalizedString(@"Like", nil);
+                    likeCellView.accessibilityLabel = NSLocalizedString(@"Not liked", nil);
                     break;
             }
             return likeCellView;
@@ -3066,7 +3078,7 @@ sortDescriptorsDidChange:(NSArray *)oldDescriptors {
         return;
     if (![_gameTableView.selectedRowIndexes containsIndex:(NSUInteger)row])
         [_gameTableView selectRowIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)row] byExtendingSelection:NO];
-    [NSMenu popUpContextMenu:_gameTableView.menu withEvent:[[NSApplication sharedApplication] currentEvent] forView:sender];
+    [NSMenu popUpContextMenu:_gameTableView.menu withEvent:[NSApp currentEvent] forView:sender];
 }
 
 - (IBAction)liked:(id)sender {

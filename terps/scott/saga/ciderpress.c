@@ -2,7 +2,7 @@
     This is based on parts of the Ciderpress source.
     See https://github.com/fadden/ciderpress for the full version.
 
-    Includes fragments from of a2tools by Terry Kyriacopoulos and Paul Schlyter
+    Includes fragments from a2tools by Terry Kyriacopoulos and Paul Schlyter
 */
 
 #include <assert.h>
@@ -810,7 +810,6 @@ static void AddFileToList(A2FileDOS *file)
  */
 static void LowerASCII(uint8_t filename[kFileNameBufLen])
 {
-
     int len = kMaxFileName;
     uint8_t *buf = filename;
     while (len--) {

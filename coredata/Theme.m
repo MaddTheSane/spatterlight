@@ -56,12 +56,6 @@
 @dynamic hardDark;
 @dynamic hardLight;
 @dynamic hardLightOrDark;
-@dynamic imageSizing;
-@dynamic justify;
-@dynamic maxCols;
-@dynamic maxRows;
-@dynamic minCols;
-@dynamic minRows;
 @dynamic minTimer;
 @dynamic morePrompt;
 @dynamic name;
@@ -80,11 +74,14 @@
 @dynamic winSpacingY;
 @dynamic zMachineTerp;
 @dynamic zMachineLetter;
-@dynamic vOExtraElements;
+@dynamic vOHackDelay;
+@dynamic vODelayOn;
 @dynamic vOSpeakCommand;
 @dynamic vOSpeakImages;
-@dynamic vOSpeakInputType;
 @dynamic vOSpeakMenu;
+@dynamic z6GraphicsType;
+@dynamic z6Colorize1Bit;
+@dynamic z6Simulate16Color;
 @dynamic bufAlert;
 @dynamic bufBlock;
 @dynamic bufEmph;
@@ -147,6 +144,10 @@
         [self setValue:[theme valueForKey:attr] forKey:attr];
 	}
 
+    self.hardDark = NO;
+    self.hardLight = NO;
+    self.hardLightOrDark = NO;
+
     self.editable = YES;
 
     //Loop through all relationships, and clone them if nil in target.
@@ -184,11 +185,10 @@
         size = self.bufferNormal.cellSize;
         self.bufferCellWidth = size.width;
         self.bufferCellHeight = size.height;
-//        NSLog(@"Created a new normal buffer style for theme %@", self.name);
     }
 
 
-    if (!self.gridNormal) {
+    if (!self.gridNormal || self.cellHeight == 0 || self.cellWidth == 0) {
         self.gridNormal = (GlkStyle *) [NSEntityDescription
                                         insertNewObjectForEntityForName:@"GlkStyle"
                                         inManagedObjectContext:self.managedObjectContext];
@@ -196,7 +196,15 @@
         size = self.gridNormal.cellSize;
         self.cellWidth = size.width;
         self.cellHeight = size.height;
-//        NSLog(@"Created a new normal grid style for theme %@", self.name);
+    }
+
+    NSParagraphStyle *parastyle = self.gridNormal.attributeDict[NSParagraphStyleAttributeName];
+    if (parastyle && parastyle.maximumLineHeight == 0) {
+        NSMutableParagraphStyle *mutable = parastyle.mutableCopy;
+        mutable.maximumLineHeight = self.cellHeight;
+        NSMutableDictionary *mutAtt = self.gridNormal.attributeDict.mutableCopy;
+        mutAtt[NSParagraphStyleAttributeName] = mutable;
+        self.gridNormal.attributeDict = mutAtt;
     }
 
     // We skip the first element (0), i.e. the Normal styles here
@@ -333,6 +341,8 @@
     self.vOSpeakCommand = YES;
     self.vOSpeakImages = kVOImageWithDescriptionOnly;
     self.vOSpeakMenu = kVOMenuTextOnly;
+    self.vODelayOn = YES;
+    self.vOHackDelay = 4.0;
     self.zMachineLetter = @"S";
     self.zMachineTerp = 4; // Amiga
     self.nohacks = NO;

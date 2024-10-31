@@ -155,7 +155,7 @@ static Preferences *prefs = nil;
     if (!name)
         name = @"Old settings";
 
-    CoreDataManager *coreDataManager = ((AppDelegate*)[NSApplication sharedApplication].delegate).coreDataManager;
+    CoreDataManager *coreDataManager = ((AppDelegate*)NSApp.delegate).coreDataManager;
 
     NSManagedObjectContext *managedObjectContext = coreDataManager.mainManagedObjectContext;
 
@@ -500,7 +500,6 @@ NSString *fontToString(NSFont *font) {
                 if (wrong != _darkTheme)
                     wrong.hardDark = NO;
             }
-
         }
     } else {
         if (error != nil) {
@@ -536,6 +535,11 @@ NSString *fontToString(NSFont *font) {
     for (Theme *wrong in fetchedObjects) {
         if (!wrong.hardDark && !wrong.hardLight)
             wrong.hardLightOrDark = NO;
+    }
+
+    if (_lightTheme && _lightTheme == _darkTheme) {
+        _darkTheme = nil;
+        _lightTheme.hardDark = NO;
     }
 }
 
@@ -655,6 +659,10 @@ NSString *fontToString(NSFont *font) {
     _btnVOSpeakCommands.state = theme.vOSpeakCommand;
     [_vOMenuButton selectItemWithTag:theme.vOSpeakMenu];
     [_vOImagesButton selectItemWithTag:theme.vOSpeakImages];
+    _vODelaySlider.doubleValue = theme.vOHackDelay;
+    _vODelaySlider.enabled = theme.vODelayOn;
+    _vODelaySlider.accessibilityValueDescription = [self secondsAccessibilityString];
+    _vODelayCheckbox.state = theme.vODelayOn ? NSOnState : NSOffState;
 
     NSString *beepHigh = theme.beepHigh;
     NSString *beepLow = theme.beepLow;
@@ -670,7 +678,7 @@ NSString *fontToString(NSFont *font) {
 
     [_beepHighMenu selectItemWithTitle:beepHigh];
     [_beepLowMenu selectItemWithTitle:beepLow];
-    [_zterpMenu selectItemAtIndex:theme.zMachineTerp];
+    [_zterpMenu selectItemWithTag:theme.zMachineTerp];
     [_bZArrowsMenu selectItemWithTag:theme.bZTerminator];
 
     _zVersionTextField.stringValue = theme.zMachineLetter;
@@ -690,6 +698,8 @@ NSString *fontToString(NSFont *font) {
     [_coverImagePopup selectItemWithTag:theme.coverArtStyle];
 
     [_imageReplacePopup selectItemWithTag:[defaults integerForKey:@"ImageReplacement"]];
+
+    _saveInGameDirCheckbox.state = [defaults boolForKey:@"SaveInGameDirectory"] ? NSOnState : NSOffState;
 
     _btnShowBezels.state = [defaults boolForKey:@"ShowBezels"] ? NSOnState : NSOffState;
 
@@ -724,6 +734,15 @@ NSString *fontToString(NSFont *font) {
         if (!selectedFontButton)
             selectedFontButton = btnBufferFont;
         [self showFontPanel:selectedFontButton];
+    }
+}
+
+- (NSString *)secondsAccessibilityString {
+    CGFloat fractional = _vODelaySlider.doubleValue - _vODelaySlider.integerValue;
+    if (fractional < 0.05 || fractional > 0.95) {
+        return [NSString stringWithFormat:@"%ld seconds", (long)round(_vODelaySlider.doubleValue)];
+    } else {
+        return [NSString stringWithFormat:@"%.1f seconds", _vODelaySlider.doubleValue];
     }
 }
 
@@ -769,7 +788,7 @@ NSString *fontToString(NSFont *font) {
 
 - (CoreDataManager *)coreDataManager {
     if (_coreDataManager == nil) {
-        _coreDataManager = ((AppDelegate*)[NSApplication sharedApplication].delegate).coreDataManager;
+        _coreDataManager = ((AppDelegate*)NSApp.delegate).coreDataManager;
     }
     return _coreDataManager;
 }
@@ -847,6 +866,9 @@ NSString *fontToString(NSFont *font) {
 
     CGFloat oldheight = NSHeight(prefsPanel.frame);
 
+    _previewController.view.hidden = NO;
+    BOOL shouldHideOnCompletion = (height == defaultWindowHeight);
+
     if (ceil(height) == ceil(oldheight)) {
         return;
     }
@@ -888,7 +910,11 @@ NSString *fontToString(NSFont *font) {
              display:YES];
             [_previewHeightConstraint.animator setConstant:newPrevHeightConstant];
             [_previewController.textHeight.animator setConstant:newTextHeightConstant];
-        } completionHandler:^{}];
+        } completionHandler:^{
+            if (shouldHideOnCompletion) {
+                self.previewController.view.hidden = YES;
+            }
+        }];
     }
 }
 
@@ -929,10 +955,15 @@ NSString *fontToString(NSFont *font) {
     }
 }
 
+- (void)windowWillStartLiveResize:(NSNotification *)notification {
+    _previewController.view.hidden = NO;
+}
+
 - (void)windowDidEndLiveResize:(id)sender {
     _previewShown = (NSHeight(self.window.frame) > defaultWindowHeight);
 
     [[NSUserDefaults standardUserDefaults] setBool:_previewShown forKey:@"ShowThemePreview"];
+    _previewController.view.hidden = !_previewShown;
 
     PreviewController *blockPrevCtrl = _previewController;
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.01 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^(void){
@@ -1793,6 +1824,17 @@ textShouldEndEditing:(NSText *)fieldEditor {
     Theme *themeToChange = [self cloneThemeIfNotEditable];
     themeToChange.vOSpeakImages = (int)[sender selectedTag];
 }
+- (IBAction)changeVODelaySlider:(id)sender {
+    Theme *themeToChange = [self cloneThemeIfNotEditable];
+    themeToChange.vOHackDelay = [sender doubleValue];
+    _vODelaySlider.accessibilityValueDescription = [self secondsAccessibilityString];
+}
+
+- (IBAction)changeVODelayCheckbox:(id)sender {
+    [self changeBooleanAttribute:@"vODelayOn" fromButton:sender];
+    _vODelaySlider.enabled = (_vODelayCheckbox.state == NSOnState);
+}
+
 
 #pragma mark ZCode menu
 
@@ -1981,6 +2023,10 @@ textShouldEndEditing:(NSText *)fieldEditor {
 - (IBAction)changeCheckFrequency:(id)sender {
     [[NSUserDefaults standardUserDefaults] setInteger:[sender intValue] forKey:@"RecheckFrequency"];
     _recheckFrequencyTextfield.integerValue = (NSInteger)round([sender floatValue]);
+}
+
+- (IBAction)changeSaveToGameDir:(id)sender {
+    [[NSUserDefaults standardUserDefaults] setBool:([sender state] == NSOnState) forKey:@"SaveInGameDirectory"];
 }
 
 #pragma mark End of Global menu

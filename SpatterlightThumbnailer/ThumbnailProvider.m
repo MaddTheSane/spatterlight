@@ -46,7 +46,6 @@
             [_persistentContainer loadPersistentStoresWithCompletionHandler:^(NSPersistentStoreDescription *aDescription, NSError *error) {
                 if (error != nil) {
                     NSLog(@"Failed to load Core Data stack: %@", error);
-                    abort();
                 }
             }];
         }
@@ -79,37 +78,42 @@
     [context performBlockAndWait:^{
 
         NSError *blockerror = nil;
-        NSArray *fetchedObjects;
-
-        NSFetchRequest *fetchRequest = [[NSFetchRequest alloc] init];
-
-        fetchRequest.entity = [NSEntityDescription entityForName:@"Game" inManagedObjectContext:context];
-        fetchRequest.predicate = [NSPredicate predicateWithFormat:@"path like[c] %@", url.path];
-
-        fetchedObjects = [context executeFetchRequest:fetchRequest error:&blockerror];
-        if (fetchedObjects == nil) {
-            NSLog(@"ThumbnailProvider: %@",blockerror);
-            handler(nil, blockerror);
-            return;
-        }
-
-        if (!fetchedObjects.count) {
-            NSString *ifid = [self ifidFromFile:url.path];
-            if (ifid.length) {
-                fetchRequest.predicate = [NSPredicate predicateWithFormat:@"ifid like[c] %@", ifid];
-                fetchedObjects = [context executeFetchRequest:fetchRequest error:&blockerror];
-            }
-        }
 
         if ([Blorb isBlorbURL:url]) {
             Blorb *blorb = [[Blorb alloc] initWithData:[NSData dataWithContentsOfURL:url]];
             imgdata = [blorb coverImageData];
         }
 
-        if (fetchedObjects.count) {
-            Game *game = fetchedObjects[0];
-            if (!imgdata)
-                imgdata = (NSData *)game.metadata.cover.data;
+        if (!imgdata) {
+
+            NSArray *fetchedObjects;
+
+            NSFetchRequest *fetchRequest = [[NSFetchRequest alloc] init];
+
+            fetchRequest.entity = [NSEntityDescription entityForName:@"Game" inManagedObjectContext:context];
+            fetchRequest.predicate = [NSPredicate predicateWithFormat:@"path like[c] %@", url.path];
+
+            fetchedObjects = [context executeFetchRequest:fetchRequest error:&blockerror];
+            if (fetchedObjects == nil) {
+                NSLog(@"ThumbnailProvider: %@",blockerror);
+                handler(nil, blockerror);
+                return;
+            }
+
+            if (!fetchedObjects.count) {
+                NSString *ifid = [self ifidFromFile:url.path];
+                if (ifid.length) {
+                    fetchRequest.predicate = [NSPredicate predicateWithFormat:@"ifid like[c] %@", ifid];
+                    fetchedObjects = [context executeFetchRequest:fetchRequest error:&blockerror];
+                }
+            }
+
+
+            if (fetchedObjects.count) {
+                Game *game = fetchedObjects[0];
+                if (!imgdata)
+                    imgdata = (NSData *)game.metadata.cover.data;
+            }
         }
 
         if (!imgdata || imgdata.length == 0) {
@@ -173,6 +177,8 @@
 
 - (NSString *)ifidFromFile:(NSString *)path {
     void *context = get_babel_ctx();
+    if (context == nil)
+        return nil;
     char *format = babel_init_ctx((char*)path.UTF8String, context);
     if (!format || !babel_get_authoritative_ctx(context))
     {

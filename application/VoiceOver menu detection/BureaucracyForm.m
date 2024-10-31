@@ -53,11 +53,11 @@
     // If the current game is Bureaucracy and the initial text
     // in the grid window is one of the four form titles, then
     // we can be be pretty sure that this is it
-    if (_glkctl.bureaucracy) {
+    if (_glkctl.gameID == kGameIsBureaucracy) {
         for (GlkTextGridWindow *win in _glkctl.gwindows.allValues) {
             if ([win isKindOfClass:[GlkTextGridWindow class]]) {
                 _attrStr = win.textview.textStorage;
-                if (_attrStr && _attrStr.length < 4000) {
+                if (_attrStr && _attrStr.length < 10000) {
                     if ([self detectForm]) {
                         _fields = [self extractFieldRanges];
                         _infoFieldRange = [self findInfoFieldRange];
@@ -164,7 +164,16 @@
     return infoString;
 }
 
-- (NSString *)constructFieldStringWithIndex:(BOOL)useIndex andTotal:(BOOL)useTotal {
+- (NSString *)fieldStringWithTitle:(BOOL)useTitle andIndex:(BOOL)useIndex andTotal:(BOOL)useTotal {
+    NSString *fieldString = [self fieldStringWithIndex:YES andTotal:YES];
+    if (useTitle) {
+        fieldString = [NSString stringWithFormat:@"%@: %@ %@", _titlestring, [self constructInputString], fieldString];
+    }
+    return fieldString;
+}
+
+
+- (NSString *)fieldStringWithIndex:(BOOL)useIndex andTotal:(BOOL)useTotal {
     NSUInteger index = [self findCurrentField];
     if (index == NSNotFound)
         return @"";
@@ -215,12 +224,6 @@
     [moves addObject:val];
 }
 
-- (void)deferredSpeakString:(id)sender {
-
-    [self speakString:(NSString *)sender];
-
-}
-
 - (void)speakCurrentField {
     if (_dontSpeakField == YES) {
         _dontSpeakField = NO;
@@ -245,14 +248,8 @@
     Theme *theme = self.glkctl.theme;
 
     if (!_haveSpokenForm || sender == self.glkctl) {
-        selectedFieldString =
-        [self constructFieldStringWithIndex:YES andTotal:YES];
-        if (!_haveSpokenForm) {
-            NSString *titleString = [_titlestring stringByAppendingString:@": "];
-            titleString = [titleString stringByAppendingString:[self constructInputString]];
-            selectedFieldString = [titleString stringByAppendingString:selectedFieldString];
-            _haveSpokenForm = YES;
-        }
+        selectedFieldString = [self fieldStringWithTitle:!_haveSpokenForm andIndex:YES andTotal:YES];
+        _haveSpokenForm = YES;
     } else {
         if (theme.vOSpeakCommand)
             selectedFieldString = [self constructInputString];
@@ -260,10 +257,11 @@
         if (!_didNotMove)
             selectedFieldString =
             [selectedFieldString stringByAppendingString:
-             [self constructFieldStringWithIndex:(theme.vOSpeakMenu >= kVOMenuIndex) andTotal:(theme.vOSpeakMenu == kVOMenuTotal)]];
+             [self fieldStringWithIndex:(theme.vOSpeakMenu >= kVOMenuIndex) andTotal:(theme.vOSpeakMenu == kVOMenuTotal)]];
     }
 
-    [self speakString:selectedFieldString];
+    [NSObject cancelPreviousPerformRequestsWithTarget:self];
+    [_glkctl speakStringNow:selectedFieldString];
     if (!_haveSpokenInstructions) {
         [self performSelector:@selector(speakInstructions:) withObject:nil afterDelay:7];
         _haveSpokenInstructions = YES;
@@ -273,16 +271,12 @@
 - (void)speakInstructions:(id)sender {
     NSDictionary *announcementInfo = @{
         NSAccessibilityPriorityKey : @(NSAccessibilityPriorityLow),
-        NSAccessibilityAnnouncementKey : @"You mave review the form by stepping through previous moves."
+        NSAccessibilityAnnouncementKey : @"You may review the form by stepping through previous moves."
     };
 
-    NSWindow *mainWin = NSApp.mainWindow;
-
-    if (mainWin) {
-        NSAccessibilityPostNotificationWithUserInfo(
-                                                    mainWin,
-                                                    NSAccessibilityAnnouncementRequestedNotification, announcementInfo);
-    }
+    NSAccessibilityPostNotificationWithUserInfo(
+                                                _glkctl.window,
+                                                NSAccessibilityAnnouncementRequestedNotification, announcementInfo);
 }
 
 - (void)speakError {
@@ -300,27 +294,10 @@
     else
         errorString = [self constructInfoString];
     errorString = [errorString stringByAppendingString:
-                   [self constructFieldStringWithIndex:(self.glkctl.theme.vOSpeakMenu >= kVOMenuIndex) andTotal:(self.glkctl.theme.vOSpeakMenu == kVOMenuTotal)]];
-    [self speakString:errorString];
-    _speakingError = NO;
-}
-
-- (void)speakString:(NSString *)string {
-    if (!string || string.length == 0)
-        return;
+                   [self fieldStringWithIndex:(self.glkctl.theme.vOSpeakMenu >= kVOMenuIndex) andTotal:(self.glkctl.theme.vOSpeakMenu == kVOMenuTotal)]];
     [NSObject cancelPreviousPerformRequestsWithTarget:self];
-    NSDictionary *announcementInfo = @{
-        NSAccessibilityPriorityKey : @(NSAccessibilityPriorityHigh),
-        NSAccessibilityAnnouncementKey : string
-    };
-
-    NSWindow *mainWin = NSApp.mainWindow;
-
-    if (mainWin) {
-        NSAccessibilityPostNotificationWithUserInfo(
-                                                    mainWin,
-                                                    NSAccessibilityAnnouncementRequestedNotification, announcementInfo);
-    }
+    [_glkctl speakStringNow:errorString];
+    _speakingError = NO;
 }
 
 - (void)checkIfMoved {

@@ -108,7 +108,7 @@
     GlkController *glkctl = _glkctl;
 
     NSArray *allWindows = glkctl.gwindows.allValues;
-    if (glkctl.colderLight && allWindows.count == 5) {
+    if (glkctl.gameID == kGameIsAColderLight && allWindows.count == 5) {
         allWindows = @[glkctl.gwindows[@(3)], glkctl.gwindows[@(4)], glkctl.gwindows[@(0)], glkctl.gwindows[@(1)]];
     }
     for (GlkWindow *view in allWindows) {
@@ -166,7 +166,7 @@
         NSRange allText = NSMakeRange(0, string.length);
         textRange = NSIntersectionRange(allText, textRange);
         unichar firstChar = [string characterAtIndex:textRange.location];
-        if (glkctl.colderLight && firstChar == '<' && textRange.length == 1) {
+        if (glkctl.gameID == kGameIsAColderLight && firstChar == '<' && textRange.length == 1) {
             searchResult.customLabel = NSLocalizedString(@"Previous Menu", nil);
         } else if (firstChar == NSAttachmentCharacter) {
             NSDictionary *attrs = [((NSTextView *)targetElement).textStorage attributesAtIndex:textRange.location effectiveRange:nil];
@@ -494,19 +494,15 @@
         NSCharacterSet *charset = [NSCharacterSet characterSetWithCharactersInString:charSetString];
         NSString *string = strings[currentItemIndex];
         string = [string stringByTrimmingCharactersInSet:charset];
-        {
-            // Strip command line if the speak command setting is off
-            if (!_glkctl.theme.vOSpeakCommand)
-            {
-                NSUInteger promptIndex = searchResult.targetRange.location;
-                if (promptIndex != 0)
-                    promptIndex--;
-                if ([largest.textview.string characterAtIndex:promptIndex] == '>' || (promptIndex > 0 && [largest.textview.string characterAtIndex:promptIndex - 1] == '>')) {
-                    NSRange foundRange = [string rangeOfString:@"\n"];
-                    if (foundRange.location != NSNotFound)
-                    {
-                        string = [string substringFromIndex:foundRange.location];
-                    }
+        // Strip command line if the speak command setting is off
+        if (!_glkctl.theme.vOSpeakCommand) {
+            NSUInteger promptIndex = searchResult.targetRange.location;
+            if (promptIndex != 0)
+                promptIndex--;
+            if ([largest.textview.string characterAtIndex:promptIndex] == '>' || (promptIndex > 0 && [largest.textview.string characterAtIndex:promptIndex - 1] == '>')) {
+                NSRange foundRange = [string rangeOfString:@"\n"];
+                if (foundRange.location != NSNotFound) {
+                    string = [string substringFromIndex:foundRange.location];
                 }
             }
         }
@@ -549,11 +545,13 @@
     // Create the text search rotor.
     NSAccessibilityCustomRotor *textSearchRotor = [[NSAccessibilityCustomRotor alloc] initWithRotorType:NSAccessibilityCustomRotorTypeAny itemSearchDelegate:self];
     [rotorsArray addObject:textSearchRotor];
+
     // Create the command history rotor
     if (glkctl.largestWithMoves) {
         NSAccessibilityCustomRotor *commandHistoryRotor = [[NSAccessibilityCustomRotor alloc] initWithLabel:NSLocalizedString(@"Command history", nil) itemSearchDelegate:self];
         [rotorsArray addObject:commandHistoryRotor];
     }
+
     // Create the Glk windows rotor
     if (glkctl.gwindows.count) {
         NSAccessibilityCustomRotor *glkWindowRotor = [[NSAccessibilityCustomRotor alloc] initWithLabel:NSLocalizedString(@"Game windows", nil) itemSearchDelegate:self];

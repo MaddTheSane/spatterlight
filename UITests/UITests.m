@@ -499,11 +499,13 @@
         XCUIElement *savePanel = gamewin.sheets[@"save-panel"];
         XCTAssert([savePanel waitForExistenceWithTimeout:5]);
         XCUIElement *popUp;
-        for (NSString *popupTitle in menuItemTitles) {
-            popUp = savePanel.popUpButtons[popupTitle];
-            if ([popUp waitForExistenceWithTimeout:5]) {
-                break;
-            }
+
+        if ([savePanel.popUpButtons[@"Rich Text Format without images"] waitForExistenceWithTimeout:0.5]) {
+            popUp = savePanel.popUpButtons[@"Rich Text Format without images"];
+        } else if ([savePanel.popUpButtons[@"Rich Text Format with images"] waitForExistenceWithTimeout:0.5]) {
+            popUp = savePanel.popUpButtons[@"Rich Text Format with images"];
+        } else {
+            popUp = savePanel.popUpButtons[@"PlainText"];
         }
         [popUp click];
 
@@ -1820,8 +1822,9 @@
     if (!infoWin.exists)
         infoWin = app.windows[@"Curses Info"];
     XCUIElement *image = [[infoWin childrenMatchingType:XCUIElementTypeAny] elementBoundByIndex:4];
+    [infoWin click];
     [self forceClickElement:image];
-    [infoWin.menuItems[@"Save Image As…"] click];
+    [infoWin.menuItems[@"saveImage:"] click];
 
     XCUIElement *saveDialog = app.sheets.firstMatch;
     XCUIElement *saveButton = saveDialog.buttons[@"Save"];
@@ -1931,6 +1934,7 @@
 
     infoWin = app.windows[@"imagetest.gblorb Info"];
     image = [[infoWin childrenMatchingType:XCUIElementTypeAny] elementBoundByIndex:4];
+    [infoWin click];
     [self forceClickElement:image];
     [infoWin.menuItems[@"Select Image File…"] click];
 
@@ -2221,7 +2225,7 @@
     [textField4 typeText:@"\r"];
 
     [[[preferences childrenMatchingType:XCUIElementTypePopUpButton] element] click];
-    [app/*@START_MENU_TOKEN@*/.menuItems[@"Show errors"]/*[[".dialogs[@\"Preferences\"]",".tabGroups",".popUpButtons",".menus.menuItems[@\"Show errors\"]",".menuItems[@\"Show errors\"]",".dialogs[@\"preferences\"]"],[[[-1,4],[-1,3],[-1,2,3],[-1,1,2],[-1,5,1],[-1,0,1]],[[-1,4],[-1,3],[-1,2,3],[-1,1,2]],[[-1,4],[-1,3],[-1,2,3]],[[-1,4],[-1,3]]],[0]]@END_MENU_TOKEN@*/ click];
+    [app.menuItems[@"Ignore errors"] click];
 
     XCUIElement *autosaveAndAutorestoreCheckBox = app/*@START_MENU_TOKEN@*/.checkBoxes[@"Autosave and autorestore"]/*[[".dialogs[@\"Preferences\"]",".tabGroups.checkBoxes[@\"Autosave and autorestore\"]",".checkBoxes[@\"Autosave and autorestore\"]",".dialogs[@\"preferences\"]"],[[[-1,2],[-1,1],[-1,3,1],[-1,0,1]],[[-1,2],[-1,1]]],[0]]@END_MENU_TOKEN@*/;
     [autosaveAndAutorestoreCheckBox click];

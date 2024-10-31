@@ -90,7 +90,7 @@
     NSPersistentStore *store = [coordinator addPersistentStoreWithType:NSSQLiteStoreType configuration:nil URL:targetURL options:options error:&error];
 
     if (!store) {
-        [[NSApplication sharedApplication] presentError:error];
+        [NSApp presentError:error];
         return nil;
     }
 
@@ -139,7 +139,7 @@
             ok = [fileManager createDirectoryAtPath:applicationFilesDirectory.path withIntermediateDirectories:YES attributes:nil error:&error];
         }
         if (!ok) {
-            [[NSApplication sharedApplication] presentError:error];
+            [NSApp presentError:error];
             NSLog(@"Error: %@", error);
             return nil;
         }
@@ -152,7 +152,7 @@
             [dict setValue:failureDescription forKey:NSLocalizedDescriptionKey];
             error = [NSError errorWithDomain:@"YOUR_ERROR_DOMAIN" code:101 userInfo:dict];
 
-            [[NSApplication sharedApplication] presentError:error];
+            [NSApp presentError:error];
             return nil;
         }
     }
@@ -265,7 +265,7 @@
         [dict setValue:@"Failed to initialize the store" forKey:NSLocalizedDescriptionKey];
         [dict setValue:@"There was an error building up the data file." forKey:NSLocalizedFailureReasonErrorKey];
         NSError *error = [NSError errorWithDomain:@"YOUR_ERROR_DOMAIN" code:9999 userInfo:dict];
-        [[NSApplication sharedApplication] presentError:error];
+        [NSApp presentError:error];
         exit(0);
     }
     privateManagedObjectContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSPrivateQueueConcurrencyType];
