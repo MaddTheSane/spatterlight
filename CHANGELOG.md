@@ -1,10 +1,32 @@
 # Change log
-## Unreleased
+
+## Release 1.3
+- Fixes the decoding of certain characters in game descriptions downloaded from IFDB.
+- Fixes reading files managed by the File Provider API, such as those on Google Drive. Mostly by opening a lot of dialogs asking the user for permission to read files.
+- More file access happens on background threads, so if a file is offline (or on a very slow external media or local network) the app won't be unresponsive while it downloads. If the access takes more than a couple of seconds, perhaps because there is no internet connection, a dialog will appear asking if the user wants to cancel the operation.
+- A blank window would appear if a file had become inaccessible or deleted between starting a game and resetting, or between closing the app and autorestoring at startup. If a game file can't be found on reset, a dialog will now inform about this before closing the window.
+- The single-blorb version of *Journey* now displays graphics again.
+- Quote boxes in Z-code games were not properly autorestored. They would also sometimes fade away too soon during play. 
+- The game window was allowed to have zero height.
+- The "Add games to library" button and menu item stayed greyed out after importing games on Sequoia.
+
+## Release 1.2.7
+- Fixes VoiceOver on macOS 15 Sequoia by adding and increasing some delays.
+- Adds improved support for *Journey*. It is now possible to resize the window and change graphics mode and interpreter number on-the-fly. All known versions and graphics formats are supported. Also adds elaborate VoiceOver support with menus and dialogs.
+- Documents VoiceOver support in the file [ACCESSIBILITY.md][accessibility]
 - Fixes mouse support in Bocfel for the v6 games.
-- Extends arrow key settings for Beyond Zork to the v6 games.
+- Extends arrow key settings originally written for *Beyond Zork* to the v6 games.
 - Makes the Old settings theme possible to delete.
 - Duplicating a theme set as designated dark or light theme would make the copy designated dark or light theme as well.
 - Fixes a problem where the Z-machine interpreter number could be set to an illegal value.
+- Keeps track of moves even when VoiceOver is off.
+- The icons (not found, playing, paused, and stopped) in the status column of the games list are centered.
+- Turning autosave on and off during play now should work as expected.
+- The timer slider in settings is more accessible, with a correct value description.
+- Fixes sorting of game titles in the games list. Titles with numbers somewhere in the middle will now sort just like in the Finder. 
+- Adds support for image descriptions in external blorb files.
+
+[accessibility]: https://github.com/angstsmurf/spatterlight/blob/master/ACCESSIBILITY.md "Documentation for using VoiceOver with Spatterlight"
 
 ## Release 1.2.5
 - A save file with a garbage single-character name would be written to the user directory when a save request was cancelled.

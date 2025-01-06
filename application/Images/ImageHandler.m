@@ -15,7 +15,7 @@
 }
 
 - (instancetype)initWithPath:(NSString *)path {
-    return [self initWithURL:[NSURL fileURLWithPath:path]];
+    return [self initWithURL:[NSURL fileURLWithPath:path isDirectory:NO]];
 }
 
 - (instancetype)initWithURL:(NSURL *)path {
@@ -169,6 +169,7 @@
         _files = [NSMutableDictionary new];
         _lastimageresno = -1;
         _imageCache = [NSCache new];
+        _imageDescriptions = [NSMutableDictionary new];
     }
     return self;
 }
@@ -216,20 +217,36 @@
     return NO;
 }
 
-- (void)cacheImagesFromBlorb:(NSURL *)file {
-    if (![Blorb isBlorbURL:file])
-        return;
-    Blorb *blorb = [[Blorb alloc] initWithData:[NSData dataWithContentsOfURL:file]];
+- (void)cacheImagesFromBlorbData:(NSData *)blorbData path:(NSString *)path {
+    Blorb *blorb = [[Blorb alloc] initWithData:blorbData];
     NSArray *resources = [blorb resourcesForUsage:PictureResource];
     for (BlorbResource *res in resources) {
         NSInteger resno = res.number;
         NSData *data = [blorb dataForResource:res];
-        ImageResource *imgres = [[ImageResource alloc] initWithFilename:file.path offset:res.start length:data.length];
+        ImageResource *imgres = [[ImageResource alloc] initWithFilename:path offset:res.start length:data.length];
         imgres.data = data;
         imgres.a11yDescription = res.descriptiontext;
         _resources[@(resno)] = imgres;
-//        if (res.descriptiontext)
-//            NSLog(@"Cached image %ld with path: %@ offset: %u length: %ld text:%@", resno, file.path, res.start, data.length, res.descriptiontext);
+        _imageDescriptions[@(resno)] = res.descriptiontext;
+        //        if (res.descriptiontext)
+        //            NSLog(@"Cached image %ld with path: %@ offset: %u length: %ld text:%@", resno, file.path, res.start, data.length, res.descriptiontext);
+    }
+}
+
+- (void)cacheImagesFromBlorbURL:(NSURL *)file withData:(NSData *)blorbData {
+    if (![Blorb isBlorbURL:file]) {
+        NSString *newPath = [[file.path stringByDeletingPathExtension] stringByAppendingPathExtension:@"blb"];
+        file = [NSURL fileURLWithPath:newPath isDirectory:NO];
+
+        NSFileCoordinator *coordinator = [NSFileCoordinator new];
+
+        NSError *error = nil;
+
+        [coordinator coordinateReadingItemAtURL:file options:NSFileCoordinatorReadingWithoutChanges error:&error byAccessor:^(NSURL * _Nonnull newURL) {
+            [self cacheImagesFromBlorbData:[NSData dataWithContentsOfURL:newURL] path:newURL.path];
+        }];
+    } else {
+        [self cacheImagesFromBlorbData:blorbData path:file.path];
     }
 }
 
@@ -252,16 +269,18 @@
 - (void)handleLoadImageNumber:(NSInteger)resno
                          from:(NSString *)path
                        offset:(NSUInteger)offset
-                       length:(NSUInteger)length {
+                       size:(NSUInteger)size {
 
     if ([self imageIsLoaded:resno])
         return;
 
-    [self setImageID:resno filename:path length:length offset:offset];
-    if (length == 8) {
+    [self setImageID:resno filename:path size:size offset:offset];
+    if (size == 8) {
         // Hack for placeholder images, which only have dimensions, no content.
         NSInteger width = ((const unsigned char *)(_resources[@(resno)].data.bytes))[3] + ((const unsigned char *)(_resources[@(resno)].data.bytes))[2] * 0x100;
         NSInteger height = ((const unsigned char *)(_resources[@(resno)].data.bytes))[7] + ((const unsigned char *)(_resources[@(resno)].data.bytes))[6] * 0x100;
+        NSLog(@"handleLoadImageNumber: Found placeholder image %ld with width %ld and height %ld", resno, width, height);
+
         // No size must be 0, or both will be, so we add a "rounding error"
         _lastimage = [[NSImage alloc] initWithSize:NSMakeSize(width + 0.01, height + 0.01)];
     } else
@@ -274,7 +293,7 @@
     _lastimageresno = resno;
 }
 
-- (void)setImageID:(NSInteger)resno filename:(nullable NSString *)filename length:(NSUInteger)length offset:(NSUInteger)offset {
+- (void)setImageID:(NSInteger)resno filename:(nullable NSString *)filename size:(NSUInteger)length offset:(NSUInteger)offset {
 
     ImageResource *res = _resources[@(resno)];
 
@@ -305,6 +324,31 @@
         label = _resources[@(_lastimageresno)].a11yDescription;
     }
     return label;
+}
+
+- (void)purgeImage:(NSInteger)resno withReplacement:(nullable NSString *)replacementPath size:(NSUInteger)replacementSize {
+    if (resno < 0)
+        return;
+
+    [_imageCache removeObjectForKey:@(resno)];
+    _resources[@(resno)] = nil;
+
+    if (!replacementPath) {
+        _lastimageresno = -1;
+        _lastimage = nil;
+    } else {
+        [self setImageID:resno filename:replacementPath size:replacementSize offset:0];
+        _lastimage = [_resources[@(resno)] createImage];
+        if (_lastimage == nil) {
+            _lastimageresno = -1;
+            return;
+        }
+        if (_lastimage.accessibilityDescription.length == 0) {
+            _lastimage.accessibilityDescription = _imageDescriptions[@(resno)];
+        }
+        [_imageCache setObject:_lastimage forKey:@(resno)];
+        _lastimageresno = resno;
+    }
 }
 
 @end

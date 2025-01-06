@@ -204,7 +204,7 @@
         maxInputLength = (NSUInteger)[decoder decodeIntForKey:@"maxInputLength"];
 
         _quoteboxSize = ((NSValue *)[decoder decodeObjectOfClass:[NSValue class] forKey:@"quoteboxSize"]).sizeValue;
-        _quoteboxAddedOnTurn = [decoder decodeIntegerForKey:@"quoteboxAddedOnTurn"];
+        _quoteboxAddedOnPAC = [decoder decodeIntegerForKey:@"quoteboxAddedOnTurn"];
         _quoteboxVerticalOffset = (NSUInteger)[decoder decodeIntegerForKey:@"quoteboxVerticalOffset"];
     }
     return self;
@@ -239,7 +239,7 @@
     [encoder encodeObject: _bufferTextStorage forKey:@"bufferTextStorage"];
 
     [encoder encodeObject:@(_quoteboxSize) forKey:@"quoteboxSize"];
-    [encoder encodeInteger:_quoteboxAddedOnTurn forKey:@"quoteboxAddedOnTurn"];
+    [encoder encodeInteger:_quoteboxAddedOnPAC forKey:@"quoteboxAddedOnTurn"];
     [encoder encodeInteger:(NSInteger)_quoteboxVerticalOffset forKey:@"quoteboxVerticalOffset"];
 }
 
@@ -354,8 +354,6 @@
         if (glkctl.usesFont3)
             [self createBeyondZorkStyle];
 
-        NSUInteger textstoragelength = textstorage.length;
-
         /* reassign styles to attributedstrings */
         // We create a copy of the text storage
         _bufferTextStorage = [textstorage mutableCopy];
@@ -365,7 +363,7 @@
          NSArray<NSDictionary *> __block *blockStyles = styles;
 
         [textstorage
-         enumerateAttributesInRange:NSMakeRange(0, textstoragelength)
+         enumerateAttributesInRange:NSMakeRange(0, textstorage.length)
          options:0
          usingBlock:^(NSDictionary *attrs, NSRange range, BOOL *stop) {
 
@@ -605,8 +603,13 @@
     _textview.textContainerInset =
         NSMakeSize(self.theme.gridMarginX, self.theme.gridMarginY);
 
-    NSUInteger newcols = (NSUInteger)round((frame.size.width -
-                                            (_textview.textContainerInset.width + container.lineFragmentPadding) * 2) /
+    if (self.theme.cellWidth == 0 || self.theme.cellHeight == 0)
+        return;
+
+    CGFloat margins = (_textview.textContainerInset.width + container.lineFragmentPadding) * 2;
+    if (margins > frame.size.width)
+        margins = 0;
+    NSUInteger newcols = (NSUInteger)round((frame.size.width - margins) /
                                            self.theme.cellWidth);
 
     CGFloat containerInsetHeight = _textview.textContainerInset.height * 2;
@@ -801,7 +804,6 @@
 }
 
 - (void)moveToColumn:(NSUInteger)c row:(NSUInteger)r {
-
     //For Bureaucracy form accessibility
     if (self.glkctl.form
        && (r != ypos || abs((int)c - (int)xpos) > 1)) {
@@ -887,7 +889,7 @@
                && [_lastKeyPress caseInsensitiveCompare:string] == NSOrderedSame) {
         // Don't echo keys if speak command setting is off
         if (glkctl.theme.vOSpeakCommand) {
-            [glkctl speakStringNow:string];
+            [glkctl speakStringNow:[string lowercaseString]];
         }
         glkctl.form.dontSpeakField = YES;
     }
@@ -905,7 +907,6 @@
     if (startpos > textstoragelength) {
         // We are outside window visible range!
         // Do nothing
-        NSLog(@"Printed outside grid window visible range! (%@)", string);
         return;
     }
 
@@ -1020,6 +1021,15 @@
 - (NSSize)currentSizeInChars {
     return NSMakeSize(cols, rows);
 }
+
+- (unichar)characterAtPoint:(NSPoint)point {
+    NSSize size = [self currentSizeInChars];
+    NSUInteger index = (NSUInteger)(point.y * (size.width + 1.0) + point.x);
+    if (textstorage.length <= index)
+        return 0;
+    return [textstorage.string characterAtIndex:index];
+}
+
 
 #pragma mark Hyperlinks
 
@@ -1488,7 +1498,7 @@
     [transform scaleBy:zorkFont.pointSize];
     CGFloat yscale = (self.theme.cellHeight + 0.5 + 0.1 * self.theme.bZAdjustment) / zorkFont.boundingRectForFont.size.height;
     if (isMonaco)
-        yscale *= 1.1;
+        yscale *= 1.5;
     [transform scaleXBy:1 yBy:yscale];
 
     zorkFont = [NSFont fontWithDescriptor:zorkFont.fontDescriptor textTransform:transform];
@@ -1576,17 +1586,18 @@
     [glkctl.quoteBoxes addObject:box];
     lowerView.quoteBox = box;
     box.quoteboxVerticalOffset = linesToSkip;
-    box.quoteboxAddedOnTurn = glkctl.turns;
+    box.quoteboxAddedOnPAC = 0;
+    glkctl.numberOfPrintsAndClears = 0;
     box.quoteboxParent = superView.enclosingScrollView;
     [box performSelector:@selector(quoteboxAdjustSize:) withObject:nil afterDelay:0.2];
 }
 
 - (void)quoteboxAdjustSize:(id)sender {
-    NSScrollView *quoteboxParent = _quoteboxParent;
+
     GlkController *glkctl = self.glkctl;
+    NSScrollView *quoteboxParent = _quoteboxParent;
 
     if (quoteboxParent == nil) {
-        NSLog(@"_quoteboxParent nil!");
         return;
     }
     NSTextView *textView = quoteboxParent.documentView;
@@ -1625,7 +1636,6 @@
         self.animator.alphaValue = 1;
     } completionHandler:^{
         self.alphaValue = 1;
-        self.quoteboxAddedOnTurn = self.glkctl.turns - 1;
     }];
 }
 

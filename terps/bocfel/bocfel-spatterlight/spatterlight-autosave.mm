@@ -37,6 +37,7 @@ extern "C" {
 
 #include "zterp.h"
 #include "stack.h"
+#include "process.h"
 #include "spatterlight-autosave.h"
 
 #import "TempLibrary.h"
@@ -67,7 +68,12 @@ void spatterlight_do_autosave(enum SaveOpcode saveopcode) {
         getautosavedir(c);
         delete[] c;
     }
-    
+
+    if (autosavedir == NULL) {
+        win_showerror(@"Could not create autosave directory name.".UTF8String);
+        return;
+    }
+
     @autoreleasepool {
         TempLibrary *library = [[TempLibrary alloc] init];
         NSFileManager *fileManager = [NSFileManager defaultManager];
@@ -86,8 +92,14 @@ void spatterlight_do_autosave(enum SaveOpcode saveopcode) {
         [fileManager removeItemAtPath:oldgamepath error:&error];
         [fileManager moveItemAtPath:finalgamepath toPath:oldgamepath error:&error];
 
+        unsigned long stored_pc = pc;
+        if (saveopcode == SaveOpcode::None) {
+            saveopcode = SaveOpcode::ReadChar;
+            pc--;
+        }
         bool res;
         res = do_save(SaveType::Autosave, saveopcode);
+        pc = stored_pc;
         
         if (!res) {
             win_showerror("Failed to autosave.");
@@ -133,58 +145,7 @@ void spatterlight_do_autosave(enum SaveOpcode saveopcode) {
     return;
 }
 
-static void load_resources(void)
-{
-    strid_t gamefile = NULL;
-    strid_t blorbfile = NULL;
-    
-    strid_t stream;
-    
-    for (stream = glk_stream_iterate(NULL, NULL); stream; stream = glk_stream_iterate(stream, NULL))
-    {
-        if (stream->filename != NULL && strcmp(stream->filename, game_file.c_str()) == 0)
-        {
-            gamefile = stream;
-            break;
-        }
-    }
-    if(gamefile != NULL)
-    {
-        if(giblorb_set_resource_map(gamefile) == giblorb_err_None)
-            return;
-        gamefile = NULL;
-    }
-    /* 7 for the worst case of needing to add .blorb to the end plus the
-     * null character.
-     */
-    size_t stringlength = strlen(game_file.c_str()) + 7;
-    char *filename = (char *)malloc(stringlength);
-    if(filename != NULL)
-    {
-        const char *exts[] = { ".blb", ".blorb" };
-        
-        strncpy(filename, game_file.c_str(), stringlength);
-        for(size_t i = 0; blorbfile == NULL && i < (sizeof exts) / (sizeof *exts); i++)
-        {
-            char *p = strrchr(filename, '.');
-            if(p != NULL) *p = 0;
-            strncat(filename, exts[i], 7);
-            
-            for (stream = glk_stream_iterate(NULL, NULL); stream; stream = glk_stream_iterate(stream, NULL))
-            {
-                if (stream->filename != NULL && strcmp(stream->filename, filename) == 0)
-                {
-                    blorbfile = stream;
-                    break;
-                }
-            }
-        }
-        free(filename);
-    }
-    
-    if (blorbfile != NULL)
-        giblorb_set_resource_map(blorbfile);
-}
+extern bool just_autorestored;
 
 // Restore an autosaved game, if one exists.
 // Returns true if the game was restored successfully, false if not.
@@ -204,7 +165,7 @@ bool spatterlight_restore_autosave(enum SaveOpcode *saveopcode)
         
         NSString *dirname = @(autosavedir);
         if (!dirname.length) {
-            win_showerror(@"Could not create autosave folder name.".UTF8String);
+            win_showerror(@"Could not create autosave directory name.".UTF8String);
             return false;
         }
         NSString *finalgamepath = [dirname stringByAppendingPathComponent:@"autosave.glksave"];
@@ -251,15 +212,47 @@ bool spatterlight_restore_autosave(enum SaveOpcode *saveopcode)
         [TempLibrary setExtraUnarchiveHook:nil];
         
         if (newlib) {
+            bool blorb_stream_was_active = (active_blorb_file_stream != nullptr);
+            char old_blorb_file_name[2048];
+            size_t old_name_length;
+            if (blorb_stream_was_active) {
+                old_name_length = strnlen(active_blorb_file_stream->filename, 2047) + 1;
+                strncpy(old_blorb_file_name, active_blorb_file_stream->filename, old_name_length + 1);
+                giblorb_unset_resource_map();
+                active_blorb_file_stream = nullptr;
+            }
             [newlib updateFromLibrary];
             recover_library_state(&library_state);
-            
-            load_resources();
-            
+
+            if (active_blorb_file_stream != nullptr && blorb_stream_was_active &&
+                strncmp(active_blorb_file_stream->filename, old_blorb_file_name, 2048) != 0) {
+                // If the autorestored stream file name doesn't match the one we opened before
+                // the autorestore, we need to close it (and reopen the old one below.)
+                glk_stream_close(active_blorb_file_stream, 0);
+                active_blorb_file_stream = nullptr;
+            }
+
+            // If there was a working, active blorb file, but there isn't anymore
+            // we just reopen the blorb file we used before the autorestore
+            if (active_blorb_file_stream == nullptr && blorb_stream_was_active) {
+                active_blorb_file_stream = glkunix_stream_open_pathname(old_blorb_file_name, 0, 0);
+            }
+
+            if (active_blorb_file_stream != nullptr) {
+                giblorb_err_t err = giblorb_set_resource_map(active_blorb_file_stream);
+                if (err != giblorb_err_None) {
+                    glk_stream_close(active_blorb_file_stream, 0);
+                    active_blorb_file_stream = nullptr;
+                }
+            }
+
             [newlib updateFromLibraryLate];
         } else { win_reset(); exit(0); }
         
     }
+    
+    just_autorestored = true;
+
     return true;
 }
 
@@ -278,11 +271,31 @@ static void spatterlight_library_archive(TempLibrary *library, NSCoder *encoder)
     [encoder encodeInt32:library_state.statuswintag forKey:@"bocfel_statuswintag"];
     [encoder encodeInt32:library_state.upperwintag forKey:@"bocfel_upperwintag"];
     [encoder encodeInt32:library_state.errorwintag forKey:@"bocfel_errorwintag"];
+    [encoder encodeInt32:library_state.graphicswintag forKey:@"bocfel_graphicswintag"];
+    [encoder encodeInt32:library_state.blorbfiletag forKey:@"bocfel_blorbfiletag"];
     [encoder encodeInt32:(int32_t)library_state.routine forKey:@"bocfel_routine"];
     [encoder encodeInt32:(int32_t)library_state.queued_sound forKey:@"bocfel_next_sample"];
     [encoder encodeInt32:(int32_t)library_state.sound_channel_tag forKey:@"bocfel_sound_channel_tag"];
     [encoder encodeInt64:(int64_t)library_state.last_random_seed forKey:@"bocfel_last_random_seed"];
     [encoder encodeInt32:(int32_t)library_state.random_calls_count forKey:@"bocfel_random_calls_count"];
+
+    [encoder encodeInt32:(int32_t)library_state.screenmode forKey:@"bocfel_screenmode"];
+    [encoder encodeInt32:(int32_t)library_state.selected_journey_line forKey:@"bocfel_selected_journey_line"];
+    [encoder encodeInt32:(int32_t)library_state.selected_journey_column forKey:@"bocfel_selected_journey_column"];
+    [encoder encodeInt32:(int32_t)library_state.current_input_mode forKey:@"bocfel_current_input_mode"];
+    [encoder encodeInt32:(int32_t)library_state.current_input_length forKey:@"bocfel_current_input_length"];
+
+    if (library_state.number_of_journey_words > 0) {
+        NSMutableArray<NSArray *> *tempMutArray = [[NSMutableArray alloc] initWithCapacity:library_state.number_of_journey_words];
+
+        for (int i = 0; i < library_state.number_of_journey_words; i++) {
+            NSArray<NSNumber *> *tempArray = @[@(library_state.journey_words[i].str), @(library_state.journey_words[i].pcf), @(library_state.journey_words[i].pcm)];
+            [tempMutArray addObject:tempArray];
+        }
+
+        [encoder encodeObject:tempMutArray forKey:@"bocfel_printed_journey_words"];
+    }
+
 }
 
 static void spatterlight_library_unarchive(TempLibrary *library, NSCoder *decoder) {
@@ -300,9 +313,27 @@ static void spatterlight_library_unarchive(TempLibrary *library, NSCoder *decode
     library_state.statuswintag = [decoder decodeInt32ForKey:@"bocfel_statuswintag"];
     library_state.upperwintag = [decoder decodeInt32ForKey:@"bocfel_upperwintag"];
     library_state.errorwintag = [decoder decodeInt32ForKey:@"bocfel_errorwintag"];
+    library_state.graphicswintag = [decoder decodeInt32ForKey:@"bocfel_graphicswintag"];
+    library_state.blorbfiletag = [decoder decodeInt32ForKey:@"bocfel_blorbfiletag"];
     library_state.routine = [decoder decodeInt32ForKey:@"bocfel_routine"];
     library_state.queued_sound = [decoder decodeInt32ForKey:@"bocfel_next_sample"];
     library_state.sound_channel_tag = [decoder decodeInt32ForKey:@"bocfel_sound_channel_tag"];
     library_state.last_random_seed = [decoder decodeInt64ForKey:@"bocfel_last_random_seed"];
     library_state.random_calls_count = [decoder decodeInt32ForKey:@"bocfel_random_calls_count"];
+
+    library_state.screenmode = (V6ScreenMode)[decoder decodeInt32ForKey:@"bocfel_screenmode"];
+    library_state.selected_journey_line = [decoder decodeInt32ForKey:@"bocfel_selected_journey_line"];
+    library_state.selected_journey_column = [decoder decodeInt32ForKey:@"bocfel_selected_journey_column"];
+    library_state.current_input_mode = (inputMode)[decoder decodeInt32ForKey:@"bocfel_current_input_mode"];
+    library_state.current_input_length = [decoder decodeInt32ForKey:@"bocfel_current_input_length"];
+
+    NSArray<NSArray *> *tempArray = [decoder decodeObjectOfClass:[NSArray class] forKey:@"bocfel_printed_journey_words"];
+    library_state.number_of_journey_words = tempArray.count;
+    NSUInteger i = 0;
+    for (NSArray *array in tempArray) {
+        library_state.journey_words[i].str = ((NSNumber *)[array objectAtIndex:0]).intValue;
+        library_state.journey_words[i].pcf = ((NSNumber *)[array objectAtIndex:1]).intValue;
+        library_state.journey_words[i].pcm = ((NSNumber *)[array objectAtIndex:2]).intValue;
+        i++;
+    }
 }

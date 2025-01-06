@@ -85,29 +85,11 @@
 + (void)typeURL:(NSURL *)url intoFileDialog:(XCUIElement *)dialog {
     [dialog typeKey:@"g" modifierFlags:XCUIKeyModifierCommand | XCUIKeyModifierShift];
 
-    if (@available(macOS 12, *)) {
         XCUIElement *sheet = dialog.sheets.firstMatch;
         XCTAssert([sheet waitForExistenceWithTimeout:5]);
 
-        XCUIElement *input = sheet.textFields.firstMatch;
-        XCTAssert([input waitForExistenceWithTimeout:5]);
-
-        [input typeText:url.path];
-        [input typeKey:XCUIKeyboardKeyEnter modifierFlags:XCUIKeyModifierNone];
-    } else {
-        XCUIElement *goButton = dialog.buttons[@"Go"];
-        XCTAssert(goButton.exists);
-
-        XCUIElement *sheet = dialog.sheets.firstMatch;
-        XCTAssert([sheet waitForExistenceWithTimeout:5]);
-
-        XCUIElement *input = sheet.comboBoxes.firstMatch;
-        XCTAssert([input waitForExistenceWithTimeout:5]);
-
-        [input typeText:url.path];
-        [goButton click];
-    }
-
+        [sheet typeText:url.path];
+        [sheet typeKey:XCUIKeyboardKeyEnter modifierFlags:XCUIKeyModifierNone];
 }
 
 + (void)typeURL:(NSURL *)url intoApp:(XCUIApplication *)app {
@@ -120,17 +102,14 @@
 
     XCTAssert([sheet waitForExistenceWithTimeout:5]);
 
-    XCUIElement *input = sheet.textFields.firstMatch;
-    XCTAssert([input waitForExistenceWithTimeout:5]);
-
-    [input typeText:url.path];
-    [input typeKey:XCUIKeyboardKeyEnter modifierFlags:XCUIKeyModifierNone];
+    [sheet typeText:url.path];
+    [sheet typeKey:XCUIKeyboardKeyEnter modifierFlags:XCUIKeyModifierNone];
 }
 
 + (NSString *)transcriptFromFile:(NSString *)fileName {
     NSURL *url = [UITests transcriptWithFormat:@"Plain Text"];
 
-    url = [url URLByAppendingPathComponent:fileName];
+    url = [url URLByAppendingPathComponent:fileName isDirectory:NO];
 
     NSError *error = nil;
     NSString *comparison = [NSString stringWithContentsOfURL:url encoding:NSUTF8StringEncoding error:&error];
@@ -144,7 +123,7 @@
 + (NSAttributedString *)attributedTranscriptFromFile:(NSString *)fileName {
     NSURL *url = [UITests transcriptWithFormat:@"Plain Text"];
 
-    url = [url URLByAppendingPathComponent:fileName];
+    url = [url URLByAppendingPathComponent:fileName isDirectory:NO];
 
     NSError *error = nil;
     NSAttributedString *comparison = [[NSAttributedString alloc] initWithURL:url options:@{NSDocumentTypeDocumentAttribute:NSRTFTextDocumentType} documentAttributes:nil error:&error];
@@ -882,7 +861,7 @@
 
     error = nil;
 
-    transcriptURL = [transcriptURL URLByAppendingPathComponent:@"Transcript of Transparent.txt"];
+    transcriptURL = [transcriptURL URLByAppendingPathComponent:@"Transcript of Transparent.txt" isDirectory:NO];
 
     NSString *transcript = [NSString stringWithContentsOfURL:transcriptURL encoding:NSUTF8StringEncoding error:&error];
 
@@ -939,7 +918,7 @@
 
     NSError *error = nil;
 
-    transcriptURL = [transcriptURL URLByAppendingPathComponent:@"Transcript of The Elysium Enigma.txt"];
+    transcriptURL = [transcriptURL URLByAppendingPathComponent:@"Transcript of The Elysium Enigma.txt" isDirectory:NO];
 
     NSString *transcript = [NSString stringWithContentsOfURL:transcriptURL encoding:NSUTF8StringEncoding error:&error];
 
@@ -975,7 +954,7 @@
     XCTNSPredicateExpectation *expectation = [[XCTNSPredicateExpectation alloc] initWithPredicate:predicate object:textView];
     [self waitForExpectations:@[expectation] timeout:80];
 
-    transcriptURL = [transcriptURL URLByAppendingPathComponent:@"Transcript of tildeath.gam.txt"];
+    transcriptURL = [transcriptURL URLByAppendingPathComponent:@"Transcript of tildeath.gam.txt" isDirectory:NO];
 
     NSError *error = nil;
 
@@ -1085,7 +1064,7 @@
 
     NSError *error = nil;
 
-    transcriptURL = [transcriptURL URLByAppendingPathComponent:@"Transcript of Guilty Bastards.txt"];
+    transcriptURL = [transcriptURL URLByAppendingPathComponent:@"Transcript of Guilty Bastards.txt" isDirectory:NO];
 
     NSString *transcript = [NSString stringWithContentsOfURL:transcriptURL encoding:NSUTF8StringEncoding error:&error];
 
@@ -1180,7 +1159,7 @@
 
     NSError *error = nil;
 
-    transcriptURL = [transcriptURL URLByAppendingPathComponent:@"Transcript of AGT-03201-0000E16C.agx.txt"];
+    transcriptURL = [transcriptURL URLByAppendingPathComponent:@"Transcript of AGT-03201-0000E16C.agx.txt" isDirectory:NO];
 
     NSString *transcript = [NSString stringWithContentsOfURL:transcriptURL encoding:NSUTF8StringEncoding error:&error];
 
@@ -1220,7 +1199,7 @@
 
     NSError *error = nil;
 
-    transcriptURL = [transcriptURL URLByAppendingPathComponent:@"Transcript of Q.l9.txt"];
+    transcriptURL = [transcriptURL URLByAppendingPathComponent:@"Transcript of Q.l9.txt" isDirectory:NO];
 
     NSString *transcript = [NSString stringWithContentsOfURL:transcriptURL encoding:NSUTF8StringEncoding error:&error];
 
@@ -1262,7 +1241,7 @@
 
     [textView typeText:@"glk script off\r"];
 
-    transcriptURL = [transcriptURL URLByAppendingPathComponent:@"Transcript of mag.mag.txt"];
+    transcriptURL = [transcriptURL URLByAppendingPathComponent:@"Transcript of mag.mag.txt" isDirectory:NO];
 
     NSString *transcript = [NSString stringWithContentsOfURL:transcriptURL encoding:NSUTF8StringEncoding error:&error];
 
@@ -1320,7 +1299,7 @@
 
     NSError *error = nil;
 
-    transcriptURL = [transcriptURL URLByAppendingPathComponent:@"Transcript of Hamper.taf.txt"];
+    transcriptURL = [transcriptURL URLByAppendingPathComponent:@"Transcript of Hamper.taf.txt" isDirectory:NO];
 
     NSString *transcript = [NSString stringWithContentsOfURL:transcriptURL encoding:NSUTF8StringEncoding error:&error];
 
@@ -1364,7 +1343,7 @@
 
     NSURL *transcriptURL = [UITests transcriptWithFormat:@"Rich Text Format"];
 
-    transcriptURL = [transcriptURL URLByAppendingPathComponent:@"czech.z5 (finished).rtf"];
+    transcriptURL = [transcriptURL URLByAppendingPathComponent:@"czech.z5 (finished).rtf" isDirectory:NO];
 
     error = nil;
     NSAttributedString *comparison = [[NSAttributedString alloc] initWithURL:transcriptURL options:@{NSDocumentTypeDocumentAttribute:NSRTFTextDocumentType} documentAttributes:nil error:&error];
@@ -1409,7 +1388,7 @@
 
     NSURL *transcriptURL = [UITests transcriptWithFormat:@"Rich Text Format"];
 
-    transcriptURL = [transcriptURL URLByAppendingPathComponent:@"praxix.rtf"];
+    transcriptURL = [transcriptURL URLByAppendingPathComponent:@"praxix.rtf" isDirectory:NO];
 
     error = nil;
     NSAttributedString *comparison = [[NSAttributedString alloc] initWithURL:transcriptURL options:@{NSDocumentTypeDocumentAttribute:NSRTFTextDocumentType} documentAttributes:nil error:&error];
@@ -1458,7 +1437,7 @@
 
     NSURL *transcriptURL = [UITests transcriptWithFormat:@"Rich Text Format"];
 
-    transcriptURL = [transcriptURL URLByAppendingPathComponent:@"etude.rtf"];
+    transcriptURL = [transcriptURL URLByAppendingPathComponent:@"etude.rtf" isDirectory:NO];
 
     error = nil;
     NSAttributedString *comparison = [[NSAttributedString alloc] initWithURL:transcriptURL options:@{NSDocumentTypeDocumentAttribute:NSRTFTextDocumentType} documentAttributes:nil error:&error];
@@ -1498,7 +1477,7 @@
     XCTNSPredicateExpectation *expectation = [[XCTNSPredicateExpectation alloc] initWithPredicate:predicate object:textView2];
     [self waitForExpectations:@[expectation] timeout:80];
 
-    transcriptURL = [transcriptURL URLByAppendingPathComponent:@"Transcript of grail.j2.txt"];
+    transcriptURL = [transcriptURL URLByAppendingPathComponent:@"Transcript of grail.j2.txt" isDirectory:NO];
 
     NSError *error = nil;
     NSString *transcript = [NSString stringWithContentsOfURL:transcriptURL encoding:NSUTF8StringEncoding error:&error];
@@ -1536,7 +1515,7 @@
     XCTNSPredicateExpectation *expectation = [[XCTNSPredicateExpectation alloc] initWithPredicate:predicate object:textView];
     [self waitForExpectations:@[expectation] timeout:25];
 
-    transcriptURL = [transcriptURL URLByAppendingPathComponent:@"Transcript of adv01.dat.txt"];
+    transcriptURL = [transcriptURL URLByAppendingPathComponent:@"Transcript of adv01.dat.txt" isDirectory:NO];
 
     NSError *error = nil;
     NSString *transcript = [NSString stringWithContentsOfURL:transcriptURL encoding:NSUTF8StringEncoding error:&error];
@@ -1576,7 +1555,7 @@
     XCTNSPredicateExpectation *expectation = [[XCTNSPredicateExpectation alloc] initWithPredicate:predicate object:textView];
     [self waitForExpectations:@[expectation] timeout:25];
 
-    transcriptURL = [transcriptURL URLByAppendingPathComponent:@"Transcript of tot.tay.txt"];
+    transcriptURL = [transcriptURL URLByAppendingPathComponent:@"Transcript of tot.tay.txt" isDirectory:NO];
 
     NSError *error = nil;
     NSString *transcript = [NSString stringWithContentsOfURL:transcriptURL encoding:NSUTF8StringEncoding error:&error];
@@ -1615,7 +1594,7 @@
     XCTNSPredicateExpectation *expectation = [[XCTNSPredicateExpectation alloc] initWithPredicate:predicate object:textView];
     [self waitForExpectations:@[expectation] timeout:25];
 
-    transcriptURL = [transcriptURL URLByAppendingPathComponent:@"Transcript of SPL13P.plus.txt"];
+    transcriptURL = [transcriptURL URLByAppendingPathComponent:@"Transcript of SPL13P.plus.txt" isDirectory:NO];
 
     NSError *error = nil;
     NSString *transcript = [NSString stringWithContentsOfURL:transcriptURL encoding:NSUTF8StringEncoding error:&error];
@@ -1822,7 +1801,6 @@
     if (!infoWin.exists)
         infoWin = app.windows[@"Curses Info"];
     XCUIElement *image = [[infoWin childrenMatchingType:XCUIElementTypeAny] elementBoundByIndex:4];
-    [infoWin click];
     [self forceClickElement:image];
     [infoWin.menuItems[@"saveImage:"] click];
 
@@ -1934,7 +1912,6 @@
 
     infoWin = app.windows[@"imagetest.gblorb Info"];
     image = [[infoWin childrenMatchingType:XCUIElementTypeAny] elementBoundByIndex:4];
-    [infoWin click];
     [self forceClickElement:image];
     [infoWin.menuItems[@"Select Image File…"] click];
 
@@ -1943,7 +1920,7 @@
                         subdirectory:nil];
 
     NSURL *path = url.URLByDeletingLastPathComponent;
-    path = [path URLByAppendingPathComponent:@"curses.png"];
+    path = [path URLByAppendingPathComponent:@"curses.png" isDirectory:NO];
 
     XCUIElement *openDialog = app.sheets.firstMatch;
     XCTAssert([openDialog waitForExistenceWithTimeout:5]);
@@ -1954,7 +1931,7 @@
 }
 
 - (void)forceClickElement:(XCUIElement *)element {
-    XCUICoordinate *coordinate = [element coordinateWithNormalizedOffset:CGVectorMake(0.0, 0.0)];
+    XCUICoordinate *coordinate = [element coordinateWithNormalizedOffset:CGVectorMake(0.1, 0.1)];
     [coordinate rightClick];
 }
 

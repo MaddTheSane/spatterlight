@@ -41,9 +41,9 @@
 - (instancetype)initWithCoder:(NSCoder *)decoder {
     self = [super init];
     if (self) {
-    _bookmark = [decoder decodeObjectOfClass:[NSData class] forKey:@"bookmark"];
-    accessCount = 0;
-    _active = NO;
+        _bookmark = [decoder decodeObjectOfClass:[NSData class] forKey:@"bookmark"];
+        accessCount = 0;
+        _active = NO;
     }
     return self;
 }
@@ -52,17 +52,33 @@
     [encoder encodeObject:_bookmark forKey:@"bookmark"];
 }
 
++ (BOOL)needsPermissionForURL:(NSURL *)url
+{
+    if ( !url ) {
+        return NO;
+    }
+    NSError *error = nil;
+
+    [NSData dataWithContentsOfURL:url options:NSDataReadingMappedAlways error:&error];
+
+    // Error 257: "The file couldn’t be opened because you don’t have permission to view it."
+    if (error.domain == NSCocoaErrorDomain && error.code == 257) {
+        return YES;
+    }
+
+    return NO;
+}
+
 + (void)askForAccessToURL:(NSURL *)url andThenRunBlock:(void (^)(void))block {
 
     NSURL *bookmarkURL = [FolderAccess suitableDirectoryForURL:url];
     if (bookmarkURL) {
-        if ([[NSFileManager defaultManager] isReadableFileAtPath:bookmarkURL.path]) {
+        if (![FolderAccess needsPermissionForURL:bookmarkURL]) {
             [FolderAccess storeBookmark:bookmarkURL];
             [FolderAccess saveBookmarks];
         } else {
-
             [FolderAccess grantAccessToFolder:bookmarkURL];
-            if (![[NSFileManager defaultManager] isReadableFileAtPath:bookmarkURL.path]) {
+            if ([FolderAccess needsPermissionForURL:bookmarkURL]) {
 
                 NSOpenPanel *openPanel = [NSOpenPanel openPanel];
                 openPanel.message = NSLocalizedString(@"Spatterlight would like to access files in this folder", nil);
@@ -84,6 +100,24 @@
     }
 
     block();
+}
+
++ (void)forceAccessDialogToURL:(NSURL *)url andThenRunBlock:(void (^)(void))block {
+    NSOpenPanel *openPanel = [NSOpenPanel openPanel];
+    openPanel.message = NSLocalizedString(@"Spatterlight would like to access files in this folder", nil);
+    openPanel.prompt = NSLocalizedString(@"Authorize", nil);
+    openPanel.canChooseFiles = NO;
+    openPanel.canChooseDirectories = YES;
+    openPanel.canCreateDirectories = NO;
+    openPanel.directoryURL = url;
+    NSModalResponse result = [openPanel runModal];
+    if (result == NSModalResponseOK) {
+        NSURL *blockURL = openPanel.URL;
+        [FolderAccess storeBookmark:blockURL];
+        [FolderAccess saveBookmarks];
+        block();
+    }
+    return;
 }
 
 + (NSURL *)grantAccessToFile:(NSURL *)url {
@@ -108,7 +142,7 @@
     pathComponents = [pathComponents subarrayWithRange:NSMakeRange(0, 3)];
     homeString = [NSString pathWithComponents:pathComponents];
 
-    NSURL *homeURL = [NSURL fileURLWithPath:homeString]; // To get user home root
+    NSURL *homeURL = [NSURL fileURLWithPath:homeString isDirectory:YES]; // To get user home root
 
     if (![[FolderAccess getVolumeNameForURL:url] isEqualToString:[FolderAccess getVolumeNameForURL:homeURL]]) {
         pathComponents = url.path.pathComponents;
@@ -126,7 +160,7 @@
     if (parentDir.length < homeString.length)
         parentDir = homeString;
 
-    return [NSURL fileURLWithPath:parentDir];
+    return [NSURL fileURLWithPath:parentDir isDirectory:YES];
 }
 
 + (NSString *)getVolumeNameForURL:(NSURL *)url {
@@ -164,7 +198,7 @@
     NSURL *secureURL = [FolderAccess restoreURL:folderURL];
     if (secureURL)
         folderURL = secureURL;
-    if ([[NSFileManager defaultManager] isReadableFileAtPath:folderURL.path])
+    if (![FolderAccess needsPermissionForURL:folderURL])
         return folderURL;
     return nil;
 }
@@ -176,7 +210,7 @@
 
     NSURL *url = [[NSFileManager defaultManager] containerURLForSecurityApplicationGroupIdentifier:groupIdentifier];
 
-    url = [url URLByAppendingPathComponent:@"Bookmarks.dict"];
+    url = [url URLByAppendingPathComponent:@"Bookmarks.dict" isDirectory:NO];
     return url.path;
 }
 
@@ -228,8 +262,32 @@
     return storedURL;
 }
 
++ (NSURL *)forceRestoreURL:(NSURL *)url {
+    FolderAccess *storedAccess = globalBookmarks[url];
+    if (!storedAccess) {
+        NSLog(@"No stored data for URL %@", url.path);
+        return nil;
+    }
+    [storedAccess forceResetCount];
+    NSURL *storedURL = [storedAccess askToAccess];
+    if (![storedURL isEqual:url]) {
+        if (!storedURL)
+            NSLog(@"storedURL is nil! Could not access %@!", url.path);
+
+        NSLog(@"Bookmark is stale! File has moved from %@ to %@!", url.path, storedURL.path);
+        globalBookmarks[url] = nil;
+        if (storedURL)
+            globalBookmarks[storedURL] = storedAccess;
+    }
+    return storedURL;
+}
+
+- (void)forceResetCount {
+    accessCount = 0;
+}
+
 - (void)resetCountIfNotReadable:(NSURL *)url {
-    if (accessCount != 0 && ![[NSFileManager defaultManager] isReadableFileAtPath:url.path]) {
+    if (accessCount != 0 && [FolderAccess needsPermissionForURL:url]) {
         NSLog(@"Secure url %@: Access count was %ld but path was not readable!", url.path, accessCount);
         accessCount = 0;
     }
@@ -243,7 +301,7 @@
             return nil;
     } else {
         url = controlURL;
-        if (![[NSFileManager defaultManager] isReadableFileAtPath:url.path]) {
+        if ([FolderAccess needsPermissionForURL:url]) {
             NSLog(@"askToAccess: already accessing %@ (accessCount = %ld) but the file there is NOT readable!", url.path, accessCount);
         }
     }

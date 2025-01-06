@@ -245,8 +245,10 @@ extern NSArray *gGameFileTypes;
         return nil;
     }
 
-    if ([extension isEqualToString:@"blorb"] || [extension isEqualToString:@"blb"]) {
-        blorb = [[Blorb alloc] initWithData:[NSData dataWithContentsOfFile:path]];
+    NSData *fileData = nil;
+    if ([extension isEqualToString:@"blorb"] || [extension isEqualToString:@"blb"] || [extension isEqualToString:@"zblorb"] || [extension isEqualToString:@"zbl"]) {
+        fileData = [NSData dataWithContentsOfFile:path];
+        blorb = [[Blorb alloc] initWithData:fileData];
         BlorbResource *executable = [blorb resourcesForUsage:ExecutableResource].firstObject;
         if (!executable) {
             if (report) {
@@ -278,9 +280,8 @@ extern NSArray *gGameFileTypes;
     }
 
     void *ctx = get_babel_ctx();
-    format = babel_init_ctx((char*)path.UTF8String, ctx);
-    if (!format || !babel_get_authoritative_ctx(ctx))
-    {
+    format = babel_init_ctx((char*)path.fileSystemRepresentation, ctx);
+    if (!format || !babel_get_authoritative_ctx(ctx)) {
         babel_release_ctx(ctx);
         free(ctx);
         if (report) {
@@ -298,8 +299,7 @@ extern NSArray *gGameFileTypes;
     if (s) format = s+1;
 
     rv = babel_treaty_ctx(GET_STORY_FILE_IFID_SEL, buf, sizeof buf, ctx);
-    if (rv <= 0)
-    {
+    if (rv <= 0) {
         babel_release_ctx(ctx);
         free(ctx);
         if (report) {
@@ -321,8 +321,11 @@ extern NSArray *gGameFileTypes;
     babel_release_ctx(ctx);
     free(ctx);
 
-    if ([ifid isEqualToString:@"ZCODE-5-------"] && [path.signatureFromFile isEqualToString:@"0304000545ff60e931b802ea1e6026860000c4cacbd2c1cb022acde526d400000000000000000000000000000000000000000000000000000000000000000000"])
+    NSString *hash = path.signatureFromFile;
+    // Hack to differ between hacked versions of Zork I and Suspended
+    if ([ifid isEqualToString:@"ZCODE-5-------"] && [hash isEqualToString:@"0304000545ff60e931b802ea1e6026860000c4cacbd2c1cb022acde526d400000000000000000000000000000000000000000000000000000000000000000000"]) {
         ifid = @"ZCODE-5-830222";
+    }
 
     if (([extension isEqualToString:@"dat"] &&
          !(([@(format) isEqualToString:@"zcode"] && [self checkZcode:path]) ||
@@ -359,11 +362,15 @@ extern NSArray *gGameFileTypes;
 
     TableViewController *libController = _libController;
 
+    NSData __block *blockdata = fileData;
     [context performBlockAndWait:^{
         metadata = [TableViewController fetchMetadataForIFID:ifid inContext:context];
 
-        if ([Blorb isBlorbURL:[NSURL fileURLWithPath:path]] && !blorb)
-            blorb = [[Blorb alloc] initWithData:[NSData dataWithContentsOfFile:path]];
+        if ([Blorb isBlorbURL:[NSURL fileURLWithPath:path isDirectory:NO]] && !blorb) {
+            if (blockdata == nil)
+                blockdata = [NSData dataWithContentsOfFile:path];
+            blorb = [[Blorb alloc] initWithData:blockdata];
+        }
 
         if (!metadata)
         {
@@ -380,17 +387,16 @@ extern NSArray *gGameFileTypes;
             game = [TableViewController fetchGameForIFID:ifid inContext:context];
             if (game) {
                 if ([game.detectedFormat isEqualToString:@"glulx"])
-                    game.hashTag = path.signatureFromFile;
+                    game.hashTag = hash;
                 else if ([game.detectedFormat isEqualToString:@"zcode"]) {
                     [self addZCodeIDfromFile:path blorb:blorb toGame:game];
                 }
-                if (![path isEqualToString:game.path])
-                {
-                    NSLog(@"File location did not match for %@. Updating library with new file location (%@).", path.lastPathComponent, path);
+                if (![path isEqualToString:game.path]) {
+                    NSLog(@"File location did not match for %@ (previous path:%@). Updating library with new file location (%@).", path.lastPathComponent, game.path, path);
                     [game bookmarkForPath:path];
                 }
                 if (![game.detectedFormat isEqualToString:@(format)]) {
-                    NSLog(@"Game format did not match for %@. Updating library with new detected format (%s).", path.lastPathComponent, format);
+                    NSLog(@"Game format did not match for %@ (previous format: %@). Updating library with new detected format (%s).", path.lastPathComponent, game.detectedFormat, format);
                     game.detectedFormat = @(format);
                 }
                 if (blorb) {
@@ -403,8 +409,7 @@ extern NSArray *gGameFileTypes;
             }
         }
 
-        if (!metadata)
-        {
+        if (!metadata) {
             metadata = (Metadata *) [NSEntityDescription
                                      insertNewObjectForEntityForName:@"Metadata"
                                      inManagedObjectContext:context];
@@ -414,23 +419,18 @@ extern NSArray *gGameFileTypes;
 
         if (!metadata.format)
             metadata.format = @(format);
-        if (!metadata.title || metadata.title.length == 0)
-        {
+        if (!metadata.title || metadata.title.length == 0) {
             metadata.title = path.lastPathComponent;
         }
 
-        if (!metadata.cover)
-        {
+        if (!metadata.cover) {
             NSURL *imgURL = [NSURL URLWithString:[ifid stringByAppendingPathExtension:@"tiff"] relativeToURL:libController.imageDir];
             NSData *img = [[NSData alloc] initWithContentsOfURL:imgURL];
-            if (img)
-            {
+            if (img) {
                 NSLog(@"Found cover image in image directory for game %@", metadata.title);
                 metadata.coverArtURL = imgURL.path;
                 [IFDBDownloader insertImageData:img inMetadata:metadata];
-            }
-            else
-            {
+            } else {
                 if (blorb) {
                     NSData *imageData = blorb.coverImageData;
                     if (imageData) {
@@ -493,7 +493,7 @@ extern NSArray *gGameFileTypes;
 - (void)addZCodeIDfromFile:(NSString *)path blorb:(nullable Blorb *)blorb toGame:(Game *)game {
     BOOL found = NO;
     NSData *data = nil;
-    if ([Blorb isBlorbURL:[NSURL fileURLWithPath:path]]) {
+    if ([Blorb isBlorbURL:[NSURL fileURLWithPath:path isDirectory:NO]]) {
         if (!blorb)
             blorb = [[Blorb alloc] initWithData:[NSData dataWithContentsOfFile:path]];
         if (blorb.checkSum && blorb.serialNumber && blorb.releaseNumber) {
@@ -536,8 +536,8 @@ static inline uint16_t word(uint8_t *memory, uint32_t addr)
     uint16_t dictionary = word(memory, 0x08);
     uint32_t static_start = word(memory, 0x0e);
 
-    if (dictionary != 0 && dictionary < static_start)
-    {   // corrupted story: dictionary is not in static memory
+    // corrupted story: dictionary is not in static memory
+    if (dictionary != 0 && dictionary < static_start) {
         return NO;
     }
 
@@ -545,15 +545,14 @@ static inline uint16_t word(uint8_t *memory, uint32_t addr)
     int zversion = memory[0x00];
     unsigned long propsize = (zversion <= 3 ? 62UL : 126UL);
 
+    // corrupted story: object table is not in dynamic memory
     if(objects < 64 ||
-       objects + propsize > static_start)
-    {
-        // corrupted story: object table is not in dynamic memory
+       objects + propsize > static_start) {
         return NO;
     }
 
+    // corrupted story: dynamic memory too small
     if (static_start < 64UL + 480UL + propsize) {
-        // corrupted story: dynamic memory too small
         return NO;
     }
     return YES;
@@ -705,9 +704,9 @@ static inline uint16_t word(uint8_t *memory, uint32_t addr)
                                stringByAppendingPathComponent:@"SCREEN.DAT"];
 
     if ([filemanager fileExistsAtPath:screenDatPath]) {
-        NSURL *oldURL = [NSURL fileURLWithPath:screenDatPath];
+        NSURL *oldURL = [NSURL fileURLWithPath:screenDatPath isDirectory:NO];
         NSString *newURLpath = [tempFilePath stringByAppendingPathExtension:@"neo"];
-        NSURL *newURL =  [NSURL fileURLWithPath:newURLpath];
+        NSURL *newURL =  [NSURL fileURLWithPath:newURLpath isDirectory:NO];
 
         [filemanager
          copyItemAtURL:oldURL
@@ -730,15 +729,13 @@ static inline uint16_t word(uint8_t *memory, uint32_t addr)
 
     NSFileManager *filemanager = [NSFileManager defaultManager];
 
-
-    NSURL *desktopURL = [NSURL fileURLWithPath:origpath
+    NSURL *gameFileURL = [NSURL fileURLWithPath:origpath
                                    isDirectory:NO];
-
 
     NSURL *temporaryDirectoryURL = [filemanager
                                     URLForDirectory:NSItemReplacementDirectory
                                     inDomain:NSUserDomainMask
-                                    appropriateForURL:desktopURL
+                                    appropriateForURL:gameFileURL
                                     create:YES
                                     error:&error];
 
@@ -761,7 +758,7 @@ static inline uint16_t word(uint8_t *memory, uint32_t addr)
     task.launchPath = exepath;
     task.arguments = @[ @"-o", tempFilePath, origpath ];
 
-    [FolderAccess askForAccessToURL:desktopURL andThenRunBlock:^{}];
+    [FolderAccess askForAccessToURL:gameFileURL andThenRunBlock:^{}];
 
     [task launch];
     [task waitUntilExit];
@@ -780,7 +777,7 @@ static inline uint16_t word(uint8_t *memory, uint32_t addr)
         int rv = babel_treaty_ctx(GET_STORY_FILE_IFID_SEL, buf, sizeof buf, ctx);
         if (rv == 1) {
             dirURL =
-            [_libController.homepath URLByAppendingPathComponent:@"Converted"];
+            [_libController.homepath URLByAppendingPathComponent:@"Converted" isDirectory:YES];
 
             [filemanager createDirectoryAtURL:dirURL
                   withIntermediateDirectories:YES
@@ -789,14 +786,14 @@ static inline uint16_t word(uint8_t *memory, uint32_t addr)
 
             cvtURL =
             [dirURL URLByAppendingPathComponent:
-             [@(buf) stringByAppendingPathExtension:@"agx"]];
+             [@(buf) stringByAppendingPathExtension:@"agx"] isDirectory:NO];
 
             babel_release_ctx(ctx);
             free(ctx);
 
             [filemanager removeItemAtURL:cvtURL error:nil];
 
-            NSURL *tmp = [NSURL fileURLWithPath:tempFilePath];
+            NSURL *tmp = [NSURL fileURLWithPath:tempFilePath isDirectory:NO];
 
             error = nil;
             status = [filemanager moveItemAtURL:tmp toURL:cvtURL error:&error];
@@ -820,9 +817,9 @@ static inline uint16_t word(uint8_t *memory, uint32_t addr)
 
             if ([filemanager fileExistsAtPath:iconPath]) {
                 NSLog(@"Found icon file at: %@", iconPath);
-                NSURL *oldIconURL = [NSURL fileURLWithPath:iconPath];
+                NSURL *oldIconURL = [NSURL fileURLWithPath:iconPath isDirectory:NO];
                 NSString *newIconPath = [cvtURL.path.stringByDeletingPathExtension stringByAppendingPathExtension:@"ico"];
-                NSURL *newIconURL = [NSURL fileURLWithPath:newIconPath];
+                NSURL *newIconURL = [NSURL fileURLWithPath:newIconPath isDirectory:NO];
 
                 [filemanager removeItemAtURL:newIconURL error:nil];
 

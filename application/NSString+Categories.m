@@ -19,8 +19,10 @@
 
 - (NSString *)signatureFromFile {
     NSMutableString *hexString = [NSMutableString string];
+    NSError * error = nil;
     NSData *theData =
-        [NSData dataWithContentsOfURL:[NSURL fileURLWithPath:self]];
+    [NSData dataWithContentsOfURL:[NSURL fileURLWithPath:self isDirectory:NO]
+                          options:NSDataReadingMappedAlways error:&error];
     Byte *bytes64 = (Byte *)malloc(64);
 
     if (theData.length > 64) {
@@ -67,11 +69,12 @@
                 if (execStart + 8 + 64 <= (int)theData.length) {
                     [theData getBytes:bytes64
                                 range:NSMakeRange((NSUInteger)execStart + 8, 64)];
-                } else
-                    NSLog(@"signatureFromFile: Executable chunk too small to "
-                          @"make signature!");
-            } else
-                NSLog(@"signatureFromFile: Found no executable index chunk!");
+                } else {
+                    NSLog(@"signatureFromFile: Executable chunk in %@ too small to make signature!", self);
+                }
+            } else {
+                NSLog(@"signatureFromFile: Found no executable index chunk in file \"%@\"!", self);
+            }
 
         } // Not a blorb
 
@@ -81,9 +84,12 @@
             [hexString appendFormat:@"%02x", (unsigned int)bytes64[i]];
         }
 
-    } else
-        NSLog(@"signatureFromFile: File too small to make signature!");
+    } else {
+        NSLog(@"signatureFromFile: File \"%@\" too small to make a signature! Size: %ld bytes.", self, theData.length);
+        if (error)
+            NSLog(@"%@", error);
 
+    }
     free(bytes64);
     return [NSString stringWithString:hexString];
 }

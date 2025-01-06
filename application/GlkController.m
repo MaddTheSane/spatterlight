@@ -28,12 +28,14 @@
 #import "SoundHandler.h"
 #import "TableViewController.h"
 #import "ZMenu.h"
+#import "JourneyMenuHandler.h"
 
 #import "Game.h"
 #import "Theme.h"
 #import "Image.h"
 
 #import "NSColor+integer.h"
+#import "NSData+Categories.h"
 #import "NSString+Categories.h"
 
 #include "glkimp.h"
@@ -52,9 +54,9 @@ fprintf(stderr, "%s\n",                                                    \
 //    "PROMPTOPEN",      "PROMPTSAVE",       "NEWWIN",      "DELWIN",
 //    "SIZWIN",          "CLRWIN",           "MOVETO",      "PRINT",
 //    "UNPRINT",         "MAKETRANSPARENT",  "STYLEHINT",   "CLEARHINT",
-//    "STYLEMEASURE",    "SETBGND",          "SETTITLE",    "AUTOSAVE",
-//    "RESET",           "BANNERCOLS",       "BANNERLINES",  "TIMER",
-//    "INITCHAR",        "CANCELCHAR",
+//    "STYLEMEASURE",    "SETBGND",          "SETTITLE",
+//    "AUTOSAVE",        "RESET",            "BANNERCOLS",  "BANNERLINES",
+//    "TIMER",           "INITCHAR",         "CANCELCHAR",
 //    "INITLINE",        "CANCELLINE",       "SETECHO",     "TERMINATORS",
 //    "INITMOUSE",       "CANCELMOUSE",      "FILLRECT",    "FINDIMAGE",
 //    "LOADIMAGE",       "SIZEIMAGE",        "DRAWIMAGE",   "FLOWBREAK",
@@ -63,6 +65,8 @@ fprintf(stderr, "%s\n",                                                    \
 //    "UNPAUSE",         "BEEP",
 //    "SETLINK",         "INITLINK",         "CANCELLINK",  "SETZCOLOR",
 //    "SETREVERSE",      "QUOTEBOX",         "SHOWERROR",   "CANPRINT",
+//    "PURGEIMG",        "MENU",
+//
 //    "NEXTEVENT",       "EVTARRANGE",       "EVTREDRAW",   "EVTLINE",
 //    "EVTKEY",          "EVTMOUSE",         "EVTTIMER",    "EVTHYPER",
 //    "EVTSOUND",        "EVTVOLUME",        "EVTPREFS",    "EVTQUIT" };
@@ -197,9 +201,10 @@ fprintf(stderr, "%s\n",                                                    \
 
     kVOMenuPrefsType lastVOSpeakMenu;
     BOOL shouldAddTitlePrefixToSpeech;
+    BOOL changedBorderThisTurn;
 }
 
-@property BOOL shouldShowAutorestoreAlert;
+@property (nonatomic) JourneyMenuHandler *journeyMenuHandler;
 @property NSURL *saveDir;
 
 @end
@@ -252,8 +257,6 @@ fprintf(stderr, "%s\n",                                                    \
 
     skipNextScriptCommand = NO;
 
-    _gameState = kGameStateUnknown;
-
     _game = game_;
     Game *game = _game;
 
@@ -271,20 +274,31 @@ fprintf(stderr, "%s\n",                                                    \
     }
 
     if (_theme.nohacks) {
-        [self resetGameDetection];
+        [self resetGameIdentification];
     } else {
-        [self detectGame:game.ifid];
+        [self identifyGame:game.ifid];
     }
 
-    NSURL *url = game.urlForBookmark;
-    _gamefile = url.path;
+    _gamefile = _gameFileURL.path;
 
+    // This may happen if the game file is deleted (or the drive it is on
+    // is disconnected) after a game has started, and the game is then reset,
+    // or if Spatterlight tries to autorestore a game at startup.
     if (![[NSFileManager defaultManager] isReadableFileAtPath:_gamefile]) {
-        [self.window performClose:nil];
-        return;
+        _gameFileURL = [game urlForBookmark];
+        _gamefile = _gameFileURL.path;
+        if (![[NSFileManager defaultManager] isReadableFileAtPath:_gamefile]) {
+            game.found = NO;
+            if (windowRestoredBySystem) {
+                [self.window performClose:nil];
+            } else {
+                [self showGameFileGoneAlert];
+            }
+            return;
+        }
     }
 
-    [_imageHandler cacheImagesFromBlorb:url];
+    [_imageHandler cacheImagesFromBlorbURL:_gameFileURL withData:_gameData];
 
     _terpname = terpname_;
 
@@ -296,10 +310,12 @@ fprintf(stderr, "%s\n",                                                    \
     NSMutableArray *nullarray = [NSMutableArray arrayWithCapacity:stylehint_NUMHINTS];
 
     NSInteger i;
+
     for (i = 0 ; i < stylehint_NUMHINTS ; i ++)
         [nullarray addObject:[NSNull null]];
     _gridStyleHints = [NSMutableArray arrayWithCapacity:style_NUMSTYLES];
     _bufferStyleHints = [NSMutableArray arrayWithCapacity:style_NUMSTYLES];
+
     for (i = 0 ; i < style_NUMSTYLES ; i ++) {
         [_gridStyleHints addObject:[nullarray mutableCopy]];
         [_bufferStyleHints addObject:[nullarray mutableCopy]];
@@ -311,8 +327,10 @@ fprintf(stderr, "%s\n",                                                    \
     _shouldSpeakNewText = NO;
     _mustBeQuiet = YES;
 
-    _supportsAutorestore = (self.window).restorable;
-    game.autosaved = _supportsAutorestore;
+    _supportsAutorestore = self.window.restorable;
+    if (_theme.autosave == NO)
+        self.window.restorable = NO;
+    game.autosaved = (_supportsAutorestore && _theme.autosave);
     windowRestoredBySystem = windowRestoredBySystem_;
 
     _shouldShowAutorestoreAlert = NO;
@@ -360,7 +378,6 @@ fprintf(stderr, "%s\n",                                                    \
             _windowPreFullscreenFrame = self.window.frame;
         }
         [self forkInterpreterTask];
-        _gameState = kGameJustStartedNormally;
         return;
     }
 
@@ -421,6 +438,7 @@ fprintf(stderr, "%s\n",                                                    \
     NSString *autosaveLatePath = [self.appSupportDir
                                   stringByAppendingPathComponent:@"autosave-GUI-late.plist"];
 
+
     lastScriptKeyTimestamp = [NSDate distantPast];
     lastKeyTimestamp = [NSDate distantPast];
 
@@ -437,7 +455,6 @@ fprintf(stderr, "%s\n",                                                    \
 }
 
 - (void)runTerpWithAutorestore {
-    _gameState = kGameJustAutorestored;
     @try {
         restoredController =
         [NSKeyedUnarchiver unarchiveObjectWithFile:self.autosaveFileGUI];
@@ -595,8 +612,8 @@ fprintf(stderr, "%s\n",                                                    \
                 NSLog(@"Successfully used previous terp save");
             } else {
                 NSLog(@"Only restore UI state at first turn");
-                [self deleteFiles:@[ [NSURL fileURLWithPath:self.autosaveFileGUI],
-                                     [NSURL fileURLWithPath:self.autosaveFileTerp] ]];
+                [self deleteFiles:@[ [NSURL fileURLWithPath:self.autosaveFileGUI isDirectory:NO],
+                                     [NSURL fileURLWithPath:self.autosaveFileTerp isDirectory:NO] ]];
                 restoredUIOnly = YES;
             }
 
@@ -611,7 +628,7 @@ fprintf(stderr, "%s\n",                                                    \
                 }
                 NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
                 if ([defaults boolForKey:@"AutorestoreAlertSuppression"]) {
-                    NSLog(@"Autorestore alert suppressed");
+                    // Autorestore alert suppressed
                     if (![defaults boolForKey:@"AlwaysAutorestore"]) {
                         // The user has checked "Remember this choice" when
                         // choosing to not autorestore
@@ -719,7 +736,6 @@ fprintf(stderr, "%s\n",                                                    \
     lastSizeInChars = [self contentSizeToCharCells:_gameView.frame.size];
     [self showWindow:nil];
     if (_theme.coverArtStyle != kDontShow && _game.metadata.cover.data) {
-        _gameState = kGameIsShowingCoverImage;
         [self deleteAutosaveFiles];
         _gameView.autoresizingMask =
         NSViewMinXMargin | NSViewMaxXMargin | NSViewHeightSizable;
@@ -728,7 +744,6 @@ fprintf(stderr, "%s\n",                                                    \
         [_coverController showLogoWindow];
     } else {
         [self forkInterpreterTask];
-        _gameState = kGameIsRunning;
     }
 }
 
@@ -741,7 +756,6 @@ fprintf(stderr, "%s\n",                                                    \
     }
 
     dead = YES;
-    _gameState = kGameIsDead;
 
     [self.window setFrame:restoredController.storedWindowFrame display:NO];
 
@@ -770,7 +784,7 @@ fprintf(stderr, "%s\n",                                                    \
     restoredController = nil;
 }
 
-- (void)detectGame:(NSString *)ifid {
+- (void)identifyGame:(NSString *)ifid {
     NSString *l9Substring = nil;
     if (ifid.length >= 10)
         l9Substring = [ifid substringToIndex:10];
@@ -870,7 +884,7 @@ fprintf(stderr, "%s\n",                                                    \
                [ifid isEqualToString:@"ZCODE-10-890313"] ||
                [ifid isEqualToString:@"ZCODE-26-890316"] ||
                [ifid isEqualToString:@"ZCODE-30-890322"] ||
-               [ifid isEqualToString:@"ZCODE-51-890322"] ||
+               [ifid isEqualToString:@"ZCODE-51-890522"] ||
                [ifid isEqualToString:@"ZCODE-54-890526"] ||
                [ifid isEqualToString:@"ZCODE-76-890615"] ||
                [ifid isEqualToString:@"ZCODE-77-890616"] ||
@@ -882,7 +896,7 @@ fprintf(stderr, "%s\n",                                                    \
     }
 }
 
-- (void)resetGameDetection {
+- (void)resetGameIdentification {
     _gameID = kGameIsGeneric;
 }
 
@@ -937,6 +951,10 @@ fprintf(stderr, "%s\n",                                                    \
     task.launchPath = terppath;
     task.arguments = @[ _gamefile ];
     if ([_terpname isEqualToString:@"bocfel"]) {
+        // Due to a bug in earlier versions, theme.zMachineTerp might be 0.
+        if (theme.zMachineTerp < 1 || theme.zMachineTerp > 11) {
+            theme.zMachineTerp = 6; // Interpreter 6 means IBM PC.
+        }
         NSArray *extraBocfelOptions =
         @[@"-n", [NSString stringWithFormat:@"%d", theme.zMachineTerp],
           @"-N", theme.zMachineLetter];
@@ -980,7 +998,7 @@ fprintf(stderr, "%s\n",                                                    \
     dead = NO;
 
     if (_secureBookmark == nil) {
-        _secureBookmark = [FolderAccess grantAccessToFile:[NSURL fileURLWithPath:_gamefile]];
+        _secureBookmark = [FolderAccess grantAccessToFile:_gameFileURL];
     }
 
     [task launch];
@@ -1005,12 +1023,12 @@ fprintf(stderr, "%s\n",                                                    \
 
     NSURL *bookmarkURL = [FolderAccess suitableDirectoryForURL:url];
     if (bookmarkURL) {
-        if ([[NSFileManager defaultManager] isReadableFileAtPath:bookmarkURL.path]) {
+        if (![FolderAccess needsPermissionForURL:bookmarkURL]) {
             [FolderAccess storeBookmark:bookmarkURL];
             [FolderAccess saveBookmarks];
         } else {
             [FolderAccess restoreURL:bookmarkURL];
-            if (![[NSFileManager defaultManager] isReadableFileAtPath:bookmarkURL.path]) {
+            if ([FolderAccess needsPermissionForURL:bookmarkURL]) {
 
                 if (!dialogFlag) {
                     double delayInSeconds = 0.5;
@@ -1057,6 +1075,17 @@ fprintf(stderr, "%s\n",                                                    \
     }
 
     block();
+}
+
+- (void)showGameFileGoneAlert {
+    NSAlert *anAlert = [[NSAlert alloc] init];
+    anAlert.messageText = [NSString stringWithFormat:NSLocalizedString(@"The game file \"%@\" is no longer accessible. This game will now close.", nil), self.gamefile.lastPathComponent];
+
+    [anAlert beginSheetModalForWindow:self.window completionHandler:^(NSInteger result) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            [self.window performClose:nil];
+        });
+    }];
 }
 
 #pragma mark Autorestore
@@ -1159,15 +1188,13 @@ fprintf(stderr, "%s\n",                                                    \
                 }
 
                 GlkTextGridWindow *quotebox = ((GlkTextBufferWindow *)win).quoteBox;
-                if (quotebox) {
+                if (quotebox && (restoredController.numberOfPrintsAndClears == quotebox.quoteboxAddedOnPAC) && (restoredController.printsAndClearsThisTurn == 0 || quotebox.quoteboxAddedOnPAC == 0)) {
                     if (_quoteBoxes == nil)
                         _quoteBoxes = [[NSMutableArray alloc] init];
                     [quotebox removeFromSuperview];
                     [_quoteBoxes addObject:quotebox];
                     quotebox.glkctl = self;
                     quotebox.quoteboxParent = ((GlkTextBufferWindow *)win).textview.enclosingScrollView;
-                    NSInteger diff = _turns - restoredController.turns;
-                    quotebox.quoteboxAddedOnTurn += diff;
                 }
             }
 
@@ -1193,9 +1220,19 @@ fprintf(stderr, "%s\n",                                                    \
         [self.commandScriptHandler copyPropertiesFrom:restoredController.commandScriptHandler];
     }
 
+    if (_gameID == kGameIsJourney && restoredController.journeyMenuHandler) {
+        self.journeyMenuHandler = restoredController.journeyMenuHandler;
+        restoredController.journeyMenuHandler = nil;
+        _journeyMenuHandler.delegate = self;
+        _journeyMenuHandler.textGridWindow = (GlkTextGridWindow *)_gwindows[@(_journeyMenuHandler.gridTextWinName)];
+        _journeyMenuHandler.textBufferWindow = (GlkTextBufferWindow *)_gwindows[@(_journeyMenuHandler.bufferTextWinName)];
+
+        [_journeyMenuHandler showJourneyMenus];
+    }
+
     // Restore scroll position etc
     for (win in _gwindows.allValues) {
-        if (!_windowsToRestore.count) {
+        if (![win isKindOfClass:[GlkGraphicsWindow class]] && !_windowsToRestore.count) {
             [win postRestoreAdjustments:(restoredControllerLate.gwindows)[@(win.name)]];
         }
         if (win.name == _firstResponderView) {
@@ -1229,8 +1266,7 @@ fprintf(stderr, "%s\n",                                                    \
 
 
 - (void)postRestoreArrange:(id)sender {
-    if (_shouldShowAutorestoreAlert && !_startingInFullscreen) {
-        _shouldShowAutorestoreAlert = NO;
+    if (!_startingInFullscreen) {
         [self performSelector:@selector(showAutorestoreAlert:) withObject:nil afterDelay:0.1];
     }
 
@@ -1288,12 +1324,27 @@ fprintf(stderr, "%s\n",                                                    \
             NSLog(@"Could not find Application Support folder. Error: %@",
                   error);
 
+        if (appSupportURL == nil)
+            return nil;
+
         Game *game = _game;
         NSString *detectedFormat = game.detectedFormat;
 
         if (!detectedFormat) {
             NSLog(@"GlkController appSupportDir: Game %@ has no specified format!", game.metadata.title);
             return nil;
+        }
+
+        NSString *signature = _gameData.signature;
+        if (signature.length == 0) {
+            signature = game.hashTag;
+            if (signature.length == 0) {
+                signature = _gamefile.signatureFromFile;
+                if (signature.length == 0) {
+                    NSLog(@"GlkController appSupportDir: Could not create signature from game file \"%@\"!", _gamefile);
+                    return nil;
+                }
+            }
         }
 
         NSString *terpFolder =
@@ -1314,17 +1365,22 @@ fprintf(stderr, "%s\n",                                                    \
         [@"Spatterlight" stringByAppendingPathComponent:terpFolder];
         dirstr = [dirstr stringByAppendingPathComponent:@"Autosaves"];
         dirstr = [dirstr
-                  stringByAppendingPathComponent:_gamefile.signatureFromFile];
+                  stringByAppendingPathComponent:signature];
         dirstr = [dirstr stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLPathAllowedCharacterSet]];
 
         appSupportURL = [NSURL URLWithString:dirstr
                                relativeToURL:appSupportURL];
 
-        if (_supportsAutorestore) {
-            [[NSFileManager defaultManager] createDirectoryAtURL:appSupportURL
+        if (_supportsAutorestore && _theme.autosave) {
+            error = nil;
+            BOOL succeed  = [[NSFileManager defaultManager] createDirectoryAtURL:appSupportURL
                                      withIntermediateDirectories:YES
                                                       attributes:nil
-                                                           error:NULL];
+                                                           error:&error];
+
+            if (!succeed || error != nil) {
+                NSLog(@"Error when creating appSupportDir: %@", error);
+            }
 
             NSString *dummyfilename = [game.metadata.title
                                        stringByAppendingPathExtension:@"txt"];
@@ -1340,12 +1396,13 @@ fprintf(stderr, "%s\n",                                                    \
             NSString *dummyfilepath =
             [appSupportURL.path stringByAppendingPathComponent:dummyfilename];
 
-            BOOL succeed =
-            [dummytext writeToURL:[NSURL fileURLWithPath:dummyfilepath]
+            error = nil;
+            succeed =
+            [dummytext writeToURL:[NSURL fileURLWithPath:dummyfilepath isDirectory:NO]
                        atomically:YES
                          encoding:NSUTF8StringEncoding
                             error:&error];
-            if (!succeed) {
+            if (!succeed || error) {
                 NSLog(@"Failed to write dummy file to autosave directory. Error:%@",
                       error);
             }
@@ -1380,15 +1437,17 @@ fprintf(stderr, "%s\n",                                                    \
 }
 
 - (void)deleteAutosaveFiles {
-    [self deleteFiles:@[ [NSURL fileURLWithPath:self.autosaveFileGUI],
-                         [NSURL fileURLWithPath:self.autosaveFileTerp],
-                         [NSURL fileURLWithPath:[self.appSupportDir stringByAppendingPathComponent:@"autosave.glksave"]],
-                         [NSURL fileURLWithPath:[self.appSupportDir stringByAppendingPathComponent:@"autosave-bak.glksave"]],
-                         [NSURL fileURLWithPath:[self.appSupportDir stringByAppendingPathComponent:@"autosave-bak.plist"]],
-                         [NSURL fileURLWithPath:[self.appSupportDir stringByAppendingPathComponent:@"autosave-tmp.glksave"]],
-                         [NSURL fileURLWithPath:[self.appSupportDir stringByAppendingPathComponent:@"autosave-GUI.plist"]],
-                         [NSURL fileURLWithPath:[self.appSupportDir stringByAppendingPathComponent:@"autosave-GUI-late.plist"]],
-                         [NSURL fileURLWithPath:[self.appSupportDir stringByAppendingPathComponent:@"autosave-tmp.plist"]] ]];
+    if (self.autosaveFileGUI == nil || self.autosaveFileTerp == nil)
+        return;
+    [self deleteFiles:@[ [NSURL fileURLWithPath:self.autosaveFileGUI isDirectory:NO],
+                         [NSURL fileURLWithPath:self.autosaveFileTerp isDirectory:NO],
+                         [NSURL fileURLWithPath:[self.appSupportDir stringByAppendingPathComponent:@"autosave.glksave"]  isDirectory:NO],
+                         [NSURL fileURLWithPath:[self.appSupportDir stringByAppendingPathComponent:@"autosave-bak.glksave"]  isDirectory:NO],
+                         [NSURL fileURLWithPath:[self.appSupportDir stringByAppendingPathComponent:@"autosave-bak.plist"]  isDirectory:NO],
+                         [NSURL fileURLWithPath:[self.appSupportDir stringByAppendingPathComponent:@"autosave-tmp.glksave"]  isDirectory:NO],
+                         [NSURL fileURLWithPath:[self.appSupportDir stringByAppendingPathComponent:@"autosave-GUI.plist"]  isDirectory:NO],
+                         [NSURL fileURLWithPath:[self.appSupportDir stringByAppendingPathComponent:@"autosave-GUI-late.plist"]  isDirectory:NO],
+                         [NSURL fileURLWithPath:[self.appSupportDir stringByAppendingPathComponent:@"autosave-tmp.plist"]  isDirectory:NO]]];
 }
 
 - (void)deleteFiles:(NSArray<NSURL *> *)urls {
@@ -1402,7 +1461,7 @@ fprintf(stderr, "%s\n",                                                    \
 }
 
 - (void)autoSaveOnExit {
-    if (_supportsAutorestore && _theme.autosave) {
+    if (_supportsAutorestore && _theme.autosave && self.appSupportDir.length) {
         NSString *autosaveLate = [self.appSupportDir
                                   stringByAppendingPathComponent:@"autosave-GUI-late.plist"];
 
@@ -1417,6 +1476,9 @@ fprintf(stderr, "%s\n",                                                    \
         }
 
         _game.autosaved = !dead;
+    } else {
+        [self deleteAutosaveFiles];
+        _game.autosaved = NO;
     }
 }
 
@@ -1459,6 +1521,8 @@ fprintf(stderr, "%s\n",                                                    \
         _inFullscreen = [decoder decodeBoolForKey:@"fullscreen"];
 
         _turns = [decoder decodeIntegerForKey:@"turns"];
+        _numberOfPrintsAndClears = [decoder decodeIntegerForKey:@"printsAndClears"];
+        _printsAndClearsThisTurn = [decoder decodeIntegerForKey:@"printsAndClearsThisTurn"];
 
         _oldThemeName = [decoder decodeObjectOfClass:[NSString class] forKey:@"oldThemeName"];
 
@@ -1468,6 +1532,9 @@ fprintf(stderr, "%s\n",                                                    \
         if (_commandScriptRunning)
             _commandScriptHandler = [decoder decodeObjectOfClass:[CommandScriptHandler class] forKey:@"commandScriptHandler"];
 
+        _journeyMenuHandler = [decoder decodeObjectOfClass:[JourneyMenuHandler class] forKey:@"journeyMenuHandler"];
+        if (_journeyMenuHandler)
+            _journeyMenuHandler.delegate = self;
         restoredController = nil;
     }
     return self;
@@ -1492,6 +1559,7 @@ fprintf(stderr, "%s\n",                                                    \
     [encoder encodeObject:_gwindows forKey:@"gwindows"];
     [encoder encodeObject:_soundHandler forKey:@"soundHandler"];
     [encoder encodeObject:_imageHandler forKey:@"imageHandler"];
+    [encoder encodeObject:_journeyMenuHandler forKey:@"journeyMenuHandler"];
 
     [encoder encodeRect:_windowPreFullscreenFrame
                  forKey:@"windowPreFullscreenFrame"];
@@ -1521,6 +1589,9 @@ fprintf(stderr, "%s\n",                                                    \
                  forKey:@"fullscreen"];
 
     [encoder encodeInteger:_turns forKey:@"turns"];
+    [encoder encodeInteger:_numberOfPrintsAndClears forKey:@"printsAndClears"];
+    [encoder encodeInteger:_printsAndClearsThisTurn forKey:@"printsAndClearsThisTurn"];
+
     [encoder encodeObject:_theme.name forKey:@"oldThemeName"];
 
     [encoder encodeBool:_showingCoverImage forKey:@"showingCoverImage"];
@@ -1531,6 +1602,21 @@ fprintf(stderr, "%s\n",                                                    \
 }
 
 - (void)showAutorestoreAlert:(id)userInfo {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSString *alertSuppressionKey = @"AutorestoreAlertSuppression";
+    NSString *alwaysAutorestoreKey = @"AlwaysAutorestore";
+
+    if ([defaults boolForKey:alertSuppressionKey] == YES)
+        _shouldShowAutorestoreAlert = NO;
+
+    if (!_shouldShowAutorestoreAlert) {
+        _mustBeQuiet = NO;
+        [_journeyMenuHandler recreateDialog];
+        return;
+    }
+
+    if (dead)
+        return;
 
     _mustBeQuiet = YES;
 
@@ -1549,15 +1635,12 @@ fprintf(stderr, "%s\n",                                                    \
 
         weakSelf.mustBeQuiet = NO;
 
-        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-
-        NSString *alertSuppressionKey = @"AutorestoreAlertSuppression";
-        NSString *alwaysAutorestoreKey = @"AlwaysAutorestore";
-
         if (anAlert.suppressionButton.state == NSOnState) {
             // Suppress this alert from now on
             [defaults setBool:YES forKey:alertSuppressionKey];
         }
+
+        weakSelf.shouldShowAutorestoreAlert = NO;
 
         if (result == NSAlertSecondButtonReturn) {
             [self reset:nil];
@@ -1571,7 +1654,10 @@ fprintf(stderr, "%s\n",                                                    \
             }
         }
 
-        weakSelf.shouldShowAutorestoreAlert = NO;
+        if (weakSelf.gameID == kGameIsJourney)
+            [weakSelf.journeyMenuHandler recreateDialog];
+
+        [self forceSpeech];
     }];
 }
 
@@ -1592,6 +1678,7 @@ fprintf(stderr, "%s\n",                                                    \
      object: readfh];
 
     _commandScriptHandler = nil;
+    _journeyMenuHandler = nil;
 
     if (task) {
         // Stop the interpreter
@@ -1686,21 +1773,27 @@ fprintf(stderr, "%s\n",                                                    \
         if (_eventcount > 1 && !_shouldShowAutorestoreAlert) {
             _mustBeQuiet = NO;
         }
+
+        if (_journeyMenuHandler && [_journeyMenuHandler updateOnBecameKey:!_shouldShowAutorestoreAlert || _turns > 1]) {
+            return;
+        }
+
         [self speakOnBecomingKey];
-    } else if (_gameState == kGameIsDead && _theme.vODelayOn) {
-        // Game did become key while dead / game over
+    } else if (_theme.vODelayOn) { // If the game has ended
         [self speakMostRecentAfterDelay];
     }
 }
 
 - (void)windowDidResignKey:(NSNotification *)notification {
     _mustBeQuiet = YES;
+    [_journeyMenuHandler captureMembersMenu];
+    [_journeyMenuHandler hideJourneyMenus];
 }
 
 - (BOOL)windowShouldClose:(id)sender {
     NSAlert *alert;
 
-    if (dead || _supportsAutorestore) {
+    if (dead || (_supportsAutorestore && _theme.autosave)) {
         return YES;
     }
 
@@ -1761,9 +1854,24 @@ fprintf(stderr, "%s\n",                                                    \
         _coverController = nil;
     }
     [self autoSaveOnExit];
+    self.window = nil;
     [_soundHandler stopAllAndCleanUp];
 
-    [[NSWorkspace sharedWorkspace] removeObserver:self forKeyPath:@"voiceOverEnabled"];
+    if (_journeyMenuHandler) {
+        [_journeyMenuHandler captureMembersMenu];
+        [self.journeyMenuHandler hideJourneyMenus];
+    }
+
+    if (_theme.autosave == NO) {
+        _game.autosaved = NO;
+        [self deleteAutosaveFiles];
+    }
+
+    @try {
+        [[NSWorkspace sharedWorkspace] removeObserver:self forKeyPath:@"voiceOverEnabled"];
+    } @catch (NSException *ex) {
+        NSLog(@"%@", ex);
+    }
 
     if (_game && [Preferences instance].currentGame == _game) {
         GlkController *remainingGameSession = nil;
@@ -1776,6 +1884,9 @@ fprintf(stderr, "%s\n",                                                    \
                 }
         }
         [Preferences changeCurrentGlkController:remainingGameSession];
+        if (remainingGameSession) {
+            [remainingGameSession.window makeKeyAndOrderFront:nil];
+        }
     }
 
     if (timer) {
@@ -1800,16 +1911,17 @@ fprintf(stderr, "%s\n",                                                    \
 - (void)flushDisplay {
     [Preferences instance].inMagnification = NO;
 
-    if (windowdirty) {
-        GlkWindow *largest = [self largestWindow];
-        if ([largest isKindOfClass:[GlkTextBufferWindow class]] || [largest isKindOfClass:[GlkTextGridWindow class]])
-            [(GlkTextBufferWindow *)largest recalcBackground];
-        windowdirty = NO;
-    }
-
     for (GlkWindow *win in _windowsToBeAdded) {
         [_gameView addSubview:win];
     }
+
+    if (windowdirty && !changedBorderThisTurn) {
+        GlkWindow *largest = [self largestWindow];
+        if (largest)
+            [largest recalcBackground];
+        windowdirty = NO;
+    }
+    changedBorderThisTurn = NO;
 
     if (self.gameID == kGameIsNarcolepsy && _theme.doGraphics && _theme.doStyles) {
         [self adjustMaskLayer:nil];
@@ -1819,6 +1931,10 @@ fprintf(stderr, "%s\n",                                                    \
 
     for (GlkWindow *win in _gwindows.allValues) {
         [win flushDisplay];
+        if (![win isKindOfClass:[GlkGraphicsWindow class]] &&
+            (!_voiceOverActive || _mustBeQuiet)) {
+            [win setLastMove];
+        }
     }
 
     for (GlkWindow *win in _windowsToBeRemoved) {
@@ -1830,19 +1946,32 @@ fprintf(stderr, "%s\n",                                                    \
         if (_voiceOverActive && !_mustBeQuiet) {
             [self checkZMenuAndSpeak:YES];
             if (!_zmenu && !_form) {
-                [self forceSpeech];
-                [self speakNewText];
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                    [self forceSpeech];
+                    [self speakNewText];
+                });
             }
             _shouldSpeakNewText = NO;
         }
-        _gameState = kGameIsRunning;
     }
+
+    if (_journeyMenuHandler)
+        [_journeyMenuHandler flushDisplay];
 
     _windowsToBeRemoved = [[NSMutableArray alloc] init];
 }
 
 
 - (void)guessFocus {
+    if (_gameID == kGameIsJourney && _voiceOverActive) {
+        for (GlkWindow *win in _gwindows.allValues) {
+            if ([win isKindOfClass:[GlkTextBufferWindow class]]) {
+                [win grabFocus];
+                return;
+            }
+        }
+    }
+
     id focuswin = self.window.firstResponder;
     while (focuswin) {
         if ([focuswin isKindOfClass:[NSView class]]) {
@@ -2051,15 +2180,37 @@ fprintf(stderr, "%s\n",                                                    \
     Theme *theme = _theme;
     size.width = round(theme.cellWidth * cells.width + (theme.gridMarginX + 5.0) * 2.0);
     size.height = round(theme.cellHeight * cells.height + (theme.gridMarginY) * 2.0);
+    if (isnan(size.height) || isinf(size.height)) {
+        NSLog(@"ERROR: charCellsToContentSize: Height is NaN!");
+        size.height = 10;
+    }
     return size;
 }
 
 - (NSSize)contentSizeToCharCells:(NSSize)points {
     // Only _contentView, does not take border into account
     NSSize size;
-    Theme *theme = _theme;
-    size.width = round((points.width - (theme.gridMarginX + 5.0) * 2.0) / theme.cellWidth);
-    size.height = round((points.height - (theme.gridMarginY) * 2.0) / theme.cellHeight);
+    CGFloat cellWidth;
+    CGFloat cellHeight;
+    CGFloat gridMarginX;
+    CGFloat gridMarginY;
+    if (_theme == nil)
+        _theme = [Preferences currentTheme];
+    if (_theme == nil) {
+        cellWidth = 8.0;
+        cellHeight = 18.0;
+        gridMarginX = 5;
+        gridMarginY = 0;
+    } else {
+        cellWidth = _theme.cellWidth;
+        cellHeight = _theme.cellHeight;
+        gridMarginX = _theme.gridMarginX + 5;
+        gridMarginY = _theme.gridMarginY;
+    }
+
+    size.width = round((points.width - gridMarginX * 2) / cellWidth);
+    size.height = round((points.height - gridMarginY * 2) / cellHeight);
+
     return size;
 }
 
@@ -2128,9 +2279,9 @@ fprintf(stderr, "%s\n",                                                    \
     }
 
     if (theme.nohacks) {
-        [self resetGameDetection];
+        [self resetGameIdentification];
     } else {
-        [self detectGame:_game.ifid];
+        [self identifyGame:_game.ifid];
     }
 
     if (theme.vOSpeakMenu == kVOMenuNone) { // "Check for menu" was switched off
@@ -2147,6 +2298,21 @@ fprintf(stderr, "%s\n",                                                    \
     }
 
     lastVOSpeakMenu = theme.vOSpeakMenu;
+
+    if (_supportsAutorestore) {
+        if (theme.autosave == NO) {
+            if (_game.autosaved) {
+                [self deleteAutosaveFiles];
+            }
+            _game.autosaved = NO;
+            _hasAutoSaved = NO;
+            self.window.restorable = NO;
+        } else {
+            self.window.restorable = YES;
+            _game.autosaved = YES;
+            [self handleAutosave:self.autosaveTag];
+        }
+    }
 
     NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
 
@@ -2448,7 +2614,7 @@ fprintf(stderr, "%s\n",                                                    \
              setObject:theDoc.path
                 .stringByDeletingLastPathComponent
              forKey:@"SaveDirectory"];
-            s = (theDoc.path).UTF8String;
+            s = (theDoc.path).fileSystemRepresentation;
         } else
             s = "";
 
@@ -2459,6 +2625,9 @@ fprintf(stderr, "%s\n",                                                    \
         if (reply.len)
             write((int)sendfd, s, reply.len);
         self.mustBeQuiet = NO;
+        // Needed to prevent Journey dialog from popping up after closing file dialog
+        if (self.gameID == kGameIsJourney)
+            self.journeyMenuHandler.skipNextDialog = YES;
     }];
 
     waitforfilename = NO; /* we're all done, resume normal processing */
@@ -2476,7 +2645,7 @@ fprintf(stderr, "%s\n",                                                    \
 
     write((int)sendfd, &reply, sizeof(struct message));
     if (reply.len)
-        write((int)sendfd, [_pendingSaveFilePath cStringUsingEncoding:NSUTF8StringEncoding], reply.len);
+        write((int)sendfd,_pendingSaveFilePath.fileSystemRepresentation, reply.len);
 
     waitforfilename = NO; /* we're all done, resume normal processing */
 
@@ -2497,7 +2666,7 @@ fprintf(stderr, "%s\n",                                                    \
     } else {
         directory = [NSURL fileURLWithPath:
                      [defaults objectForKey:@"SaveDirectory"]
-                                isDirectory:YES];
+                               isDirectory:YES];
     }
 
     NSSavePanel *panel = [NSSavePanel savePanel];
@@ -2579,7 +2748,7 @@ fprintf(stderr, "%s\n",                                                    \
              setObject:theFile.path
                 .stringByDeletingLastPathComponent
              forKey:@"SaveDirectory"];
-            s = (theFile.path).UTF8String;
+            s = (theFile.path).fileSystemRepresentation;
             reply.len = strlen(s);
         } else {
             s = nil;
@@ -2864,9 +3033,8 @@ fprintf(stderr, "%s\n",                                                    \
     }
 
     str = [NSString stringWithCharacters:buf length:len];
-
+//    NSLog(@"\"%@\"", str);
     [gwindow putString:str style:style];
-    windowdirty = YES;
     free(buf);
 }
 
@@ -2999,10 +3167,27 @@ fprintf(stderr, "%s\n",                                                    \
     return NO;
 }
 
+- (nullable JourneyMenuHandler *)journeyMenuHandler {
+    if (_journeyMenuHandler == nil) {
+        GlkTextGridWindow *gridwindow = nil;
+        GlkTextBufferWindow *bufferwindow = nil;
+        for (GlkWindow *win in _gwindows.allValues)
+            if ([win isKindOfClass:[GlkTextGridWindow class]]) {
+                gridwindow = (GlkTextGridWindow *)win;
+            } else if ([win isKindOfClass:[GlkTextBufferWindow class]]) {
+                bufferwindow = (GlkTextBufferWindow *)win;
+            }
+        if (gridwindow == nil || bufferwindow == nil)
+            return nil;
+        _journeyMenuHandler = [[JourneyMenuHandler alloc] initWithDelegate:self gridWindow:gridwindow bufferWindow:bufferwindow];
+    }
+    return _journeyMenuHandler;
+}
+
 - (BOOL)handleRequest:(struct message *)req
                 reply:(struct message *)ans
                buffer:(char *)buf {
-    // NSLog(@"glkctl: incoming request %s", msgnames[req->cmd]);
+//    NSLog(@"glkctl: incoming request %s", msgnames[req->cmd]);
 
     NSInteger result;
     GlkWindow *reqWin = nil;
@@ -3023,7 +3208,8 @@ fprintf(stderr, "%s\n",                                                    \
         case NEXTEVENT:
             if (_windowsToRestore.count) {
                 for (GlkWindow *win in _windowsToRestore) {
-                    [_gwindows[@(win.name)] postRestoreAdjustments:win];
+                    if (![win isKindOfClass:[GlkGraphicsWindow class]])
+                        [_gwindows[@(win.name)] postRestoreAdjustments:win];
                 }
                 _windowsToRestore = nil;
             }
@@ -3052,23 +3238,30 @@ fprintf(stderr, "%s\n",                                                    \
                 _turns++;
             }
 
-            if (_quoteBoxes.count && (_turns - _quoteBoxes.lastObject.quoteboxAddedOnTurn > 1 || (_turns == 0 && _quoteBoxes.lastObject.quoteboxAddedOnTurn == -1) || _quoteBoxes.count > 1)) {
-                GlkTextGridWindow *view = _quoteBoxes.firstObject;
-                [_quoteBoxes removeObjectAtIndex:0];
-                ((GlkTextBufferWindow *)view.quoteboxParent.superview).quoteBox = nil;
-                view.quoteboxParent = nil;
-                if (_quoteBoxes.count == 0) {
-                    _quoteBoxes = nil;
+            _numberOfPrintsAndClears += _printsAndClearsThisTurn;
+            _printsAndClearsThisTurn = 0;
+            if (_quoteBoxes.count) {
+                if (_quoteBoxes.lastObject.quoteboxAddedOnPAC == 0)
+                    _quoteBoxes.lastObject.quoteboxAddedOnPAC = _numberOfPrintsAndClears;
+                if (_numberOfPrintsAndClears > _quoteBoxes.lastObject.quoteboxAddedOnPAC ||
+                    _quoteBoxes.count > 1) {
+                    GlkTextGridWindow *view = _quoteBoxes.firstObject;
+                    [_quoteBoxes removeObjectAtIndex:0];
+                    ((GlkTextBufferWindow *)view.quoteboxParent.superview).quoteBox = nil;
+                    view.quoteboxParent = nil;
+                    if (_quoteBoxes.count == 0) {
+                        _quoteBoxes = nil;
+                    }
+                    [NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
+                        context.duration = 1;
+                        view.animator.alphaValue = 0;
+                    } completionHandler:^{
+                        view.hidden = YES;
+                        view.alphaValue = 1;
+                        [view removeFromSuperview];
+                        view.glkctl = nil;
+                    }];
                 }
-                [NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
-                    context.duration = 1;
-                    view.animator.alphaValue = 0;
-                } completionHandler:^{
-                    view.hidden = YES;
-                    view.alphaValue = 1;
-                    [view removeFromSuperview];
-                    view.glkctl = nil;
-                }];
             }
 
             [self flushDisplay];
@@ -3175,7 +3368,7 @@ fprintf(stderr, "%s\n",                                                    \
             [_imageHandler handleLoadImageNumber:req->a1
                                             from:@(buf)
                                           offset:(NSUInteger)req->a2
-                                          length:(NSUInteger)req->a3];
+                                            size:(NSUInteger)req->a3];
             break;
 
         case SIZEIMAGE:
@@ -3189,6 +3382,8 @@ fprintf(stderr, "%s\n",                                                    \
                 size = lastimage.size;
                 ans->a1 = (int)size.width;
                 ans->a2 = (int)size.height;
+            } else {
+                NSLog(@"SIZEIMAGE: No last image found!");
             }
         }
             break;
@@ -3267,7 +3462,7 @@ fprintf(stderr, "%s\n",                                                    \
 
         case SIZWIN:
             if (reqWin) {
-                uint x0, y0, x1, y1, checksumWidth, checksumHeight;
+                int x0, y0, x1, y1, checksumWidth, checksumHeight;
                 NSRect rect;
 
                 struct sizewinrect *sizewin = malloc(sizeof(struct sizewinrect));
@@ -3296,7 +3491,7 @@ fprintf(stderr, "%s\n",                                                    \
                     rect.size.width = 0;
                 if (rect.size.height < 0)
                     rect.size.height = 0;
-
+//                NSLog(@"Resize window %ld (%@) to %@", reqWin.name, reqWin.className, NSStringFromRect(rect));
                 reqWin.frame = rect;
 
                 NSAutoresizingMaskOptions hmask = NSViewMaxXMargin;
@@ -3323,6 +3518,7 @@ fprintf(stderr, "%s\n",                                                    \
             break;
 
         case CLRWIN:
+            _printsAndClearsThisTurn++;
             if (reqWin) {
                 [reqWin clear];
                 _shouldCheckForMenu = YES;
@@ -3337,6 +3533,7 @@ fprintf(stderr, "%s\n",                                                    \
             if (req->a1 == -1) {
                 _lastAutoBGColor = bg;
                 [self setBorderColor:bg];
+                changedBorderThisTurn = YES;
             }
 
             if (reqWin) {
@@ -3366,16 +3563,19 @@ fprintf(stderr, "%s\n",                                                    \
             break;
 
         case PRINT:
+            _printsAndClearsThisTurn++;
             if (!_gwindows.count && shouldRestoreUI) {
                 _windowsToRestore = restoredControllerLate.gwindows.allValues;
                 [self restoreUI];
                 reqWin = _gwindows[@(req->a1)];
             }
-            if (reqWin) {
+            if (reqWin && req->len) {
                 [self handlePrintOnWindow:reqWin
                                     style:(NSUInteger)req->a2
                                    buffer:buf
                                    length:req->len / sizeof(unichar)];
+            } else {
+                NSLog(@"Print to non-existent window!");
             }
             break;
 
@@ -3639,6 +3839,24 @@ fprintf(stderr, "%s\n",                                                    \
             }
             break;
 
+        case PURGEIMG:
+            if (req->len) {
+                buf[req->len] = 0;
+                [_imageHandler purgeImage:req->a1
+                          withReplacement:@(buf)
+                                     size:(NSUInteger)req->a2];
+            } else {
+                [_imageHandler purgeImage:req->a1
+                          withReplacement:nil
+                                     size:0];
+            }
+            break;
+
+        case MENUITEM: {
+            [self.journeyMenuHandler handleMenuItemOfType:(JourneyMenuType)req->a1 column:(NSUInteger)req->a2 line:(NSUInteger)req->a3 stopflag:(BOOL)req->a4 == 1 text:(char *)buf length:(NSUInteger)req->len];
+            break;
+        }
+
         default:
             NSLog(@"glkctl: unhandled request (%d)", req->cmd);
             break;
@@ -3695,13 +3913,10 @@ static BOOL pollMoreData(int fd) {
 }
 
 - (void)noteTaskDidTerminate:(id)sender {
-    NSLog(@"glkctl: noteTaskDidTerminate");
-
     if (windowClosedAlready)
         return;
 
     dead = YES;
-    _gameState = kGameIsDead;
     restartingAlready = NO;
 
     if (timer) {
@@ -3712,7 +3927,7 @@ static BOOL pollMoreData(int fd) {
     [self flushDisplay];
     [task waitUntilExit];
 
-    if (task && task.terminationStatus != 0) {
+    if (task.terminationStatus != 0) {
         NSAlert *alert = [[NSAlert alloc] init];
         alert.messageText = NSLocalizedString(@"The game has unexpectedly terminated.", nil);
         alert.informativeText = [NSString stringWithFormat:NSLocalizedString(@"Error code: %@.", nil), signalToName(task)];
@@ -3725,8 +3940,18 @@ static BOOL pollMoreData(int fd) {
     } else {
         NotificationBezel *bezel = [[NotificationBezel alloc] initWithScreen:self.window.screen];
         [bezel showGameOver];
-        [self performSelector:@selector(speakStringNow:) withObject:[NSString stringWithFormat:@"%@ has finished.", _game.metadata.title] afterDelay:1];
+
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            NSAccessibilityPostNotificationWithUserInfo(
+                                                        NSApp.mainWindow,
+                                                        NSAccessibilityAnnouncementRequestedNotification,
+                                                        @{NSAccessibilityPriorityKey: @(NSAccessibilityPriorityHigh),
+                                                          NSAccessibilityAnnouncementKey: [NSString stringWithFormat:@"%@ has finished.", self.game.metadata.title]
+                                                        });
+        });
     }
+
+    [_journeyMenuHandler deleteAllJourneyMenus];
 
     for (GlkWindow *win in _gwindows.allValues)
         [win terpDidStop];
@@ -3741,11 +3966,11 @@ static BOOL pollMoreData(int fd) {
     if (!restartingAlready)
         [self autoSaveOnExit];
 
-    [self deleteFiles:@[ [NSURL fileURLWithPath:self.autosaveFileTerp],
-                         [NSURL fileURLWithPath:[self.appSupportDir stringByAppendingPathComponent:@"autosave.glksave"]],
-                         [NSURL fileURLWithPath:[self.appSupportDir stringByAppendingPathComponent:@"autosave-GUI.plist"]],
-                         [NSURL fileURLWithPath:[self.appSupportDir stringByAppendingPathComponent:@"autosave-tmp.glksave"]],
-                         [NSURL fileURLWithPath:[self.appSupportDir stringByAppendingPathComponent:@"autosave-tmp.plist"]] ]];
+    [self deleteFiles:@[ [NSURL fileURLWithPath:self.autosaveFileTerp isDirectory:NO],
+                         [NSURL fileURLWithPath:[self.appSupportDir stringByAppendingPathComponent:@"autosave.glksave"] isDirectory:NO],
+                         [NSURL fileURLWithPath:[self.appSupportDir stringByAppendingPathComponent:@"autosave-GUI.plist"] isDirectory:NO],
+                         [NSURL fileURLWithPath:[self.appSupportDir stringByAppendingPathComponent:@"autosave-tmp.glksave"] isDirectory:NO],
+                         [NSURL fileURLWithPath:[self.appSupportDir stringByAppendingPathComponent:@"autosave-tmp.plist"] isDirectory:NO] ]];
 }
 
 - (void)queueEvent:(GlkEvent *)gevent {
@@ -3875,6 +4100,8 @@ again:
 #pragma mark Border color
 
 - (void)setBorderColor:(NSColor *)color fromWindow:(GlkWindow *)aWindow {
+    if (changedBorderThisTurn)
+        return;
     NSSize windowsize = aWindow.bounds.size;
     if (aWindow.framePending)
         windowsize = aWindow.pendingFrame.size;
@@ -3908,13 +4135,17 @@ again:
         _borderView.layer.backgroundColor = CGColorGetConstantColor(kCGColorClear);
         return;
     }
+
+//    NSLog(@"Trying to set border color to %06lx", (long)color.integerColor);
+    if (color.integerColor == 0xffff)
+        NSLog(@"Wrong color?");
+
     if (theme.doStyles || [color isEqualToColor:theme.bufferBackground] || [color isEqualToColor:theme.gridBackground] || theme.borderBehavior == kUserOverride) {
         _borderView.layer.backgroundColor = color.CGColor;
 
         [Preferences instance].borderColorWell.color = color;
     }
 }
-
 
 - (GlkWindow *)largestWindow {
     GlkWindow *largestWin = nil;
@@ -4185,7 +4416,7 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
                     // Finally, we extend the content view vertically if needed.
                     [NSAnimationContext
                      runAnimationGroup:^(NSAnimationContext *context) {
-                        context.duration = 0.1;
+                        context.duration = 0.2;
                         [localContentView animator].frame = [weakSelf contentFrameForFullscreen];
                     }
                      completionHandler:^{
@@ -4259,12 +4490,15 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
          completionHandler:^{
             GlkController *strongSelf = weakSelf;
             // Finally, we get the content view into position ...
-            [strongSelf enableArrangementEvents];
-            [strongSelf sendArrangeEventWithFrame:[strongSelf contentFrameForFullscreen] force:NO];
+            if (strongSelf) {
 
-            if (stashShouldShowAlert && strongSelf)
+                [strongSelf enableArrangementEvents];
+                [strongSelf sendArrangeEventWithFrame:[strongSelf contentFrameForFullscreen] force:NO];
+
+                strongSelf.shouldShowAutorestoreAlert = stashShouldShowAlert;
                 [strongSelf performSelector:@selector(showAutorestoreAlert:) withObject:nil afterDelay:0.1];
-            [strongSelf restoreScrollOffsets];
+                [strongSelf restoreScrollOffsets];
+            }
         }];
     }];
 }
@@ -4369,10 +4603,7 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
 
 - (void)deferredEnterFullscreen:(id)sender {
     [self.window toggleFullScreen:nil];
-    if (_shouldShowAutorestoreAlert) {
-        _shouldShowAutorestoreAlert = NO;
-        [self performSelector:@selector(showAutorestoreAlert:) withObject:nil afterDelay:1];
-    }
+    [self performSelector:@selector(showAutorestoreAlert:) withObject:nil afterDelay:1];
 }
 
 - (CALayer *)takeSnapshot {
@@ -4435,13 +4666,13 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
     if (frame.size.width < kMinimumWindowWidth)
         frame.size.width = kMinimumWindowWidth;
     if (frame.size.height < kMinimumWindowHeight)
-        frame.size.width = kMinimumWindowHeight;
+        frame.size.height = kMinimumWindowHeight;
 
     NSRect windowframe = self.window.frame;
     if (windowframe.size.width < kMinimumWindowWidth)
         windowframe.size.width = kMinimumWindowWidth;
     if (windowframe.size.height < kMinimumWindowHeight)
-        windowframe.size.width = kMinimumWindowHeight;
+        windowframe.size.height = kMinimumWindowHeight;
     if (!NSEqualRects(self.window.frame, windowframe))
         [self.window setFrame:windowframe display:YES];
 
@@ -4536,6 +4767,14 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
     }
 }
 
+- (void)journeyPartyAction:(id)sender {
+    [self.journeyMenuHandler journeyPartyAction:sender];
+}
+
+- (void)journeyMemberVerbAction:(id)sender {
+    [self.journeyMenuHandler journeyMemberVerbAction:sender];
+}
+
 - (BOOL)validateMenuItem:(NSMenuItem *)menuItem {
 
     SEL action = menuItem.action;
@@ -4608,7 +4847,19 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
     if ([keyPath isEqualToString:@"voiceOverEnabled"]) {
         NSWorkspace * ws = [NSWorkspace sharedWorkspace];
         _voiceOverActive = ws.voiceOverEnabled;
-        [self speakOnBecomingKey];
+        if (_voiceOverActive) { // VoiceOver was switched on
+            // Don't speak or change menus unless we are the top game
+            if ([Preferences.instance currentGame] == _game && !dead) {
+                [_journeyMenuHandler showJourneyMenus];
+                if (_journeyMenuHandler.shouldShowDialog) {
+                    [_journeyMenuHandler recreateDialog];
+                } else {
+                    [self speakOnBecomingKey];
+                }
+            }
+        } else { // VoiceOver was switched off
+            [_journeyMenuHandler hideJourneyMenus];
+        }
     } else {
         // Any unrecognized context must belong to super
         [super observeValueForKeyPath:keyPath
@@ -4753,7 +5004,9 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
         _shouldCheckForMenu = YES;
         [self checkZMenuAndSpeak:NO];
         if (_theme.vODelayOn && !_mustBeQuiet) {
-            [self speakMostRecentAfterDelay];
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                [self speakMostRecentAfterDelay];
+            });
         }
     } else {
         _zmenu = nil;
@@ -4783,20 +5036,13 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
         return;
     }
 
-    // Hack to prevent interrupting text if the "interruption text" is the same as Spatterlight is speaking
-    // anyway (because we just became key window or the text was cleared)
-    if ([mainWindow isKindOfClass:[GlkTextBufferWindow class]] && sender == self && [mainWindow wantsFocus] &&
-        (_lastSpokenString == nil || ((GlkTextBufferWindow *)mainWindow).printPositionOnInput == 0)) {
-        if (_lastSpokenString == nil)
-            _lastSpokenString = ((GlkTextBufferWindow *)mainWindow).textview.string;
-        _speechTimeStamp = [NSDate date];
-    }
-
     if (_quoteBoxes.count) {
         _speechTimeStamp = [NSDate distantPast];
     }
     [mainWindow setLastMove];
-    [mainWindow repeatLastMove:nil];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [mainWindow repeatLastMove:nil];
+    });
 }
 
 - (void)speakMostRecentAfterDelay {
@@ -4870,7 +5116,7 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
     if (string.length == 0 || !_voiceOverActive)
         return;
 
-    if ([string isEqualToString: _lastSpokenString] &&_speechTimeStamp.timeIntervalSinceNow > -3) {
+    if ([string isEqualToString: _lastSpokenString] && _speechTimeStamp.timeIntervalSinceNow > -3.0) {
         return;
     }
 
@@ -4885,24 +5131,36 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
         newString = string;
 
     if (shouldAddTitlePrefixToSpeech) {
-        newString = [NSString stringWithFormat:@"Now in, %@: %@", _game.metadata.title, newString];
+        newString = [NSString stringWithFormat:@"Now in, %@: %@", [self gameTitle], newString];
         shouldAddTitlePrefixToSpeech = NO;
     }
 
-    NSDictionary *announcementInfo = @{
-        NSAccessibilityPriorityKey:@(NSAccessibilityPriorityHigh),
-        NSAccessibilityAnnouncementKey:newString
-    };
+    NSWindow *window = self.window;
+
+    if (_gameID == kGameIsJourney && Preferences.instance.currentGame == _game) {
+        window = NSApp.mainWindow;
+    }
 
     NSAccessibilityPostNotificationWithUserInfo(
-                                                self.window,
+                                                window,
                                                 NSAccessibilityAnnouncementRequestedNotification,
-                                                announcementInfo);
+                                                @{NSAccessibilityPriorityKey: @(NSAccessibilityPriorityHigh),
+                                                  NSAccessibilityAnnouncementKey: newString
+                                                });
 }
 
 - (GlkWindow *)largestWithMoves {
     // Find a "main text window"
     GlkWindow *largest = nil;
+
+// This somewhat reduces VoiceOver confusingly speaking of the command area grid in Journey
+    if (_gameID == kGameIsJourney) {
+        for (GlkWindow *view in _gwindows.allValues) {
+            if ([view isKindOfClass:[GlkTextBufferWindow class]])
+                return view;
+        }
+    }
+
     NSMutableArray *windowsWithMoves = _gwindows.allValues.mutableCopy;
     for (GlkWindow *view in _gwindows.allValues) {
         // Remove all Glk windows without text from array
@@ -4922,7 +5180,7 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
                 [windowsWithMoves addObject:view];
         }
         if (!windowsWithMoves.count) {
-            NSLog(@"largestWithMoves: No windows with text!");
+            // No windows with text
             return nil;
         }
     }
@@ -4946,6 +5204,10 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
         _rotorHandler.glkctl = self;
     }
     return _rotorHandler.createCustomRotors;
+}
+
+- (NSString *)gameTitle {
+    return _game.metadata.title;
 }
 
 @end

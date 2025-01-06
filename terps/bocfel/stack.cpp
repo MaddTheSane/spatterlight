@@ -47,6 +47,10 @@
 #include "util.h"
 #include "zterp.h"
 
+#ifdef SPATTERLIGHT
+#include "journey.hpp"
+#endif
+
 using namespace std::literals;
 
 enum class StoreWhere {
@@ -113,7 +117,11 @@ private:
         } else {
             std::ostringstream formatted_time;
 
-            formatted_time.imbue(std::locale(""));
+            try {
+                formatted_time.imbue(std::locale(""));
+            } catch (...) {
+                // If the locale is invalid, don’t worry about it.
+            }
             formatted_time << std::put_time(lt, "%c");
 
             return formatted_time.str();
@@ -341,6 +349,46 @@ uint16_t internal_call(uint16_t routine)
 
     return pop_stack();
 }
+
+#ifdef SPATTERLIGHT
+uint16_t internal_call_with_args(uint16_t routine, uint16_t number_of_args, uint16_t *args)
+{
+    if (number_of_args > 4)
+        return 0;
+
+    std::vector<uint16_t> saved_args(zargs.begin(), zargs.begin() + znargs);
+
+    znargs = number_of_args + 1;
+    zargs[0] = routine;
+    for (int i = 1; i <= number_of_args; i++) {
+        zargs[i] = args[i - 1];
+    }
+
+    call(StoreWhere::Push);
+
+    process_instructions();
+
+    std::copy(saved_args.begin(), saved_args.end(), zargs.begin());
+    znargs = (int)saved_args.size();
+
+    return pop_stack();
+}
+
+
+uint16_t internal_call_with_arg(uint16_t routine, uint16_t arg)
+{
+    uint16_t args[1] = { arg };
+    return internal_call_with_args(routine, 1, args);
+}
+
+
+uint16_t internal_call_with_2_args(uint16_t routine, uint16_t arg1, uint16_t arg2)
+{
+    uint16_t args[2] = { arg1 , arg2 };
+    return internal_call_with_args(routine, 2, args);
+}
+#endif
+
 #endif
 
 void zcall_store()
@@ -680,7 +728,9 @@ static void write_chunk(IO &io, IFF::TypeID (*writefunc)(IO &savefile, Types... 
     IFF::TypeID type;
 
     chunk_pos = io.tell();
-    io.seek(8, IO::SeekFrom::Current); // skip past type and size
+    // Type and size, to be filled in below.
+    io.write32(0);
+    io.write32(0);
     type = writefunc(io, args...);
     if (type.empty()) {
         io.seek(chunk_pos, IO::SeekFrom::Start);
@@ -1285,7 +1335,19 @@ void zsave()
         return;
     }
 
+#ifdef SPATTERLIGHT
+    if (is_spatterlight_journey) {
+        journey_pre_save_hacks();
+    }
+#endif
+
     bool success = do_save(SaveType::Normal, SaveOpcode::None);
+
+#ifdef SPATTERLIGHT
+    if (is_spatterlight_journey) {
+        journey_post_save_hacks();
+    }
+#endif
 
     if (zversion <= 3) {
         branch_if(success);

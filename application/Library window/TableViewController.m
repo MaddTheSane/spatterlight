@@ -49,6 +49,8 @@
 
 #import "CoreDataManager.h"
 
+#import "OpenGameOperation.h"
+
 enum { X_EDITED, X_LIBRARY, X_DATABASE }; // export selections
 
 enum  {
@@ -695,6 +697,10 @@ enum  {
                 strongSelf.undoGroupingCount--;
             }
         }];
+
+        // This is the only way I have found to immediately enable the "Add to library…" button again.
+        // (Although the Apple header for validateVisibleItems says: "Typically you should not invoke this method.")
+        [strongSelf.windowController.window.toolbar validateVisibleItems];
     });
 }
 
@@ -1003,6 +1009,18 @@ enum  {
     }
 
     return _alertQueue;
+}
+
+@synthesize openGameQueue = _openGameQueue;
+
+- (NSOperationQueue *)openGameQueue {
+    if (_openGameQueue == nil) {
+        _openGameQueue = [NSOperationQueue new];
+        _openGameQueue.maxConcurrentOperationCount = 3;
+        _openGameQueue.qualityOfService = NSQualityOfServiceUserInteractive;
+    }
+
+    return _openGameQueue;
 }
 
 - (void)downloadMetadataForGames:(NSArray<Game *> *)games {
@@ -1844,9 +1862,9 @@ enum  {
                         } else {
                             NSString *path = (NSString *)[games valueForKey:ifid];
                             void *context = get_babel_ctx();
-                            const char *format = babel_init_ctx((char *)path.UTF8String, context);
+                            const char *format = babel_init_ctx((char *)path.fileSystemRepresentation, context);
                             if (format) {
-                                if ([Blorb isBlorbURL:[NSURL fileURLWithPath:path]]) {
+                                if ([Blorb isBlorbURL:[NSURL fileURLWithPath:path isDirectory:NO]]) {
                                     Blorb *blorb = [[Blorb alloc] initWithData:[NSData dataWithContentsOfFile:path]];
                                     imgdata = blorb.coverImageData;
                                     game.metadata.coverArtURL = path;
@@ -2300,7 +2318,7 @@ static void write_xml_text(FILE *fp, Metadata *info, NSString *key) {
 
     //Check if the file is in trash
     NSError *error = nil;
-    NSURL *trashUrl = [fileManager URLForDirectory:NSTrashDirectory inDomain:NSUserDomainMask appropriateForURL:[NSURL fileURLWithPath:path] create:NO error:&error];
+    NSURL *trashUrl = [fileManager URLForDirectory:NSTrashDirectory inDomain:NSUserDomainMask appropriateForURL:[NSURL fileURLWithPath:path isDirectory:NO] create:NO error:&error];
     if (error)
         NSLog(@"Error getting Trash path: %@", error);
     if (trashUrl && [path hasPrefix:trashUrl.path]) {
@@ -2340,8 +2358,9 @@ static void write_xml_text(FILE *fp, Metadata *info, NSString *key) {
         gctl.window.restorable = YES;
         gctl.window.restorationClass = [AppDelegate class];
         gctl.window.identifier = [NSString stringWithFormat:@"gameWin%@", game.ifid];
-    } else
+    } else {
         gctl.window.restorable = NO;
+    }
 
     if (game.metadata.title.length)
         gctl.window.title = game.metadata.title;
@@ -2350,19 +2369,59 @@ static void write_xml_text(FILE *fp, Metadata *info, NSString *key) {
 
     TableViewController __weak *weakSelf = self;
 
-    [gctl askForAccessToURL:url showDialog:!systemWindowRestoration andThenRunBlock:^{
-        weakSelf.gameSessions[game.ifid] = gctl;
-        game.lastPlayed = [NSDate date];
-        [gctl runTerp:terp withGame:game reset:NO winRestore:systemWindowRestoration];
-        [((AppDelegate *)NSApp.delegate)
-         addToRecents:@[ url ]];
-    }];
+    GlkController __block *blockgctl = gctl;
+    Game __block *blockGame = game;
+    NSString *ifid = game.ifid;
 
-    if ([Blorb isBlorbURL:url]) {
-        Blorb *blorb = [[Blorb alloc] initWithData:[NSData dataWithContentsOfFile:path]];
-        GameImporter *importer = [[GameImporter alloc] initWithLibController:self];
-        [importer updateImageFromBlorb:blorb inGame:game];
-    }
+    [gctl askForAccessToURL:url showDialog:!systemWindowRestoration andThenRunBlock:^{
+        OpenGameOperation *operation = [[OpenGameOperation alloc] initWithURL:url completionHandler:^(NSData * _Nullable newData, NSURL * _Nullable newURL) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [blockgctl.slowReadAlert.window close];
+                blockgctl.slowReadAlert = nil;
+
+                if (newData.length == 0) {
+                    NSAlert *alert = [[NSAlert alloc] init];
+                    alert.messageText = NSLocalizedString(@"Failed to open the game.", nil);
+                    alert.informativeText = [NSString stringWithFormat:NSLocalizedString(@"File access to \"%@\" was not permitted.", nil), newURL.lastPathComponent];
+                    [alert runModal];
+                } else {
+                    weakSelf.gameSessions[ifid] = blockgctl;
+                    blockGame.lastPlayed = [NSDate date];
+                    blockgctl.gameData = newData;
+                    blockgctl.gameFileURL = newURL;
+                    
+                    [blockgctl runTerp:terp withGame:blockGame reset:NO winRestore:systemWindowRestoration];
+                    
+                    [((AppDelegate *)NSApp.delegate)
+                     addToRecents:@[ newURL ]];
+                    
+                    if ([Blorb isBlorbURL:newURL]) {
+                        Blorb *blorb = [[Blorb alloc] initWithData:newData];
+                        GameImporter *importer = [[GameImporter alloc] initWithLibController:weakSelf];
+                        [importer updateImageFromBlorb:blorb inGame:blockGame];
+                    }
+                }
+            });
+        }];
+
+        [weakSelf.openGameQueue addOperation:operation];
+
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            if (gctl.gameData == nil) {
+                gctl.slowReadAlert = [[NSAlert alloc] init];
+                NSAlert __weak *alert = gctl.slowReadAlert;
+                alert.messageText =
+                [NSString stringWithFormat:NSLocalizedString(@"The game \"%@\" is taking a long time to load.", nil), blockGame.metadata.title];
+                [alert addButtonWithTitle:NSLocalizedString(@"Cancel loading", nil)];
+
+                [alert beginSheetModalForWindow:gctl.window completionHandler:^(NSInteger result){
+                    if (result == NSAlertFirstButtonReturn) {
+                        [operation cancel];
+                    }
+                }];
+            }
+        });
+    }];
 
     return gctl.window;
 }
@@ -2441,6 +2500,7 @@ static void write_xml_text(FILE *fp, Metadata *info, NSString *key) {
     verifyIsCancelled = YES;
     [_alertQueue cancelAllOperations];
     [_downloadQueue cancelAllOperations];
+    [_openGameQueue cancelAllOperations];
     [self endImporting];
 }
 
@@ -2539,7 +2599,7 @@ static void write_xml_text(FILE *fp, Metadata *info, NSString *key) {
         a = [a substringFromIndex: 4];
     if ([b hasPrefix: @"The "] || [b hasPrefix: @"the "])
         b = [b substringFromIndex: 4];
-    return [a localizedCaseInsensitiveCompare: b];
+    return [a localizedStandardCompare: b];
 }
 
 + (NSInteger)compareGame:(Metadata *)a with:(Metadata *)b key:(id)key ascending:(BOOL)ascending {

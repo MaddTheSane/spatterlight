@@ -46,15 +46,19 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nullable) NSImage *lastimage;
 @property NSMutableDictionary <NSNumber *, ImageResource *> *resources;
 @property NSMutableDictionary <NSString *, ImageFile *> *files;
+@property NSMutableDictionary <NSNumber *, NSString *> *imageDescriptions;
 
-- (void)cacheImagesFromBlorb:(NSURL *)file;
+- (void)cacheImagesFromBlorbURL:(NSURL *)file withData:(NSData *)data;
 @property (readonly, nonatomic, copy) NSString *lastImageLabel;
 
 - (BOOL)handleFindImageNumber:(NSInteger)resno;
 - (void)handleLoadImageNumber:(NSInteger)resno
                          from:(NSString *)path
                        offset:(NSUInteger)offset
-                       length:(NSUInteger)length;
+                       size:(NSUInteger)size;
+
+- (void)purgeImage:(NSInteger)resno withReplacement:(nullable NSString *)path
+            size:(NSUInteger)size;
 
 @end
 

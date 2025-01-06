@@ -24,7 +24,7 @@ private:
 
 extern std::string game_file;
 
-#define ZTERP_VERSION	"2.2"
+#define ZTERP_VERSION	"2.2.2"
 
 // v3
 constexpr uint8_t FLAGS1_STATUSTYPE  = 1U << 1;
@@ -84,6 +84,15 @@ extern int zversion;
 extern Header header;
 extern std::array<uint8_t, 26 * 3> atable;
 
+#ifdef SPATTERLIGHT
+extern int pixversion;
+#endif
+
+#ifdef ZTERP_GLK_BLORB
+extern int zterp_blorb_expected_release;
+extern std::array<uint8_t, 6> zterp_blorb_expected_serial;
+#endif
+
 const std::string &get_story_id();
 
 enum class Game {
@@ -110,6 +119,9 @@ void start_story();
 uint32_t unpack_routine(uint16_t addr);
 uint32_t unpack_string(uint16_t addr);
 void store(uint16_t v);
+#ifdef SPATTERLIGHT
+uint32_t pack_routine(uint32_t addr);
+#endif
 
 void zterp_mouse_click(uint16_t x, uint16_t y);
 

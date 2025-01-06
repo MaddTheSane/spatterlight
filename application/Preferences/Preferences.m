@@ -660,6 +660,8 @@ NSString *fontToString(NSFont *font) {
     [_vOMenuButton selectItemWithTag:theme.vOSpeakMenu];
     [_vOImagesButton selectItemWithTag:theme.vOSpeakImages];
     _vODelaySlider.doubleValue = theme.vOHackDelay;
+    _vODelayTextField.doubleValue = theme.vOHackDelay;
+    _vODelayTextField.enabled = theme.vODelayOn;
     _vODelaySlider.enabled = theme.vODelayOn;
     _vODelaySlider.accessibilityValueDescription = [self secondsAccessibilityString];
     _vODelayCheckbox.state = theme.vODelayOn ? NSOnState : NSOffState;
@@ -686,6 +688,10 @@ NSString *fontToString(NSFont *font) {
     _bZVerticalTextField.integerValue = theme.bZAdjustment;
     _bZVerticalStepper.integerValue = theme.bZAdjustment;
 
+    [_z6GraphicsPopup selectItemWithTag:theme.z6GraphicsType];
+    _z6ColorizeCheckBox.state = theme.z6Colorize1Bit ? NSOnState : NSOffState;
+    _z6Sim16ColoursCheckBox.state = theme.z6Simulate16Color ? NSOnState : NSOffState;
+
     _btnSmoothScroll.state = theme.smoothScroll;
     _btnAutosave.state = theme.autosave;
     _btnAutosaveOnTimer.state = theme.autosaveOnTimer;
@@ -710,6 +716,7 @@ NSString *fontToString(NSFont *font) {
         if (_timerTextField.integerValue != (1000.0 / theme.minTimer)) {
             _timerTextField.integerValue = (long)(1000.0 / theme.minTimer);
         }
+        _timerSlider.accessibilityValueDescription = [NSString stringWithFormat:@"%ld per second", _timerSlider.integerValue];
     }
 
     _libraryAtStartCheckbox.state = [defaults boolForKey:@"ShowLibrary"] ? NSOnState : NSOffState;
@@ -1826,6 +1833,8 @@ textShouldEndEditing:(NSText *)fieldEditor {
 }
 - (IBAction)changeVODelaySlider:(id)sender {
     Theme *themeToChange = [self cloneThemeIfNotEditable];
+    _vODelaySlider.doubleValue = [sender doubleValue];
+    _vODelayTextField.doubleValue = [sender doubleValue];
     themeToChange.vOHackDelay = [sender doubleValue];
     _vODelaySlider.accessibilityValueDescription = [self secondsAccessibilityString];
 }
@@ -1833,6 +1842,7 @@ textShouldEndEditing:(NSText *)fieldEditor {
 - (IBAction)changeVODelayCheckbox:(id)sender {
     [self changeBooleanAttribute:@"vODelayOn" fromButton:sender];
     _vODelaySlider.enabled = (_vODelayCheckbox.state == NSOnState);
+    _vODelayTextField.enabled = _vODelaySlider.enabled;
 }
 
 
@@ -1912,6 +1922,20 @@ textShouldEndEditing:(NSText *)fieldEditor {
     [self changeBooleanAttribute:@"quoteBox" fromButton:sender];
 }
 
+#pragma mark Z Machine version 6 stuff
+
+- (IBAction)changez6GraphicsMenu:(id)sender {
+    [self changeMenuAttribute:@"z6GraphicsType" fromPopUp:sender];
+}
+
+- (IBAction)changez6ColorizeCheckBox:(id)sender {
+    [self changeBooleanAttribute:@"z6Colorize1Bit" fromButton:sender];
+}
+
+- (IBAction)changez6sim16ColorCheckBox:(id)sender {
+    [self changeBooleanAttribute:@"z6Simulate16Color" fromButton:sender];
+}
+
 #pragma mark Scott Adams menu
 
 - (IBAction)changeScottAdamsPalette:(id)sender {
@@ -1971,6 +1995,7 @@ textShouldEndEditing:(NSText *)fieldEditor {
     themeToChange.minTimer = (1000.0 / [sender integerValue]);
     _timerTextField.integerValue = [sender integerValue];
     _timerSlider.integerValue = [sender integerValue];
+    _timerSlider.accessibilityValueDescription = [NSString stringWithFormat:@"%ld per second", _timerSlider.integerValue];
 }
 
 - (IBAction)changeDeterminism:(id)sender {

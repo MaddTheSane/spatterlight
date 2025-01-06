@@ -41,6 +41,7 @@ extern "C" {
 
 #ifdef SPATTERLIGHT
 #include "spatterlight-autosave.h"
+#include "entrypoints.hpp"
 #endif
 
 unsigned long pc;
@@ -308,6 +309,7 @@ void process_instructions()
         SaveOpcode saveopcode;
 
         handled_autosave = true;
+
 #ifdef SPATTERLIGHT
         if (spatterlight_restore_autosave(&saveopcode)) {
 #else
@@ -328,6 +330,11 @@ void process_instructions()
 #endif
 
         current_instruction = pc;
+#ifdef SPATTERLIGHT
+        if (is_spatterlight_journey) {
+            check_entrypoints(pc);
+        }
+#endif
         opcode = byte(pc++);
 
         if (opcode < 0x80) { // long 2OP
@@ -404,6 +411,9 @@ void process_loop()
             } else if (restore.saveopcode == SaveOpcode::ReadChar) {
                 synthetic_call = zread_char;
             }
+#ifdef SPATTERLIGHT
+            v6_restore_hacks();
+#endif
         } catch (const Operation::Quit &) {
             break;
         }

@@ -28,23 +28,26 @@
 - (instancetype)init {
     return [self
         initWithImage:[[NSImage alloc] initWithContentsOfFile:@"../Resources/Question.png"]
-                align:kAlignLeft
-               linkid:0
+            index:0
+            alignment:kAlignLeft
+            linkId:0
                    at:0
                sender:self];
 }
 
 - (instancetype)initWithImage:(NSImage *)animage
-                        align:(NSInteger)analign
-                       linkid:(NSUInteger)linkid
+                       index:(NSInteger)index
+                    alignment:(NSInteger)alignment
+                       linkId:(NSUInteger)linkId
                            at:(NSUInteger)apos
                        sender:(id)sender {
     self = [super init];
     if (self) {
         _image = animage;
-        _alignment = analign;
+        _index = index;
+        _alignment = alignment;
         _bounds = NSZeroRect;
-        _linkid = linkid;
+        _linkid = linkId;
         _pos = apos;
         recalc = YES;
         _container = sender;
@@ -221,7 +224,7 @@
         // The receiver has passed us a URL where we are to write our data to.
 
         NSString *str = [pasteboard stringForType:PasteboardFilePasteLocation];
-        NSURL *destinationFolderURL = [NSURL fileURLWithPath:str];
+        NSURL *destinationFolderURL = [NSURL fileURLWithPath:str isDirectory:YES];
         if (!destinationFolderURL) {
             NSLog(@"ERROR:- Receiver didn't tell us where to put the file?");
             return;
@@ -233,7 +236,7 @@
 
         NSString *fileName = [baseFilename stringByAppendingPathExtension:@"png"];
 
-        NSURL *destinationFileURL = [destinationFolderURL URLByAppendingPathComponent:fileName];
+        NSURL *destinationFileURL = [destinationFolderURL URLByAppendingPathComponent:fileName isDirectory:NO];
 
         NSUInteger index = 2;
 
@@ -242,7 +245,7 @@
         while ([[NSFileManager defaultManager] fileExistsAtPath:destinationFileURL.path]) {
             NSString *newFileName = [NSString stringWithFormat:@"%@ %ld", baseFilename, index];
             newFileName = [newFileName stringByAppendingPathExtension:@"png"];
-            destinationFileURL = [destinationFolderURL URLByAppendingPathComponent:newFileName];
+            destinationFileURL = [destinationFolderURL URLByAppendingPathComponent:newFileName isDirectory:NO];
             index++;
         }
 

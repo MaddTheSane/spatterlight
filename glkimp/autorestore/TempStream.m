@@ -76,7 +76,7 @@
         
         URL = nil;
         if (str->filename)
-            URL = [NSURL fileURLWithPath:@(str->filename)];
+            URL = [NSURL fileURLWithPath:@(str->filename) isDirectory:NO];
         _file = str->file;
         
         /* for strtype_Memory and strtype_Resource. Separate pointers for
@@ -420,7 +420,7 @@
         NSString *newPath = [parent stringByAppendingPathComponent:filename];
         if ([[NSFileManager defaultManager] fileExistsAtPath:newPath]) {
             NSLog(@"TempStream reopenInternal: Changed path from %@ to %@ for stream %d.", URL.path, newPath, _tag);
-            path = newPath.UTF8String;
+            path = newPath.fileSystemRepresentation;
             if (str->filename != NULL)
                 free(str->filename);
             size_t len = strlen(path);
@@ -428,7 +428,8 @@
             strncpy(urlpath, path, len);
             urlpath[len] = '\0';
             str->filename = urlpath;
-        } else {
+        } else if (str->writable) {
+            // If a file is writable (and not, say, a blorb file) we create a new one as a last resort
             str->file = fopen(path,"w");
             if (!str->file)
             {
@@ -437,6 +438,9 @@
             }
             NSLog(@"TempStream reopenInternal: Could not find file at %@ for stream %d, so created a new one.", URL.path, _tag);
             fclose(str->file);
+        } else {
+            NSLog(@"TempStream reopenInternal: Could not reopen file at %@ for stream %d.", URL.path, _tag);
+            return NO;
         }
     }
 

@@ -29,7 +29,7 @@
 @property NSUInteger lastForm;
 
 @property NSSize quoteboxSize;
-@property NSInteger quoteboxAddedOnTurn;
+@property NSInteger quoteboxAddedOnPAC;
 @property NSUInteger quoteboxVerticalOffset;
 @property (weak) NSScrollView *quoteboxParent;
 
@@ -43,6 +43,7 @@
 - (void)deferredGrabFocus:(id)sender;
 - (void)recalcBackground;
 
-@property (NS_NONATOMIC_IOSONLY, readonly) NSSize currentSizeInChars;
+- (NSSize)currentSizeInChars;
+- (unichar)characterAtPoint:(NSPoint)point;
 
 @end

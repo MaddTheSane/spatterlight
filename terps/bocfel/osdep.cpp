@@ -31,7 +31,7 @@
 
 #ifdef ZTERP_GLK
 extern "C" {
-#include "glk.h"
+#include <glk.h>
 #ifdef SPATTERLIGHT
 #include "fileref.h"
 #endif
@@ -1034,7 +1034,11 @@ std::string convertToString(char* a)
 std::unique_ptr<std::string> zterp_os_autosave_name()
 {
     getautosavedir((char *)game_file.c_str());
+    if (autosavedir == nullptr)
+        return nullptr;
     std::string s = convertToString(autosavedir);
+    if (s.size() == 0)
+        return nullptr;
     return std::make_unique<std::string>(s + "/autosave.glksave");
 }
 
