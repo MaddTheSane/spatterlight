@@ -690,7 +690,8 @@ NSString *fontToString(NSFont *font) {
 
     [_z6GraphicsPopup selectItemWithTag:theme.z6GraphicsType];
     _z6ColorizeCheckBox.state = theme.z6Colorize1Bit ? NSOnState : NSOffState;
-    _z6Sim16ColoursCheckBox.state = theme.z6Simulate16Color ? NSOnState : NSOffState;
+
+    _zMachineNoErrWinCheckbox.state = theme.zMachineNoErrWin ? NSOnState : NSOffState;
 
     _btnSmoothScroll.state = theme.smoothScroll;
     _btnAutosave.state = theme.autosave;
@@ -1679,7 +1680,7 @@ textShouldEndEditing:(NSText *)fieldEditor {
         if (_lightTheme == theme) {
             _lightTheme = nil;
             if (_lightOverrideActive) {
-                lightOrDarkWasRemoved = YES;;
+                lightOrDarkWasRemoved = YES;
             }
         }
         theme.hardLight = NO;
@@ -1720,7 +1721,7 @@ textShouldEndEditing:(NSText *)fieldEditor {
         theme.hardDark = NO;
         if (_darkTheme == theme) {
             if (_darkOverrideActive) {
-                lightOrDarkWasRemoved = YES;;
+                lightOrDarkWasRemoved = YES;
             }
             _darkTheme = nil;
         }
@@ -1738,7 +1739,7 @@ textShouldEndEditing:(NSText *)fieldEditor {
         if (_lightTheme == theme) {
             _lightTheme = nil;
             if (_lightOverrideActive) {
-                lightOrDarkWasRemoved = YES;;
+                lightOrDarkWasRemoved = YES;
             }
         }
     }
@@ -1922,6 +1923,10 @@ textShouldEndEditing:(NSText *)fieldEditor {
     [self changeBooleanAttribute:@"quoteBox" fromButton:sender];
 }
 
+- (IBAction)changeNoErrWinCheckBox:(id)sender {
+    [self changeBooleanAttribute:@"zMachineNoErrWin" fromButton:sender];
+}
+
 #pragma mark Z Machine version 6 stuff
 
 - (IBAction)changez6GraphicsMenu:(id)sender {
@@ -1930,10 +1935,6 @@ textShouldEndEditing:(NSText *)fieldEditor {
 
 - (IBAction)changez6ColorizeCheckBox:(id)sender {
     [self changeBooleanAttribute:@"z6Colorize1Bit" fromButton:sender];
-}
-
-- (IBAction)changez6sim16ColorCheckBox:(id)sender {
-    [self changeBooleanAttribute:@"z6Simulate16Color" fromButton:sender];
 }
 
 #pragma mark Scott Adams menu
@@ -2533,6 +2534,10 @@ textShouldEndEditing:(NSText *)fieldEditor {
 }
 
 - (void)switchToPanel:(NSToolbarItem *)item resizePreview:(BOOL)resizePreview {
+
+    // This must be set here for selecting tab using VoiceOver to work properly
+    self.window.toolbar.selectedItemIdentifier = item.itemIdentifier;
+
     NSView *preferencePane = itemIdentifierToViewDict[item.itemIdentifier];
     if (!preferencePane)
         return;
@@ -2613,12 +2618,7 @@ textShouldEndEditing:(NSText *)fieldEditor {
 }
 
 - (NSArray<NSToolbarItemIdentifier> *)toolbarDefaultItemIdentifiers:(NSToolbar *)toolbar {
-
-    NSMutableArray<NSToolbarItemIdentifier> *toolbarItemIdentifiers = [NSMutableArray new];
-
-    [toolbarItemIdentifiers addObjectsFromArray:@[themesPanel, stylesPanel, presentationPanel, formatPanel, voiceOverPanel, miscPanel, globalPanel]];
-
-    return toolbarItemIdentifiers;
+    return @[themesPanel, stylesPanel, presentationPanel, formatPanel, voiceOverPanel, miscPanel, globalPanel];
 }
 
 - (NSArray<NSToolbarItemIdentifier> *)toolbarAllowedItemIdentifiers:(NSToolbar *)toolbar {

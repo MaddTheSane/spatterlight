@@ -70,7 +70,7 @@
 
     if (self) {
         // lines = [[NSMutableArray alloc] init];
-        
+
         NSDictionary *styleDict = nil;
 
         self.styleHints = [self deepCopyOfStyleHintsArray:glkctl_.gridStyleHints];
@@ -360,7 +360,7 @@
 
         GlkTextGridWindow * __weak weakSelf = self;
 
-         NSArray<NSDictionary *> __block *blockStyles = styles;
+        NSArray<NSDictionary *> __block *blockStyles = styles;
 
         [textstorage
          enumerateAttributesInRange:NSMakeRange(0, textstorage.length)
@@ -490,33 +490,52 @@
     // and if so, uses this color for the window background color.
     // It is complicated by the fact that some games have a status line in reverse video, but leaves
     // a single character at the end non-reversed. Also, our setFrame implementation inserts newline
-    // charaters at the end of every row, and those may not have the right background color. So we have
-    // to check on a row by row basis.
+    // charaters at the end of every row, and those may not have the right background color. So we
+    // simply count the background color runs and check if one fills the window (which we fudge to
+    // mean "length of textstorage minus two colums".)
 
-    if (!_bufferTextStorage.length) {
+    NSAttributedString __block *blockTextStorage = _bufferTextStorage;
+
+    if (!blockTextStorage.length) {
         if (textstorage.length) {
-            _bufferTextStorage = textstorage;
+            blockTextStorage = textstorage;
         } else return;
     }
 
-    NSColor __block *bgCol;
-    NSUInteger __block blocCols = cols;
-    NSAttributedString __block *blockTextStorage = _bufferTextStorage;
+    NSMutableDictionary<NSColor *, NSValue *> __block *colors = [[NSMutableDictionary alloc] init];
 
     [blockTextStorage
      enumerateAttribute:NSBackgroundColorAttributeName
      inRange:NSMakeRange(0, blockTextStorage.length)
      options:0
-     usingBlock:^(id value, NSRange range, BOOL *stop) {
-
-        bgCol = (NSColor *)value;
-        if (bgCol && range.length + 2 > blocCols) {
-            if (NSMaxRange(range) > blockTextStorage.length - 3)
-                *stop = YES;
-        } else {
-            bgCol = nil;
+     usingBlock:^(NSColor *color, NSRange range, BOOL *stop) {
+        if (color) {
+            NSValue *rangeVal = colors[color];
+            if (rangeVal) {
+                NSRange storedRange = rangeVal.rangeValue;
+                storedRange.length += range.length;
+                colors[color] = [NSValue valueWithRange:storedRange];
+            } else {
+                colors[color] = [NSValue valueWithRange:range];
+            }
         }
     }];
+
+    NSColor *bgCol = nil;
+
+    if (colors.count) {
+        NSUInteger longest = 0;
+        for (NSColor *col in colors.allKeys) {
+            NSValue *rangeVal = colors[col];
+            NSUInteger length = rangeVal.rangeValue.length;
+            if (length > longest) {
+                longest = length;
+                bgCol = col;
+            }
+        }
+        if (longest < blockTextStorage.length - rows * 2)
+            bgCol = nil;
+    }
 
     if (!bgCol) {
         if (bgnd < 0 || !self.theme.doStyles) {
@@ -530,6 +549,8 @@
 }
 
 - (void)flushDisplay {
+    // Making the textview temporarily editable
+    // reduces flicker in Hugo Tetris, for some reason.
     _textview.editable = YES;
     NSRange selectedRange = _textview.selectedRange;
     NSString *selectedString = [textstorage.string substringWithRange:selectedRange];
@@ -550,7 +571,7 @@
     if (!transparent)
         [self checkForUglyBorder];
 
-    if (_pendingBackgroundCol && ![_pendingBackgroundCol isEqualToColor:_textview.backgroundColor]) {
+    if (_pendingBackgroundCol) {
         _textview.backgroundColor = _pendingBackgroundCol;
     }
     _pendingBackgroundCol = nil;
@@ -568,7 +589,7 @@
     if (NSMaxRange(_restoredSelection) <= _bufferTextStorage.length) {
         NSString *newSelectedString = [_bufferTextStorage.string substringWithRange:_restoredSelection];
         if ([newSelectedString isEqualToString:selectedString]) {
-           _textview.selectedRange = _restoredSelection;
+            _textview.selectedRange = _restoredSelection;
         }
     }
     _restoredSelection = _textview.selectedRange;
@@ -578,11 +599,11 @@
 #pragma mark Printing, moving, resizing
 
 - (void)setFrame:(NSRect)frame {
-
     GlkController *glkctl = self.glkctl;
 
-    if (glkctl.ignoreResizes)
+    if (glkctl.ignoreResizes) {
         return;
+    }
 
     NSUInteger r;
 
@@ -597,14 +618,15 @@
     if (glkctl) {
         screensize = glkctl.window.screen.visibleFrame.size;
         if (frame.size.height > screensize.height)
-        frame.size.height = glkctl.gameView.frame.size.height;
+            frame.size.height = glkctl.gameView.frame.size.height;
     }
 
     _textview.textContainerInset =
-        NSMakeSize(self.theme.gridMarginX, self.theme.gridMarginY);
+    NSMakeSize(self.theme.gridMarginX, self.theme.gridMarginY);
 
-    if (self.theme.cellWidth == 0 || self.theme.cellHeight == 0)
+    if (self.theme.cellWidth == 0 || self.theme.cellHeight == 0) {
         return;
+    }
 
     CGFloat margins = (_textview.textContainerInset.width + container.lineFragmentPadding) * 2;
     if (margins > frame.size.width)
@@ -642,8 +664,9 @@
 
     if ((NSInteger)newcols > 0 && (NSInteger)newrows > 0) {
 
-        if (self.inLiveResize && newcols < cols)
+        if (self.inLiveResize && newcols < cols) {
             return;
+        }
 
         _selectedRow = _restoredSelection.location / (cols + 1);
         _selectedCol = _restoredSelection.location % (cols + 1);
@@ -840,6 +863,13 @@
 //        [self recalcBackground];
 //    }
 
+    NSDictionary *attributes = [self getCurrentAttributesForStyle:style_Normal];
+    NSColor *background = attributes[NSBackgroundColorAttributeName];
+    if (background && bgnd != background.integerColor) {
+        bgnd = background.integerColor;
+        [self recalcBackground];
+    }
+
     if (NSMaxRange(selectedRange) > _textview.textStorage.length) {
         if (_textview.textStorage.length) {
             selectedRange = NSMakeRange(_textview.textStorage.length - 1, 0);
@@ -858,7 +888,6 @@
 }
 
 - (void)printToWindow:(NSString *)string style:(NSUInteger)stylevalue {
-    NSUInteger length = string.length;
     NSUInteger startpos;
     NSUInteger pos = 0;
 
@@ -873,8 +902,9 @@
         } else return;
     }
 
-    if (cols == 0 || rows == 0 || length == 0)
+    if (cols == 0 || rows == 0 || string.length == 0) {
         return;
+    }
 
     // With certain fonts and sizes, strings containing only spaces will "collapse."
     // So if the first character is a space, we replace it with a &nbsp;
@@ -898,42 +928,13 @@
         ypos += xpos / cols;
         xpos = xpos % cols;
     }
-    NSMutableDictionary *attrDict = [styles[stylevalue] mutableCopy];
-
-    if (!attrDict)
-        NSLog(@"GlkTextGridWindow printToWindow: ERROR! Style dictionary nil!");
+    NSMutableDictionary *attrDict = [self getCurrentAttributesForStyle:stylevalue];
 
     startpos = self.indexOfPos;
     if (startpos > textstoragelength) {
         // We are outside window visible range!
         // Do nothing
         return;
-    }
-
-    if (currentZColor) {
-        attrDict[@"ZColor"] = currentZColor;
-        if (self.theme.doStyles) {
-            if ([self.styleHints[stylevalue][stylehint_ReverseColor] isEqualTo:@(1)]) {
-                attrDict = [currentZColor reversedAttributes:attrDict];
-                //  If the style has the reverseColor hint set, we apply the zcolors in reverse
-            } else {
-                attrDict = [currentZColor coloredAttributes:attrDict];
-                // Otherwise we apply the zcolors normally");
-            }
-        }
-    }
-
-    if (self.currentReverseVideo) {
-        attrDict[@"ReverseVideo"] = @(YES);
-        if (!self.theme.doStyles || [self.styleHints[stylevalue][stylehint_ReverseColor] isNotEqualTo:@(1)]) {
-            // If the current colours are not already reversed by stylehint_ReverseColor,
-            // we reverse the colours here
-            attrDict = [self reversedAttributes:attrDict background:self.theme.gridBackground];
-        }
-    }
-
-    if (self.currentHyperlink) {
-        attrDict[NSLinkAttributeName] = @(self.currentHyperlink);
     }
 
     if (ypos > rows) {
@@ -943,7 +944,7 @@
 
     // Check for newlines in string to write
     NSUInteger x;
-    for (x = 0; x < length; x++) {
+    for (x = 0; x < string.length; x++) {
         if ([string characterAtIndex:x] == '\n' ||
             [string characterAtIndex:x] == '\r') {
             [self printToWindow:[string substringToIndex:x] style:stylevalue];
@@ -956,7 +957,7 @@
     }
 
     // Write this string
-    while (pos < length) {
+    while (pos < string.length) {
         // Can't write if we've fallen off the end of the window
         if (((NSInteger)cols > -1 && ypos > textstoragelength / (cols + 1) ) || ypos > rows)
             break;
@@ -1052,7 +1053,7 @@
             p.y = charIndex / (cols + 1);
             p.x = charIndex % (cols + 1);
             if (p.x >= 0 && p.y >= 0 && p.x < cols && p.y < rows) {
-               gev = [[GlkEvent alloc] initMouseEvent:p forWindow:self.name];
+                gev = [[GlkEvent alloc] initMouseEvent:p forWindow:self.name];
                 [self.glkctl queueEvent:gev];
                 mouse_request = NO;
                 return YES;
@@ -1157,15 +1158,16 @@
 
     GlkWindow *win;
     // pass on this key press to another GlkWindow if we are not expecting one
-    if (!self.wantsFocus)
+    if (!self.wantsFocus) {
         for (win in (glkctl.gwindows).allValues) {
             if (win != self && win.wantsFocus) {
                 [win grabFocus];
-                NSLog(@"GlkTextGridWindow: Passing on keypress");
+                NSLog(@"GlkTextGridWindow %ld: Passing on keypress to %@ %ld", self.name, win.class, win.name);
                 [win keyDown:evt];
                 return;
             }
         }
+    }
 
     // Stupid hack for Swedish keyboard
     if (char_request && glkctl.gameID == kGameIsBureaucracy && evt.keyCode == 30)
@@ -1175,7 +1177,7 @@
         [glkctl markLastSeen];
 
         if (glkctl.gameID == kGameIsBureaucracy) {
-            // Bureacracy on Bocfel will try to convert these keycodes
+            // Bureaucracy on Bocfel will try to convert these keycodes
             // to characters and then error out with
             // "fatal error: @print_char called with invalid character"
             // so we attempt to change them into something reasonable here.
@@ -1438,7 +1440,7 @@
     if (cx) {
         self.input.stringValue = cx;
         self.input.fieldEditor.selectedRange = NSMakeRange(cx.length, 0);
-    }  
+    }
 
     if (!cx.length) {
         if ([history empty])
@@ -1455,7 +1457,7 @@
     if (cx) {
         self.input.stringValue = cx;
         self.input.fieldEditor.selectedRange = NSMakeRange(cx.length, 0);
-    } 
+    }
 
     if (!cx.length) {
         if ([history empty])
@@ -1486,7 +1488,7 @@
     NSMutableDictionary *beyondZorkStyle = [styles[style_Normal] mutableCopy];
     NSString *normalFontName = self.theme.gridNormal.font.fontName;
     BOOL isMonaco = ([normalFontName isEqualToString:@"Monaco"]);
-    
+
     beyondZorkStyle[@"GlkStyle"] = @(style_BlockQuote);
 
     NSMutableParagraphStyle *para = [beyondZorkStyle[NSParagraphStyleAttributeName] mutableCopy];
@@ -1497,8 +1499,8 @@
     NSAffineTransform *transform = [[NSAffineTransform alloc] init];
     [transform scaleBy:zorkFont.pointSize];
     CGFloat yscale = (self.theme.cellHeight + 0.5 + 0.1 * self.theme.bZAdjustment) / zorkFont.boundingRectForFont.size.height;
-    if (isMonaco)
-        yscale *= 1.5;
+    if (isMonaco && self.glkctl.gameID == kGameIsJourney)
+        yscale *= 1.2;
     [transform scaleXBy:1 yBy:yscale];
 
     zorkFont = [NSFont fontWithDescriptor:zorkFont.fontDescriptor textTransform:transform];
@@ -1507,9 +1509,6 @@
         NSLog(@"Failed to create Zork Font!");
 
     beyondZorkStyle[NSFontAttributeName] = zorkFont;
-
-    para.maximumLineHeight = self.theme.cellHeight;
-    para.minimumLineHeight = self.theme.cellHeight;
     beyondZorkStyle[NSParagraphStyleAttributeName] = para;
 
     styles[style_BlockQuote] = beyondZorkStyle;
@@ -1563,12 +1562,6 @@
     }];
 
     GlkController *glkctl = self.glkctl;
-    if (!glkctl.quoteBoxes)
-        glkctl.quoteBoxes = [[NSMutableArray alloc] init];
-
-    GlkTextGridWindow *box = [[GlkTextGridWindow alloc] initWithGlkController:glkctl name:-1];
-    box.quoteboxSize = NSMakeSize(width, height);
-    [box makeTransparent];
 
     GlkTextBufferWindow *lowerView;
 
@@ -1579,17 +1572,30 @@
 
     NSTextView *superView = lowerView.textview;
 
-    [box.textview.textStorage setAttributedString:quoteAttStr];
+    if (glkctl.theme.zMachineNoErrWin) {
+        [lowerView putString:quoteAttStr.string style:style_Preformatted];
+    }
 
-    box.alphaValue = 0;
+    if (glkctl.theme.quoteBox) {
+        if (!glkctl.quoteBoxes)
+            glkctl.quoteBoxes = [[NSMutableArray alloc] init];
 
-    [glkctl.quoteBoxes addObject:box];
-    lowerView.quoteBox = box;
-    box.quoteboxVerticalOffset = linesToSkip;
-    box.quoteboxAddedOnPAC = 0;
-    glkctl.numberOfPrintsAndClears = 0;
-    box.quoteboxParent = superView.enclosingScrollView;
-    [box performSelector:@selector(quoteboxAdjustSize:) withObject:nil afterDelay:0.2];
+        GlkTextGridWindow *box = [[GlkTextGridWindow alloc] initWithGlkController:glkctl name:-1];
+        box.quoteboxSize = NSMakeSize(width, height);
+        [box makeTransparent];
+
+        [box.textview.textStorage setAttributedString:quoteAttStr];
+
+        box.alphaValue = 0;
+
+        [glkctl.quoteBoxes addObject:box];
+        lowerView.quoteBox = box;
+        box.quoteboxVerticalOffset = linesToSkip;
+        box.quoteboxAddedOnPAC = 0;
+        glkctl.numberOfPrintsAndClears = 0;
+        box.quoteboxParent = superView.enclosingScrollView;
+        [box performSelector:@selector(quoteboxAdjustSize:) withObject:nil afterDelay:0.2];
+    }
 }
 
 - (void)quoteboxAdjustSize:(id)sender {
@@ -1665,7 +1671,7 @@
     moveRangeIndex = self.moveRanges.count - 1;
     NSString *str = [textstorage.string substringWithRangeValue:self.moveRanges.lastObject];
 
-    if (!str.length) {
+    if (!str.length && sender != self.glkctl) {
         [self.glkctl speakStringNow:@"No last move to speak"];
         return;
     }

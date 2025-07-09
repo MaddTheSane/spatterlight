@@ -18,6 +18,8 @@
 #import "MarginImage.h"
 #import "BufferTextView.h"
 #import "GridTextView.h"
+#import "InfocomV6MenuHandler.h"
+#import "ImageHandler.h"
 #include "glkimp.h"
 
 
@@ -64,6 +66,9 @@ fprintf(stderr, "%s\n",                                                    \
 
     BOOL scrolling;
     NSMutableArray<NSEvent *> *bufferedEvents;
+
+    NSRange lastSpokenRange;
+    NSString *lastSpokenString;
 }
 @end
 
@@ -501,14 +506,33 @@ fprintf(stderr, "%s\n",                                                    \
 
     _lastNewTextOnTurn = self.glkctl.turns;
 
+    NSMutableDictionary<NSString *, MyAttachmentCell *> *attachmentCells = [[NSMutableDictionary alloc] initWithCapacity:container.marginImages.count];
+
+    [textstorage
+     enumerateAttribute:NSAttachmentAttributeName
+     inRange:NSMakeRange(0, textstorage.length)
+     options:0
+     usingBlock:^(NSTextAttachment *attachment, NSRange range, BOOL *stop) {
+        MyAttachmentCell *cell = (MyAttachmentCell *)attachment.attachmentCell;
+        if (cell) {
+            if (cell.glkImgAlign == imagealign_MarginLeft || cell.glkImgAlign == imagealign_MarginRight) {
+                if (cell.marginImgUUID != nil)
+                    attachmentCells[cell.marginImgUUID] = cell;
+            }
+            cell.pos = range.location;
+        }
+    }];
+
     for (MarginImage *img in container.marginImages) {
         img.container = container;
         img.accessibilityParent = _textview;
-        img.bounds = [img boundsWithLayout:layoutmanager];
-        NSTextAttachment *attachment = [textstorage attribute:NSAttachmentAttributeName atIndex:img.pos + 1 effectiveRange:nil];
-        MyAttachmentCell *cell = (MyAttachmentCell *)attachment.attachmentCell;
-        cell.marginImage = img;
-        cell.accessibilityLabel = cell.customA11yLabel;
+        MyAttachmentCell *cell = attachmentCells[img.uuid];
+        if (cell) {
+            cell.marginImage = img;
+            img.pos = cell.pos;
+            img.bounds = [img boundsWithLayout:layoutmanager];
+            cell.accessibilityLabel = cell.customA11yLabel;
+        }
     }
 
     if (!self.glkctl.inFullscreen || self.glkctl.startingInFullscreen)
@@ -687,9 +711,9 @@ fprintf(stderr, "%s\n",                                                    \
 
             // Then, we re-add all the "non-Glk" style values we want to keep
             // (inline images, hyperlinks, Z-colors and reverse video)
-            id image = attrs[@"NSAttachment"];
+            id image = attrs[NSAttachmentAttributeName];
             if (image) {
-                [backingStorage addAttribute: @"NSAttachment"
+                [backingStorage addAttribute: NSAttachmentAttributeName
                                        value: image
                                        range: NSMakeRange(range.location, 1)];
                 ((MyAttachmentCell *)((NSTextAttachment *)image).attachmentCell).attrstr = backingStorage;
@@ -776,6 +800,7 @@ fprintf(stderr, "%s\n",                                                    \
     if (currentZColor && currentZColor.bg != zcolor_Current)
         bgnd = currentZColor.bg;
     [self recalcBackground];
+    [self resetLastSpokenString];
 }
 
 - (void)reallyClear {
@@ -877,15 +902,7 @@ fprintf(stderr, "%s\n",                                                    \
     }
 }
 
-// static const char *stylenames[] =
-//{
-//    "style_Normal", "style_Emphasized", "style_Preformatted", "style_Header",
-//    "style_Subheader", "style_Alert", "style_Note", "style_BlockQuote",
-//    "style_Input", "style_User1", "style_User2", "style_NUMSTYLES"
-//};
-
 - (void)printToWindow:(NSString *)str style:(NSUInteger)stylevalue {
-//    NSLog(@"printToWindow:\"%@\" style:%s", str, stylenames[stylevalue]);
 
     if (self.glkctl.usesFont3 && str.length == 1 && stylevalue == style_BlockQuote) {
         NSDictionary *font3 = [self font3ToUnicode];
@@ -895,7 +912,6 @@ fprintf(stderr, "%s\n",                                                    \
             stylevalue = style_Normal;
         }
     }
-    //    NSLog(@"\nPrinting %ld chars at position %ld with style %@", str.length, textstorage.length, gBufferStyleNames[stylevalue]);
 
     // With certain fonts and sizes, strings containing only spaces will "collapse."
     // So if the first character is a space, we replace it with a &nbsp;
@@ -912,32 +928,7 @@ fprintf(stderr, "%s\n",                                                    \
         storedNewline = nil;
     }
 
-    NSMutableDictionary *attributes = [styles[stylevalue] mutableCopy];
-
-    if (currentZColor) {
-        attributes[@"ZColor"] = currentZColor;
-        if (self.theme.doStyles) {
-            if ([self.styleHints[stylevalue][stylehint_ReverseColor] isEqualTo:@(1)]) {
-                attributes = [currentZColor reversedAttributes:attributes];
-                //            NSLog(@"Because the style has reverseColor hint, we apply the zcolors in reverse");
-            } else {
-                attributes = [currentZColor coloredAttributes:attributes];
-                //            NSLog(@"We apply the zcolors normally");
-            }
-        }
-    }
-
-    if (self.currentReverseVideo) {
-        attributes[@"ReverseVideo"] = @(YES);
-        if (!self.theme.doStyles || [self.styleHints[stylevalue][stylehint_ReverseColor] isNotEqualTo:@(1)]) {
-            // Current style has stylehint_ReverseColor unset, so we reverse colors
-            attributes = [self reversedAttributes:attributes background:self.theme.bufferBackground];
-        }
-    }
-
-    if (self.currentHyperlink) {
-        attributes[NSLinkAttributeName] = @(self.currentHyperlink);
-    }
+    NSMutableDictionary *attributes = [self getCurrentAttributesForStyle:stylevalue];
 
     if (str.length > 1) {
         unichar c = [str characterAtIndex:str.length - 1];
@@ -1001,7 +992,7 @@ fprintf(stderr, "%s\n",                                                    \
         //        NSLog(@"%ld does not want focus", self.name);
         for (win in (glkctl.gwindows).allValues) {
             if (win != self && win.wantsFocus) {
-                NSLog(@"GlkTextBufferWindow: Passing on keypress to window %ld", win.name);
+                NSLog(@"GlkTextBufferWindow %ld: Passing on keypress to %@ %ld", self.name, win.class, win.name);
                 [win grabFocus];
                 [win keyDown:evt];
                 return;
@@ -1026,9 +1017,8 @@ fprintf(stderr, "%s\n",                                                    \
             ch = keycode_PageDown;
         else if (commandKeyOnly)
             ch = keycode_End;
-    }
 
-    else if (([str isEqualToString:@"f"] || [str isEqualToString:@"F"]) &&
+    } else if (([str isEqualToString:@"f"] || [str isEqualToString:@"F"]) &&
              commandKeyOnly) {
         if (!scrollview.findBarVisible) {
             _restoredFindBarVisible = YES;
@@ -1240,7 +1230,6 @@ fprintf(stderr, "%s\n",                                                    \
               attributes:_inputAttributes];
 
     [textstorage appendAttributedString:att];
-
     _textview.editable = YES;
 
     line_request = YES;
@@ -1257,18 +1246,7 @@ fprintf(stderr, "%s\n",                                                    \
 }
 
 - (void)recalcInputAttributes {
-    NSMutableDictionary *inputStyle = [styles[style_Input] mutableCopy];
-    if (currentZColor && self.theme.doStyles && currentZColor.fg != zcolor_Current && currentZColor.fg != zcolor_Default && currentZColor.fg != zcolor_Transparent) {
-        inputStyle[NSForegroundColorAttributeName] = [NSColor colorFromInteger: currentZColor.fg];
-    }
-
-    if (currentZColor)
-        inputStyle[@"ZColor"] = currentZColor;
-    if (self.currentReverseVideo)
-        inputStyle[@"ReverseVideo"] = @(YES);
-
-    //    inputStyle[NSCursorAttributeName] = [NSCursor IBeamCursor];
-    _inputAttributes = inputStyle;
+    _inputAttributes = [self getCurrentAttributesForStyle:style_Input];
 }
 
 - (NSString *)cancelLine {
@@ -1485,14 +1463,14 @@ replacementString:(id)repl {
 - (void)showInsertionPoint {
     if (line_request) {
         NSColor *color = styles[style_Normal][NSForegroundColorAttributeName];
+        if (currentZColor)
+            color = [NSColor colorFromInteger: currentZColor.fg];
         if (textstorage.length && [color isEqualToColor:_textview.backgroundColor]) {
             if (fence <= textstorage.length && fence > 0)
                 color = [textstorage attribute:NSForegroundColorAttributeName atIndex:fence - 1 effectiveRange:nil];
             else
                 color = [textstorage attribute:NSForegroundColorAttributeName atIndex:0 effectiveRange:nil];
         }
-        if (!color)
-            color = self.theme.bufferNormal.color;
         _textview.insertionPointColor = color;
     }
 }
@@ -1617,16 +1595,24 @@ replacementString:(id)repl {
     return dst;
 }
 
+- (NSTextAttachment *)textAttachmenWithImage:(NSImage *)image alignment:(NSInteger)alignment index:(NSInteger)index position:(NSUInteger)position {
+    NSTextAttachment *att = [[NSTextAttachment alloc] initWithData:nil ofType:nil];
+    MyAttachmentCell *cell =
+    [[MyAttachmentCell alloc] initImageCell:image
+                               andAlignment:alignment
+                                  andAttStr:textstorage
+                                         at:position
+                                      index:index];
+    att.attachmentCell = cell;
+    return att;
+}
+
 - (void)drawImage:(NSImage *)image
              val1:(NSInteger)alignment
              val2:(NSInteger)index
             width:(NSInteger)w
            height:(NSInteger)h
             style:(NSUInteger)style {
-    NSTextAttachment *att;
-    NSFileWrapper *wrapper;
-    NSData *tiffdata;
-
     [self flushDisplay];
 
     if (storedNewline) {
@@ -1642,29 +1628,30 @@ replacementString:(id)repl {
 
     image = [self scaleImage:image size:NSMakeSize(w, h)];
 
-    tiffdata = image.TIFFRepresentation;
-
-    wrapper = [[NSFileWrapper alloc] initRegularFileWithContents:tiffdata];
-    wrapper.preferredFilename = @"image.tiff";
-    att = [[NSTextAttachment alloc] initWithFileWrapper:wrapper];
+    if (textstorage.length == 0 && (alignment == imagealign_MarginLeft || alignment == imagealign_MarginRight)) {
+        [textstorage appendAttributedString:[[NSAttributedString alloc] initWithString:@"\u00AD" attributes:styles[style]]];
+        _lastchar = '\n';
+    }
 
     MyAttachmentCell *cell =
     [[MyAttachmentCell alloc] initImageCell:image
                                andAlignment:alignment
                                   andAttStr:textstorage
-                                         at:textstorage.length];
+                                         at:textstorage.length
+                                      index:index];
 
     if (alignment == imagealign_MarginLeft || alignment == imagealign_MarginRight) {
-        if (textstorage.length == 0) {
-            [textstorage appendAttributedString:[[NSAttributedString alloc] initWithString:@"\n\n" attributes:styles[style]]];
-        } else if (_lastchar != '\n' && textstorage.length) {
+        if (_lastchar != '\n') {
             NSLog(@"lastchar is not line break. Do not add margin image.");
+            return;
         }
 
-        [container addImage:image index:index alignment:alignment at:textstorage.length linkid:(NSUInteger)self.currentHyperlink];
+        [container addImage:image alignment:alignment at:textstorage.length linkid:(NSUInteger)self.currentHyperlink];
         cell.marginImage = container.marginImages.lastObject;
+        cell.marginImgUUID = cell.marginImage.uuid;
     }
 
+    NSTextAttachment *att = [[NSTextAttachment alloc] initWithData:nil ofType:nil];
     att.attachmentCell = cell;
     NSAttributedString *attstr = [NSAttributedString
                                   attributedStringWithAttachment:att];
@@ -1700,6 +1687,65 @@ replacementString:(id)repl {
         NSString *filename = self.glkctl.game.path.lastPathComponent.stringByDeletingPathExtension;
         [attachment dragTextAttachmentFrom:view event:event filename:filename inRect:rect];
     }
+}
+
+- (void)updateImageAttachmentsWithXScale:(CGFloat)xscale yScale:(CGFloat)yscale {
+
+    if (xscale == 0 || yscale == 0)
+        return;
+
+    NSMutableDictionary<NSString *, MarginImage *> *marginImages = [[NSMutableDictionary alloc] initWithCapacity:container.marginImages.count];
+    for (MarginImage *marginImage in container.marginImages) {
+        marginImages[marginImage.uuid] = marginImage;
+    }
+
+    [textstorage
+     enumerateAttribute:NSAttachmentAttributeName
+     inRange:NSMakeRange(0, textstorage.length)
+     options:0
+     usingBlock:^(NSTextAttachment *value, NSRange subrange, BOOL *stop) {
+        if (!value) {
+            return;
+        }
+        MyAttachmentCell *cell = (MyAttachmentCell *)value.attachmentCell;
+
+        NSImage *img = nil;
+        BOOL imageIsMargin = (cell.glkImgAlign == imagealign_MarginLeft || cell.glkImgAlign == imagealign_MarginRight);
+
+        if (cell && [self.glkctl.imageHandler handleFindImageNumber:cell.index]) {
+            CGFloat blockXScale = xscale;
+            CGFloat blockYScale = yscale;
+
+            img = self.glkctl.imageHandler.lastimage;
+            if (!imageIsMargin && cell.image && cell.image.size.width > scrollview.contentView.frame.size.width * 0.7) {
+                CGFloat width = scrollview.contentView.frame.size.width;
+                CGFloat factor = img.size.width * xscale / width;
+                blockXScale *= factor;
+                blockYScale *= factor;
+            }
+            img = [self scaleImage:img size:NSMakeSize(img.size.width * blockXScale, img.size.height * blockYScale)];
+        } else {
+            return;
+        }
+
+        // Replace non-margin inline images (alignment imagealign_InlineUp, imagealign_InlineDown, or imagealign_InlineCenter)
+        if (!imageIsMargin) {
+            NSTextAttachment *att = [self textAttachmenWithImage:img alignment:cell.glkImgAlign index:cell.index position:subrange.location];
+            [textstorage addAttribute:NSAttachmentAttributeName value:att range:subrange];
+            return;
+        }
+
+        MarginImage *mimg = marginImages[cell.marginImgUUID];
+        if (mimg == nil) {
+            NSLog(@"updateImageAttachments: Could not find margin image with uuid %@", cell.marginImgUUID);
+            return;
+        }
+
+        [container.marginImages removeObject:mimg];
+        [container addImage:img alignment:mimg.glkImgAlign at:subrange.location linkid:0];
+        cell.marginImage = container.marginImages.lastObject;
+        cell.marginImgUUID = cell.marginImage.uuid;
+    }];
 }
 
 #pragma mark Hyperlinks
@@ -2028,6 +2074,12 @@ replacementString:(id)repl {
         _printPositionOnInput = 0;
         return NO;
     }
+
+    if (self.glkctl.showingInfocomV6Menu) {
+        [self.glkctl.infocomV6MenuHandler updateMoveRanges:self];
+        return YES;
+    }
+
     NSRange allText = NSMakeRange(0, maxlength);
     NSRange currentMove = allText;
 
@@ -2089,17 +2141,17 @@ replacementString:(id)repl {
     }
 
     // Strip command line if the speak command setting is off
-    if (!self.glkctl.theme.vOSpeakCommand && range.location != 0)
-    {
+    if (!self.glkctl.theme.vOSpeakCommand && range.location != 0 && !self.glkctl.showingInfocomV6Menu) {
         NSUInteger promptIndex = range.location - 1;
         if ([textstorage.string characterAtIndex:promptIndex] == '>' || (promptIndex > 0 && [textstorage.string characterAtIndex:promptIndex - 1] == '>')) {
             NSRange foundRange = [string rangeOfString:@"\n"];
-            if (foundRange.location != NSNotFound)
-            {
+            if (foundRange.location != NSNotFound) {
                 string = [string substringFromIndex:foundRange.location].mutableCopy;
             }
         }
     }
+
+
     return string;
 }
 
@@ -2111,6 +2163,11 @@ replacementString:(id)repl {
         str = [self stringFromRangeVal:self.moveRanges.lastObject];
     }
     return str;
+}
+
+- (void)resetLastSpokenString {
+    lastSpokenRange = NSMakeRange(0, 0);
+    lastSpokenString = @"";
 }
 
 - (void)repeatLastMove:(id)sender {
@@ -2129,9 +2186,23 @@ replacementString:(id)repl {
         str = [@"QUOTE: \n\n" stringByAppendingString:str];
     }
 
-    if (!str.length) {
+    // sender is only set to self.glkctl if repeatLastMove is called by
+    // the GlkController after entering a command, or the window gets focus,
+    // or VoiceOver is activated, i.e. not in response to the player
+    // using the shortcut or the menu item.
+    if (!str.length && sender != glkctl) {
         [glkctl speakStringNow:@"No last move to speak"];
         return;
+    }
+
+    // The GlkController might sometimes think there
+    // is new text to speak after a key event even if there isn't,
+    // so we perform an extra check for that here.
+    if (sender == glkctl && NSEqualRanges(lastSpokenRange, self.moveRanges.lastObject.rangeValue) && [str isEqualToString:lastSpokenString]) {
+        return;
+    } else {
+        lastSpokenRange = self.moveRanges.lastObject.rangeValue;
+        lastSpokenString = str;
     }
 
     [glkctl speakString:str];
@@ -2155,8 +2226,7 @@ replacementString:(id)repl {
 - (void)speakNext {
     //    NSLog(@"GlkTextBufferWindow %ld speakNext:", self.name);
     [self setLastMove];
-    if (!self.moveRanges.count)
-    {
+    if (!self.moveRanges.count) {
         return;
     }
 
@@ -2182,6 +2252,17 @@ replacementString:(id)repl {
     [glkctl speakStringNow:textstorage.string];
 }
 
+- (void)movesRangesFromV6Menu:(NSArray<NSString *> *)menuStrings {
+    self.moveRanges = [[NSMutableArray<NSValue *> alloc] initWithCapacity:menuStrings.count];
+    moveRangeIndex = menuStrings.count - 1;
+    [self flushDisplay];
+    for (NSString *str in menuStrings) {
+        NSRange range = [textstorage.string rangeOfString:str];
+        if (range.location != NSNotFound) {
+            [self.moveRanges addObject:[NSValue valueWithRange:range]];
+        }
+    }
+}
 
 #pragma mark Accessibility
 
@@ -2233,7 +2314,7 @@ replacementString:(id)repl {
 - (NSArray<NSValue *> *)images {
     if (self.theme.vOSpeakImages == kVOImageNone)
         return @[];
-    NSArray<NSValue *> *images = [self imagesInRange:_textview.accessibilityVisibleCharacterRange];
+    NSArray<NSValue *> *images = [self imagesInRange:NSMakeRange(0,_textview.string.length)];
     return images;
 }
 
@@ -2249,8 +2330,11 @@ replacementString:(id)repl {
         if (!value) {
             return;
         }
-        if (withDescOnly && !((MyAttachmentCell *)((NSTextAttachment *)value).attachmentCell).hasDescription)
+        MyAttachmentCell *cell = (MyAttachmentCell *)((NSTextAttachment *)value).attachmentCell;
+        if (withDescOnly && cell.hasDescription == NO)
             return;
+        if (subrange.length < 2 && (cell.alignment == imagealign_MarginRight || cell.alignment == imagealign_MarginLeft))
+            subrange.length = 2;
         [images addObject:[NSValue valueWithRange:subrange]];
     }];
 
@@ -2260,10 +2344,11 @@ replacementString:(id)repl {
 - (NSDictionary <NSNumber *, NSTextAttachment *> *)attachmentsInRange:(NSRange)range withKeys:(NSArray * __autoreleasing *)keys {
     NSMutableDictionary <NSNumber *, NSTextAttachment *> __block *attachments = [NSMutableDictionary new];
     NSMutableArray __block *mutKeys = [NSMutableArray new];
+    range = NSIntersectionRange(range, NSMakeRange(0, textstorage.length));
     [textstorage
      enumerateAttribute:NSAttachmentAttributeName
      inRange:range
-     options:NSAttributedStringEnumerationLongestEffectiveRangeNotRequired
+     options:0
      usingBlock:^(id value, NSRange subrange, BOOL *stop) {
         if (!value) {
             return;

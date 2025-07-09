@@ -117,18 +117,38 @@ void *MemAlloc(size_t size)
     return (t);
 }
 
+void *MyCalloc(size_t size)
+{
+    void *t = (void *)calloc(1, size);
+    if (t == NULL)
+        Fatal("Out of memory");
+    return (t);
+}
+
 void SetBit(int bit)
 {
-    BitFlags |= (uint64_t)1 << bit;
+    if (bit >= 64 || bit < 0) {
+        fprintf(stderr, "SetBit: bit %d out of range!\n", bit);
+    } else {
+        BitFlags |= (uint64_t)1 << bit;
+    }
 }
 
 void ResetBit(int bit)
 {
-    BitFlags &= ~((uint64_t)1 << bit);
+    if (bit >= 64 || bit < 0) {
+        fprintf(stderr, "ResetBit: bit %d out of range!\n", bit);
+    } else {
+        BitFlags &= ~((uint64_t)1 << bit);
+    }
 }
 
 int IsSet(int bit)
 {
+    if (bit >= 64 || bit < 0) {
+        fprintf(stderr, "IsSet: bit %d out of range!\n", bit);
+        return 0;
+    }
     return ((BitFlags & ((uint64_t)1 << bit)) != 0);
 }
 
@@ -553,8 +573,7 @@ void Look(int transcript)
         DrawCurrentRoom();
     }
 
-    char *buf = MemAlloc(1000);
-    buf = memset(buf, 0, 1000);
+    char *buf = MyCalloc(1000);
     room_description_stream = glk_stream_open_memory(buf, 1000, filemode_Write, 0);
 
     Room *r;

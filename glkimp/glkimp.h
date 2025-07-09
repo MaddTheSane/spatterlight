@@ -58,8 +58,8 @@ extern int gli_flicker;
 extern int gli_zmachine_terp;
 extern int gli_z6_graphics;
 extern int gli_z6_colorize;
-extern int gli_z6_sim_16_cols;
-
+extern int gli_zmachine_no_err_win;
+extern int gli_voiceover_on;
 
 extern glui32 tagcounter;
 extern glui32 lasteventtype;
@@ -118,6 +118,11 @@ void win_cancelmouse(int name);
 //  against the Glk spec, to change the background on-the-fly
 // of buffer and grid windows.
 void win_setbgnd(int name, glui32 color);
+
+// Redraw a buffer window with current styles,
+// against the Glk spec.
+void win_refresh(int name, float xscale, float yscale);
+
 void win_clear(int name);
 void win_moveto(int name, int x, int y);
 
@@ -178,7 +183,20 @@ typedef enum JourneyMenuType {
     kJMenuTypeDeleteAll
 } JourneyMenuType;
 
-void win_menuitem(JourneyMenuType type, glui32 column, glui32 line, glui32 stopflag, char *str, int len);
+typedef enum InfocomV6MenuType {
+    kV6MenuNone,
+    kV6MenuTypeTopic,
+    kV6MenuTypeQuestion,
+    kV6MenuTypeHint,
+    kV6MenuTypeDefine,
+    kV6MenuTypeShogun,
+    kV6MenuSelectionChanged,
+    kV6MenuCurrentItemChanged,
+    kV6MenuTitle,
+    kV6MenuExited,
+} InfocomV6MenuType;
+
+void win_menuitem(int type, glui32 column, glui32 line, glui32 stopflag, char *str, int len);
 
 void gli_close_all_file_streams(void);
 

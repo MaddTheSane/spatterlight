@@ -74,6 +74,7 @@
 @dynamic winSpacingY;
 @dynamic zMachineTerp;
 @dynamic zMachineLetter;
+@dynamic zMachineNoErrWin;
 @dynamic vOHackDelay;
 @dynamic vODelayOn;
 @dynamic vOSpeakCommand;
@@ -81,7 +82,6 @@
 @dynamic vOSpeakMenu;
 @dynamic z6GraphicsType;
 @dynamic z6Colorize1Bit;
-@dynamic z6Simulate16Color;
 @dynamic bufAlert;
 @dynamic bufBlock;
 @dynamic bufEmph;
@@ -161,13 +161,12 @@
         //NSLog(@"Setting my %@ to a clone of the %@ of %@", keyName, keyName, theme.name);
         [self setValue:clonedStyle forKey:keyName];
         if ([clonedStyle valueForKey:keyName] != self)
-            NSLog(@"Error! Reciprocal relationship did not work as expected");
+            NSLog(@"copyAttributesFrom error! Reciprocal relationship did not work as expected");
         keyName = gGridStyleNames[i];
         clonedStyle = [(GlkStyle * )[theme valueForKey:keyName] clone];
-//        NSLog(@"Setting my %@ to a clone of the %@ of %@", keyName, keyName, theme.name);
         [self setValue:clonedStyle forKey:keyName];
         if ([clonedStyle valueForKey:keyName] != self)
-            NSLog(@"Error! Reciprocal relationship did not work as expected");
+            NSLog(@"copyAttributesFrom error! Reciprocal relationship did not work as expected");
 	}
 }
 
@@ -196,15 +195,6 @@
         size = self.gridNormal.cellSize;
         self.cellWidth = size.width;
         self.cellHeight = size.height;
-    }
-
-    NSParagraphStyle *parastyle = self.gridNormal.attributeDict[NSParagraphStyleAttributeName];
-    if (parastyle && parastyle.maximumLineHeight == 0) {
-        NSMutableParagraphStyle *mutable = parastyle.mutableCopy;
-        mutable.maximumLineHeight = self.cellHeight;
-        NSMutableDictionary *mutAtt = self.gridNormal.attributeDict.mutableCopy;
-        mutAtt[NSParagraphStyleAttributeName] = mutable;
-        self.gridNormal.attributeDict = mutAtt;
     }
 
     // We skip the first element (0), i.e. the Normal styles here
@@ -331,7 +321,7 @@
 - (void)resetCommonValues {
     self.autosave = YES;
     self.autosaveOnTimer = YES;
-    self.bZTerminator = kBZArrowsCompromise;
+    self.bZTerminator = kBZArrowsSwapped;
     self.doGraphics = YES;
     self.doSound = YES;
     self.editable = NO;

@@ -1,18 +1,6 @@
 // Copyright 2010-2021 Chris Spiegel.
 //
-// This file is part of Bocfel.
-//
-// Bocfel is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License, version
-// 2 or 3, as published by the Free Software Foundation.
-//
-// Bocfel is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with Bocfel. If not, see <http://www.gnu.org/licenses/>.
+// SPDX-License-Identifier: MIT
 
 #include <array>
 #include <functional>
@@ -275,7 +263,7 @@ void setup_opcodes()
     setup_single_opcode(5, 6, Opcount::Ext, 0x0d, zset_true_colour);
     setup_single_opcode(6, 6, Opcount::Ext, 0x10, znop); // XXX move_window
     setup_single_opcode(6, 6, Opcount::Ext, 0x11, znop); // XXX window_size
-    setup_single_opcode(6, 6, Opcount::Ext, 0x12, znop); // XXX window_style
+    setup_single_opcode(6, 6, Opcount::Ext, 0x12, zwindow_style);
     setup_single_opcode(6, 6, Opcount::Ext, 0x13, zget_wind_prop);
     setup_single_opcode(6, 6, Opcount::Ext, 0x14, znop); // XXX scroll_window
     setup_single_opcode(6, 6, Opcount::Ext, 0x15, zpop_stack);
@@ -331,7 +319,7 @@ void process_instructions()
 
         current_instruction = pc;
 #ifdef SPATTERLIGHT
-        if (is_spatterlight_journey) {
+        if (is_spatterlight_v6) {
             check_entrypoints(pc);
         }
 #endif

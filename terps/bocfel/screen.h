@@ -105,6 +105,14 @@ enum : int {
     ISTREAM_FILE     = 1,
 };
 
+// Window attributes.
+enum : uint16_t {
+    WINATTR_WRAPPING_BIT =      (1 << 0),
+    WINATTR_SCROLLING_BIT =     (1 << 1),
+    WINATTR_TRANSCRIPTING_BIT = (1 << 2),
+    WINATTR_BUFFERING_BIT =     (1 << 3)
+};
+
 void screen_set_header_bit(bool set);
 
 bool output_stream(int16_t number, uint16_t table);
@@ -153,23 +161,25 @@ void zcheck_unicode();
 void zdraw_picture();
 void zpicture_data();
 void zget_wind_prop();
+void zwindow_style();
 void zprint_form();
 void zmake_menu();
 void zbuffer_screen();
 
 #ifdef SPATTERLIGHT
-
 extern GraphicsType graphics_type;
-extern bool centeredText;
+
+extern winid_t current_graphics_buf_win;
+extern winid_t graphics_bg_glk;
+extern winid_t graphics_fg_glk;
 
 struct Window {
     Style style;
-    //    Color fg_color = Color(), bg_color = Color();
-    Color fg_color = Color(Color::Mode::ANSI, 13), bg_color = Color(Color::Mode::ANSI, 14);
+    Color fg_color = Color(), bg_color = Color();
     enum class Font { Query, Normal, Picture, Character, Fixed } font = Font::Normal;
 
     winid_t id = nullptr;
-    long x = 0, y = 0; // The hold Glk 0-based values, not Z-machine 1-based
+    long x = 0, y = 0; // These hold Glk 0-based values, not Z-machine 1-based
     bool has_echo = false;
 
     uint16_t y_size;
@@ -179,11 +189,15 @@ struct Window {
     uint16_t index;
     uint16_t last_click_x;
     uint16_t last_click_y;
+    uint16_t attribute;
 };
 
-extern glui32 user_selected_foreground, user_selected_background;
-extern bool is_spatterlight_journey;
 extern std::array<Window, 8> windows;
+
+extern glui32 current_picture;
+extern glui32 user_selected_foreground;
+extern glui32 user_selected_background;
+extern bool graphics_type_changed;
 
 uint8_t internal_read_char(void);
 int count_characters_in_zstring(uint16_t str);
@@ -191,8 +205,19 @@ void v6_sizewin(Window *win);
 void v6_define_window(Window *win, uint16_t x, uint16_t y, uint16_t width, uint16_t height);
 void v6_restore_hacks(void);
 bool v6_switch_to_allowed_interpreter_number(void);
-void journey_sync_upperwin_size(glui32 width, glui32 height);
+void v6_delete_win(Window *win);
+void v6_delete_glk_win(winid_t win);
+void v6_remap_win(Window *win, int type, winid_t *stored_win);
+void v6_remap_win_to_grid(Window *win);
+void v6_remap_win_to_buffer(Window *win);
+void update_user_defined_colours(void);
+void flush_image_buffer(void);
 
+void v6_sync_upperwin_size(glui32 width, glui32 height);
+void v6_get_and_sync_upperwin_size(void);
+
+void update_v6_colours(void);
+void window_change(void);
 void set_current_window(Window *window);
 void transcribe(uint32_t c);
 

@@ -29,6 +29,7 @@
 #import "TableViewController.h"
 #import "ZMenu.h"
 #import "JourneyMenuHandler.h"
+#import "InfocomV6MenuHandler.h"
 
 #import "Game.h"
 #import "Theme.h"
@@ -54,7 +55,7 @@ fprintf(stderr, "%s\n",                                                    \
 //    "PROMPTOPEN",      "PROMPTSAVE",       "NEWWIN",      "DELWIN",
 //    "SIZWIN",          "CLRWIN",           "MOVETO",      "PRINT",
 //    "UNPRINT",         "MAKETRANSPARENT",  "STYLEHINT",   "CLEARHINT",
-//    "STYLEMEASURE",    "SETBGND",          "SETTITLE",
+//    "STYLEMEASURE",    "SETBGND",          "REFRESH",     "SETTITLE",
 //    "AUTOSAVE",        "RESET",            "BANNERCOLS",  "BANNERLINES",
 //    "TIMER",           "INITCHAR",         "CANCELCHAR",
 //    "INITLINE",        "CANCELLINE",       "SETECHO",     "TERMINATORS",
@@ -75,13 +76,7 @@ fprintf(stderr, "%s\n",                                                    \
 ////    "wintype_Blank",    "wintype_TextBuffer",
 ////    "wintype_TextGrid", "wintype_Graphics"};
 //
-// static const char *stylenames[] =
-//{
-//    "style_Normal", "style_Emphasized", "style_Preformatted", "style_Header",
-//    "style_Subheader", "style_Alert", "style_Note", "style_BlockQuote",
-//    "style_Input", "style_User1", "style_User2", "style_NUMSTYLES"
-//};
-////
+
 // static const char *stylehintnames[] =
 //{
 //    "stylehint_Indentation", "stylehint_ParaIndentation",
@@ -205,6 +200,7 @@ fprintf(stderr, "%s\n",                                                    \
 }
 
 @property (nonatomic) JourneyMenuHandler *journeyMenuHandler;
+
 @property NSURL *saveDir;
 
 @end
@@ -248,6 +244,7 @@ fprintf(stderr, "%s\n",                                                    \
     _soundHandler = [SoundHandler new];
     _soundHandler.glkctl = self;
     _imageHandler = [ImageHandler new];
+    _infocomV6MenuHandler = nil;
 
     // We could use separate versioning for GUI and interpreter autosaves,
     // but it is probably simpler this way
@@ -855,14 +852,13 @@ fprintf(stderr, "%s\n",                                                    \
                [ifid isEqualToString:@"ZCODE-63-890622"] ||
                [ifid isEqualToString:@"ZCODE-74-890714"] ) {
         _gameID = kGameIsArthur;
-    } else if ([ifid isEqualToString:@"ZCODE-0-870831"] ||
-               [ifid isEqualToString:@"ZCODE-278-890209"] ||
+    } else if ([ifid isEqualToString:@"ZCODE-278-890209"] ||
                [ifid isEqualToString:@"ZCODE-278-890211"] ||
                [ifid isEqualToString:@"ZCODE-279-890217"] ||
                [ifid isEqualToString:@"ZCODE-280-890217"] ||
                [ifid isEqualToString:@"ZCODE-281-890222"] ||
                [ifid isEqualToString:@"ZCODE-282-890224"] ||
-               [ifid isEqualToString:@"ZCODE-283-890238"] ||
+               [ifid isEqualToString:@"ZCODE-283-890228"] ||
                [ifid isEqualToString:@"ZCODE-284-890302"] ||
                [ifid isEqualToString:@"ZCODE-286-890306"] ||
                [ifid isEqualToString:@"ZCODE-288-890308"] ||
@@ -873,7 +869,7 @@ fprintf(stderr, "%s\n",                                                    \
                [ifid isEqualToString:@"ZCODE-295-890321"] ||
                [ifid isEqualToString:@"ZCODE-311-890510"] ||
                [ifid isEqualToString:@"ZCODE-320-890627"] ||
-               [ifid isEqualToString:@"ZCODE-321-891629"] ||
+               [ifid isEqualToString:@"ZCODE-321-890629"] ||
                [ifid isEqualToString:@"ZCODE-322-890706"]) {
         _gameID = kGameIsShogun;
     } else if ([ifid isEqualToString:@"ZCODE-142-890205"] ||
@@ -1854,7 +1850,6 @@ fprintf(stderr, "%s\n",                                                    \
         _coverController = nil;
     }
     [self autoSaveOnExit];
-    self.window = nil;
     [_soundHandler stopAllAndCleanUp];
 
     if (_journeyMenuHandler) {
@@ -1917,8 +1912,9 @@ fprintf(stderr, "%s\n",                                                    \
 
     if (windowdirty && !changedBorderThisTurn) {
         GlkWindow *largest = [self largestWindow];
-        if (largest)
+        if (largest) {
             [largest recalcBackground];
+        }
         windowdirty = NO;
     }
     changedBorderThisTurn = NO;
@@ -1946,7 +1942,11 @@ fprintf(stderr, "%s\n",                                                    \
         if (_voiceOverActive && !_mustBeQuiet) {
             [self checkZMenuAndSpeak:YES];
             if (!_zmenu && !_form) {
-                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                CGFloat delay = 0.2;
+                // We need a longer delay if we just closed a dialog
+                if (_journeyMenuHandler && [_journeyMenuHandler.journeyDialogClosedTimestamp timeIntervalSinceNow] > -1)
+                    delay = 1;
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
                     [self forceSpeech];
                     [self speakNewText];
                 });
@@ -2071,7 +2071,7 @@ fprintf(stderr, "%s\n",                                                    \
                         defaultFrame:(NSRect)screenframe {
     NSSize windowSize = [self defaultContentSize];
 
-    NSRect frame = [window frameRectForContentRect:NSMakeRect(0, 0, windowSize.width, windowSize.height)];;
+    NSRect frame = [window frameRectForContentRect:NSMakeRect(0, 0, windowSize.width, windowSize.height)];
 
     if (frame.size.width > screenframe.size.width)
         frame.size.width = screenframe.size.width;
@@ -2084,6 +2084,26 @@ fprintf(stderr, "%s\n",                                                    \
         frame.origin.y = NSMaxY(screenframe) - frame.size.height;
 
     return frame;
+}
+
+- (NSRect)frameWithSanitycheckedSize:(NSRect)rect {
+    if (rect.size.width < kMinimumWindowWidth || rect.size.height < kMinimumWindowHeight) {
+        NSSize defaultSize = [self defaultContentSize];
+        NSRect screenFrame = self.window.screen.visibleFrame;
+        if (rect.size.width < defaultSize.width) {
+            rect.size.width = defaultSize.width;
+            rect.origin.x = round((NSWidth(screenFrame) - defaultSize.width) / 2);
+        }
+        if (rect.size.height < defaultSize.height) {
+            rect.size.height = defaultSize.height;
+            rect.origin.y = round(screenFrame.origin.y + (NSHeight(screenFrame) - defaultSize.height) / 2) + 40;
+        }
+    }
+    if (rect.size.width < kMinimumWindowWidth)
+        rect.size.width = kMinimumWindowWidth;
+    if (rect.size.height < kMinimumWindowHeight)
+        rect.size.height = kMinimumWindowHeight;
+    return rect;
 }
 
 - (NSSize)defaultContentSize {
@@ -2893,27 +2913,29 @@ fprintf(stderr, "%s\n",                                                    \
                           style:(NSUInteger)style
                            hint:(NSUInteger)hint
                          result:(NSInteger *)result {
-    Theme *theme = _theme;
-    if ([gwindow getStyleVal:style hint:hint value:result])
-        return YES;
-    else {
-        if (hint == stylehint_TextColor) {
-            if ([gwindow isKindOfClass:[GlkTextBufferWindow class]])
-                *result = (theme.bufferNormal.color).integerColor;
-            else
-                *result = (theme.gridNormal.color).integerColor;
 
-            return YES;
+    if (hint == stylehint_TextColor || hint == stylehint_BackColor) {
+        NSMutableDictionary *attributes = [gwindow getCurrentAttributesForStyle:style];
+        NSColor *color = nil;
+        if (hint == stylehint_TextColor) {
+            color = attributes[NSForegroundColorAttributeName];
         }
         if (hint == stylehint_BackColor) {
-            if ([gwindow isKindOfClass:[GlkTextBufferWindow class]])
-                *result = theme.bufferBackground.integerColor;
-            else
-                *result = theme.gridBackground.integerColor;
+            color = attributes[NSBackgroundColorAttributeName];
+            if (!color) {
+                color = [gwindow isKindOfClass:[GlkTextBufferWindow class]] ? _theme.bufferBackground : _theme.gridBackground;
+            }
+        }
 
+        if (color) {
+            *result = color.integerColor;
             return YES;
         }
     }
+
+    if ([gwindow getStyleVal:style hint:hint value:result])
+        return YES;
+
     return NO;
 }
 
@@ -3033,7 +3055,6 @@ fprintf(stderr, "%s\n",                                                    \
     }
 
     str = [NSString stringWithCharacters:buf length:len];
-//    NSLog(@"\"%@\"", str);
     [gwindow putString:str style:style];
     free(buf);
 }
@@ -3184,6 +3205,14 @@ fprintf(stderr, "%s\n",                                                    \
     return _journeyMenuHandler;
 }
 
+- (nullable InfocomV6MenuHandler *)infocomV6MenuHandler {
+    if (_infocomV6MenuHandler == nil) {
+
+        _infocomV6MenuHandler = [[InfocomV6MenuHandler alloc] initWithDelegate:self];
+    }
+    return _infocomV6MenuHandler;
+}
+
 - (BOOL)handleRequest:(struct message *)req
                 reply:(struct message *)ans
                buffer:(char *)buf {
@@ -3262,6 +3291,11 @@ fprintf(stderr, "%s\n",                                                    \
                         view.glkctl = nil;
                     }];
                 }
+            }
+
+            if (_slowReadAlert != nil) {
+                [_slowReadAlert.window close];
+                _slowReadAlert = nil;
             }
 
             [self flushDisplay];
@@ -3344,7 +3378,7 @@ fprintf(stderr, "%s\n",                                                    \
                 [_gwindows removeObjectForKey:@(req->a1)];
                 _shouldCheckForMenu = YES;
             } else
-                NSLog(@"delwin: No window with name %d", req->a1);
+                NSLog(@"delwin called on a non-existant Glk window (%d)", req->a1);
 
             break;
 
@@ -3491,7 +3525,6 @@ fprintf(stderr, "%s\n",                                                    \
                     rect.size.width = 0;
                 if (rect.size.height < 0)
                     rect.size.height = 0;
-//                NSLog(@"Resize window %ld (%@) to %@", reqWin.name, reqWin.className, NSStringFromRect(rect));
                 reqWin.frame = rect;
 
                 NSAutoresizingMaskOptions hmask = NSViewMaxXMargin;
@@ -3514,7 +3547,7 @@ fprintf(stderr, "%s\n",                                                    \
                 windowdirty = YES;
                 free(sizewin);
             } else
-                NSLog(@"sizwin: something went wrong.");
+                NSLog(@"sizwin called on a non-existant Glk window (%d)", req->a1);
             break;
 
         case CLRWIN:
@@ -3852,8 +3885,29 @@ fprintf(stderr, "%s\n",                                                    \
             }
             break;
 
+        case REFRESH:
+//            This updates an existing window on-the-fly with the styles
+//            that normally would only be applied to a new window.
+//            It can also update any inline images.
+            if ([reqWin isKindOfClass:[GlkTextBufferWindow class]]) {
+                reqWin.styleHints = [reqWin deepCopyOfStyleHintsArray:_bufferStyleHints];
+                if (req->a2 > 0)
+                    [((GlkTextBufferWindow *)reqWin) updateImageAttachmentsWithXScale: req->a2 / 1000.0 yScale: req->a3 / 1000.0 ];
+            } else if ([reqWin isKindOfClass:[GlkTextGridWindow class]]) {
+                reqWin.styleHints = [reqWin deepCopyOfStyleHintsArray:_gridStyleHints];
+            } else {
+                break;
+            }
+            [self flushDisplay];
+            [reqWin prefsDidChange];
+            break;
+
         case MENUITEM: {
-            [self.journeyMenuHandler handleMenuItemOfType:(JourneyMenuType)req->a1 column:(NSUInteger)req->a2 line:(NSUInteger)req->a3 stopflag:(BOOL)req->a4 == 1 text:(char *)buf length:(NSUInteger)req->len];
+            if (self.gameID == kGameIsJourney) {
+                [self.journeyMenuHandler handleMenuItemOfType:(JourneyMenuType)req->a1 column:(NSUInteger)req->a2 line:(NSUInteger)req->a3 stopflag:(req->a4 == 1) text:(char *)buf length:(NSUInteger)req->len];
+            } else {
+                [self.infocomV6MenuHandler handleMenuItemOfType:(InfocomV6MenuType)req->a1 index:(NSUInteger)req->a2 total:(NSUInteger)req->a3 text:(char *)buf length:(NSUInteger)req->len];
+            }
             break;
         }
 
@@ -4136,10 +4190,6 @@ again:
         return;
     }
 
-//    NSLog(@"Trying to set border color to %06lx", (long)color.integerColor);
-    if (color.integerColor == 0xffff)
-        NSLog(@"Wrong color?");
-
     if (theme.doStyles || [color isEqualToColor:theme.bufferBackground] || [color isEqualToColor:theme.gridBackground] || theme.borderBehavior == kUserOverride) {
         _borderView.layer.backgroundColor = color.CGColor;
 
@@ -4166,7 +4216,7 @@ again:
         if (win.framePending)
             windowsize = win.pendingFrame.size;
         CGFloat winarea = windowsize.width * windowsize.height;
-        if (winarea > largestSize) {
+        if (winarea >= largestSize) {
             largestSize = winarea;
             largestWin = win;
         }
@@ -4663,18 +4713,22 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
         // We are not in fullscreen
         frame = [self contentFrameForWindowed];
     }
-    if (frame.size.width < kMinimumWindowWidth)
-        frame.size.width = kMinimumWindowWidth;
-    if (frame.size.height < kMinimumWindowHeight)
-        frame.size.height = kMinimumWindowHeight;
+
+    NSUInteger border = (NSUInteger)_theme.border;
+    NSRect contentRect = frame;
+    contentRect.size = NSMakeSize(frame.size.width + 2 * border, frame.size.height + 2 * border);
+    contentRect.origin = NSMakePoint(frame.origin.x - border, frame.origin.y - border);
+    if (contentRect.size.width < kMinimumWindowWidth || contentRect.size.height < kMinimumWindowHeight) {
+        contentRect = [self frameWithSanitycheckedSize:contentRect];
+        frame.size.width = contentRect.size.width - 2 * border;
+        frame.size.height = contentRect.size.height - 2 * border;
+    }
 
     NSRect windowframe = self.window.frame;
-    if (windowframe.size.width < kMinimumWindowWidth)
-        windowframe.size.width = kMinimumWindowWidth;
-    if (windowframe.size.height < kMinimumWindowHeight)
-        windowframe.size.height = kMinimumWindowHeight;
-    if (!NSEqualRects(self.window.frame, windowframe))
-        [self.window setFrame:windowframe display:YES];
+    NSRect frameForContent = [self.window frameRectForContentRect:contentRect];
+    if (windowframe.size.width < frameForContent.size.width || windowframe.size.height < frameForContent.size.height) {
+        [self.window setFrame:[self.window frameRectForContentRect:frame] display:YES];
+    }
 
     _gameView.frame = frame;
 }
@@ -4845,8 +4899,7 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
                        context:(void *)context {
 
     if ([keyPath isEqualToString:@"voiceOverEnabled"]) {
-        NSWorkspace * ws = [NSWorkspace sharedWorkspace];
-        _voiceOverActive = ws.voiceOverEnabled;
+        _voiceOverActive = [NSWorkspace sharedWorkspace].voiceOverEnabled;
         if (_voiceOverActive) { // VoiceOver was switched on
             // Don't speak or change menus unless we are the top game
             if ([Preferences.instance currentGame] == _game && !dead) {
@@ -4860,6 +4913,10 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
         } else { // VoiceOver was switched off
             [_journeyMenuHandler hideJourneyMenus];
         }
+        // We send an event to let the interpreter know VoiceOver status.
+        // Only to Bocfel for now.
+        if ([_terpname isEqualToString:@"bocfel"])
+            [self sendArrangeEventWithFrame:_gameView.frame force:NO];
     } else {
         // Any unrecognized context must belong to super
         [super observeValueForKeyPath:keyPath
@@ -4936,15 +4993,23 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
     }
 }
 
+- (BOOL)showingInfocomV6Menu {
+    return (_infocomV6MenuHandler != nil);
+}
+
 #pragma mark Speak new text
 
 - (void)speakNewText {
     // Find a "main text window"
     NSMutableArray *windowsWithText = _gwindows.allValues.mutableCopy;
+    NSMutableArray *bufWinsWithoutText = [[NSMutableArray alloc] init];
     for (GlkWindow *view in _gwindows.allValues) {
         if ([view isKindOfClass:[GlkGraphicsWindow class]] || ![(GlkTextBufferWindow *)view setLastMove]) {
             // Remove all Glk window objects with no new text to speak
             [windowsWithText removeObject:view];
+            if ([view isKindOfClass:[GlkTextBufferWindow class]] && ((GlkTextBufferWindow *)view).moveRanges.count) {
+                [bufWinsWithoutText addObject:view];
+            }
         }
     }
 
@@ -4953,13 +5018,16 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
 
     if (!windowsWithText.count) {
         return;
-    } else if (windowsWithText.count > 1) {
+    } else {
         NSMutableArray *bufWinsWithText = [[NSMutableArray alloc] init];
         for (GlkWindow *view in windowsWithText)
             if ([view isKindOfClass:[GlkTextBufferWindow class]])
                 [bufWinsWithText addObject:view];
         if (bufWinsWithText.count == 1) {
             [self speakLargest:bufWinsWithText];
+            return;
+        } else if (bufWinsWithText.count == 0 && bufWinsWithoutText.count > 0) {
+            [self speakLargest:bufWinsWithoutText];
             return;
         }
     }
@@ -4995,7 +5063,7 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
                 return;
             }
         }
-        [largest repeatLastMove:nil];
+        [largest repeatLastMove:self];
     }
 }
 
@@ -5019,7 +5087,7 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
 // If sender == self, never announce "No last move to speak!"
 - (IBAction)speakMostRecent:(id)sender {
     if (_zmenu) {
-        NSString *menuString = [_zmenu menuLineStringWithTitle:YES Index:YES total:YES instructions:YES];
+        NSString *menuString = [_zmenu menuLineStringWithTitle:YES index:YES total:YES instructions:YES];
         _zmenu.haveSpokenMenu = YES;
         [self speakString:menuString];
         return;
@@ -5041,11 +5109,16 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
     }
     [mainWindow setLastMove];
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        [mainWindow repeatLastMove:nil];
+        [mainWindow repeatLastMove:sender];
     });
 }
 
 - (void)speakMostRecentAfterDelay {
+    for (GlkWindow *win in _gwindows.allValues) {
+        if ([win isKindOfClass:[GlkTextBufferWindow class]])
+            [(GlkTextBufferWindow *)win resetLastSpokenString];
+    }
+
     CGFloat delay = _theme.vOHackDelay;
     shouldAddTitlePrefixToSpeech = (delay < 1);
     delay *= NSEC_PER_SEC;
@@ -5123,9 +5196,12 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
     _speechTimeStamp = [NSDate date];
     _lastSpokenString = string;
 
-    NSString *charSetString = @"\u00A0 >\n_";
-    NSCharacterSet *charset = [NSCharacterSet characterSetWithCharactersInString:charSetString];
+    NSCharacterSet *charset = [NSCharacterSet characterSetWithCharactersInString:@"\u00A0 >\n_\0\uFFFC"];
     newString = [newString stringByTrimmingCharactersInSet:charset];
+
+    unichar nc = '\0';
+    NSString *nullChar = [NSString stringWithCharacters:&nc length:1];
+    newString = [newString stringByReplacingOccurrencesOfString:nullChar withString:@""];
 
     if (newString.length == 0)
         newString = string;

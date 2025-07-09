@@ -88,8 +88,21 @@
 }
 
 - (void)setBgColor:(NSInteger)bc {
-    bgnd = bc;
-    [self.glkctl setBorderColor:[NSColor colorFromInteger:bgnd] fromWindow:self];
+    if (bc == zcolor_Current)
+        return;
+    NSColor *color;
+    if (bc == zcolor_Default) {
+        color = self.glkctl.theme.bufferBackground;
+        bgnd = color.integerColor;
+    } else {
+        bgnd = bc;
+        color = [NSColor colorFromInteger:bgnd];
+    }
+    [self.glkctl setBorderColor:color fromWindow:self];
+    if (transparent)
+        self.layer.backgroundColor = NSColor.clearColor.CGColor;
+    else
+        self.layer.backgroundColor = color.CGColor;
 }
 
 - (void)recalcBackground {
@@ -97,6 +110,11 @@
 }
 
 - (void)clear {
+    if (NSEqualSizes(NSZeroSize, _image.size)) {
+        NSLog(@"GlkGraphicsWindow %ld clear: Image is zero size, so bailing", self.name);
+        return;
+    }
+    [_image lockFocus];
     NSColor *color;
     if (transparent)
         color = NSColor.clearColor;
@@ -105,8 +123,12 @@
 
     [color setFill];
     NSRectFill(self.bounds);
+    [_image unlockFocus];
     _showingImage = NO;
-    subImages = nil;
+    if (subImages)
+        [subImages removeAllObjects];
+    dirtyRects = [NSMutableArray new];
+    [dirtyRects addObject:@(self.bounds)];
     dirty = YES;
 }
 
@@ -203,8 +225,7 @@
 - (void)flushDisplay {
     if (dirty) {
         for (NSValue *val in dirtyRects) {
-            NSRect rect = val.rectValue;
-            [self setNeedsDisplayInRect:rect];
+            [self setNeedsDisplayInRect:val.rectValue];
         }
     }
     dirtyRects = [NSMutableArray new];
@@ -407,7 +428,6 @@
                 return ((SubImage *)object).accessibilityLabel.length > 0;
             }]];
         } else {
-            NSLog(@"GlkGraphicsWindow images: returning %ld subimages", subImages.count);
             return subImages;
         }
     } else if (self.theme.vOSpeakImages == kVOImageAll && _showingImage) {
@@ -464,10 +484,6 @@
         char_request = NO;
         return;
     }
-}
-
-- (BOOL)isAccessibilityElement {
-    return YES;
 }
 
 - (NSArray *)accessibilityChildren {

@@ -49,7 +49,7 @@
     if (self) {
         self.title = [decoder decodeObjectOfClass:[NSString class] forKey:@"title"];
         self.column = (NSUInteger)[decoder decodeIntegerForKey:@"column"];
-        self.line = (NSUInteger)[decoder decodeIntegerForKey:@"line"];;
+        self.line = (NSUInteger)[decoder decodeIntegerForKey:@"line"];
         self.tag = [decoder decodeIntegerForKey:@"tag"];
         self.actor = [decoder decodeObjectOfClass:[NSString class] forKey:@"actor"];
     }
@@ -607,7 +607,7 @@ errorDescription:(NSString * __autoreleasing *)error
         return;
     }
 
-    unichar cstring[20];
+    unichar cstring[len];
     for (NSUInteger i = 0; i < len; i++) {
         cstring[i] = (unichar)buf[i];
     }
@@ -782,7 +782,7 @@ errorDescription:(NSString * __autoreleasing *)error
             }
             break;
         default:
-            NSLog(@"Error!");
+            NSLog(@"handleMenuItemOfType: Unhandled switch case!");
             break;
     }
 }
@@ -806,8 +806,6 @@ errorDescription:(NSString * __autoreleasing *)error
 - (void)recreateDialog {
     [self showJourneyMenus];
 
-    _lastDialogAddedMove = (_textBufferWindow.lastNewTextOnTurn == _delegate.turns);
-
     if (_reallyShowingDialog || [_journeyDialogClosedTimestamp timeIntervalSinceNow] > -1 || _delegate.mustBeQuiet || _delegate.shouldShowAutorestoreAlert) {
         return;
     }
@@ -817,6 +815,13 @@ errorDescription:(NSString * __autoreleasing *)error
     }
     _restoredShowingDialog = NO;
 
+    if (!_delegate.voiceOverActive || !_shouldShowDialog || _delegate.gameID != kGameIsJourney) {
+        return;
+    }
+
+    [_textBufferWindow setLastMove];
+    _lastDialogAddedMove = (_textBufferWindow.lastNewTextOnTurn == _delegate.turns);
+
     // Whether the current move has printed text
     // that we should add to the dialog
     // (to make VoiceOver read it to the player)
@@ -825,9 +830,6 @@ errorDescription:(NSString * __autoreleasing *)error
     }
     _restoredDialogAddedMove = NO;
 
-    if (!_delegate.voiceOverActive || !_shouldShowDialog || _delegate.gameID != kGameIsJourney) {
-        return;
-    }
     _shouldShowDialog = NO;
 
     if (_textBufferWindow.lastNewTextOnTurn == _delegate.turns || _lastDialogAddedMove) {
@@ -846,20 +848,24 @@ errorDescription:(NSString * __autoreleasing *)error
         _storedDialogText = [NSString stringWithFormat:@"\"%@\"\n\n%@",  lastMoveString, _storedDialogText];
     }
 
-    switch (_storedDialogType) {
-        case kJourneyDialogTextEntry:
-            [self displayAlertWithTextEntry:_storedDialogText elvish:NO];
-            break;
-        case kJourneyDialogTextEntryElvish:
-            [self displayAlertWithTextEntry:_storedDialogText elvish:YES];
-            break;
-        case kJourneyDialogSingleChoice:
-            [self displayAlertWithText:_storedDialogText];
-            break;
-        case kJourneyDialogMultipleChoice:
-            [self displayPopupMenuWithMessageText:self.storedDialogText];
-            break;
-    }
+    JourneyMenuHandler __weak *weakSelf = self;
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        switch (weakSelf.storedDialogType) {
+            case kJourneyDialogTextEntry:
+                [self displayAlertWithTextEntry:weakSelf.storedDialogText elvish:NO];
+                break;
+            case kJourneyDialogTextEntryElvish:
+                [self displayAlertWithTextEntry:weakSelf.storedDialogText elvish:YES];
+                break;
+            case kJourneyDialogSingleChoice:
+                [self displayAlertWithText:weakSelf.storedDialogText];
+                break;
+            case kJourneyDialogMultipleChoice:
+                [self displayPopupMenuWithMessageText:weakSelf.storedDialogText];
+                break;
+        }
+    });
 }
 
 - (BOOL)updateOnBecameKey:(BOOL)recreateDialog {

@@ -52,9 +52,13 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)padWithNewlines:(NSUInteger)lines;
 
 - (void)scrollWheelchanged:(NSEvent *)event;
+- (void)updateImageAttachmentsWithXScale:(CGFloat)xscale yScale:(CGFloat)yscale;
 
+- (void)resetLastSpokenString;
+
+// Only used by JourneyMenuHandler
 - (NSString *)lastMoveString;
-
+- (void)movesRangesFromV6Menu:(NSArray<NSString *> *)menuStrings;
 @property NSInteger lastNewTextOnTurn;
 
 @property (NS_NONATOMIC_IOSONLY, readonly) NSRange editableRange;

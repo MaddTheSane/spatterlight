@@ -11,13 +11,13 @@
 
 #import <AppKit/AppKit.h>
 
-@class Game, Theme, GlkEvent, GlkWindow, ZMenu, BureaucracyForm, GlkTextGridWindow, GlkSoundChannel, SoundHandler, ImageHandler, RotorHandler, CommandScriptHandler, CoverImageHandler, GlkController;
+@class Game, Theme, GlkEvent, GlkWindow, ZMenu, BureaucracyForm, GlkTextGridWindow, GlkSoundChannel, SoundHandler, ImageHandler, RotorHandler, CommandScriptHandler, CoverImageHandler, GlkController, InfocomV6MenuHandler;
 
 #define MAXWIN 64
 
 typedef enum kMinimumWindowSize : NSUInteger {
-    kMinimumWindowWidth = 213,
-    kMinimumWindowHeight = 107,
+    kMinimumWindowWidth = 212,
+    kMinimumWindowHeight = 100
 } kMinimumWindowSize;
 
 @interface GlkHelperView : NSView
@@ -33,8 +33,8 @@ typedef enum kMinimumWindowSize : NSUInteger {
 @property ImageHandler *imageHandler;
 @property NSMutableArray *imagesToSpeak;
 
-@property NSMutableArray *windowsToBeAdded;
-@property NSMutableArray *windowsToBeRemoved;
+@property NSMutableArray<GlkWindow *> *windowsToBeAdded;
+@property NSMutableArray<GlkWindow *> *windowsToBeRemoved;
 @property IBOutlet NSView *borderView;
 @property IBOutlet GlkHelperView *gameView;
 
@@ -190,6 +190,7 @@ typedef enum kGameIdentity : NSUInteger {
 @property NSString *pendingSaveFilePath;
 
 @property CoverImageHandler *coverController;
+@property (nonatomic) InfocomV6MenuHandler *infocomV6MenuHandler;
 
 
 - (void)runTerp:(NSString *)terpname
@@ -236,5 +237,7 @@ typedef enum kGameIdentity : NSUInteger {
 
 - (void)setBorderColor:(NSColor *)color;
 - (void)terminateTask;
+
+- (BOOL)showingInfocomV6Menu;
 
 @end

@@ -268,7 +268,8 @@ unsigned chartokeycode(unsigned ch) {
         settings->zmachine_terp = (int)theme.zMachineTerp;
         settings->z6_graphics = (int)theme.z6GraphicsType;
         settings->z6_colorize = (int)theme.z6Colorize1Bit;
-        settings->z6_sim_16_cols = (int)theme.z6Simulate16Color;
+        settings->zmachine_no_err_win = (int)theme.zMachineNoErrWin;
+        settings->voiceover_on = (int)[NSWorkspace sharedWorkspace].voiceOverEnabled;
 
         settings->force_arrange = _forced;
 

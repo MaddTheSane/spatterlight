@@ -73,12 +73,10 @@
 }
 
 - (void)addImage:(NSImage *)image
-           index:(NSInteger)index
        alignment:(NSInteger)alignment
               at:(NSUInteger)pos
           linkid:(NSUInteger)linkid {
     MarginImage *mi = [[MarginImage alloc] initWithImage:image
-                                                   index:index
                                                alignment:alignment
                                                   linkId:linkid
                                                       at:pos
@@ -151,7 +149,7 @@
 
                     if (NSIntersectsRect(bounds, newrect)) {
                         overlapped2 = YES;
-                        if (image.alignment == imagealign_MarginLeft) {
+                        if (image.glkImgAlign == imagealign_MarginLeft) {
                             // If we intersect with a left-aligned image, cut
                             // off the left end of the rect
 
@@ -249,11 +247,11 @@
     NSRect adjustedBounds = image.bounds;
 
     // If outside margin, move to opposite margin
-    if (image.alignment == imagealign_MarginLeft &&
+    if (image.glkImgAlign == imagealign_MarginLeft &&
         NSMaxX(adjustedBounds) > rightMargin + 1) {
         // Left-aligned image outside right margin
         adjustedBounds.origin.x = self.lineFragmentPadding;
-    } else if (image.alignment == imagealign_MarginRight &&
+    } else if (image.glkImgAlign == imagealign_MarginRight &&
                adjustedBounds.origin.x < leftMargin - 1) {
         // Right-aligned image outside left margin
         adjustedBounds.origin.x = rightMargin - adjustedBounds.size.width;
@@ -264,8 +262,8 @@
 
         // If overlapping, shift in opposite alignment direction
         if (NSIntersectsRect(img2.bounds, adjustedBounds)) {
-            if (image.alignment == img2.alignment) {
-                if (image.alignment == imagealign_MarginLeft) {
+            if (image.glkImgAlign == img2.glkImgAlign) {
+                if (image.glkImgAlign == imagealign_MarginLeft) {
                     adjustedBounds.origin.x =
                         NSMaxX(img2.bounds) + self.lineFragmentPadding;
                     // Move to the right of image if both left-aligned,
@@ -295,7 +293,7 @@
             } else {
                 // If we have collided with an image of opposite alignment,
                 // move below it and back to margin
-                if (image.alignment == imagealign_MarginLeft)
+                if (image.glkImgAlign == imagealign_MarginLeft)
                     adjustedBounds.origin.x = self.lineFragmentPadding;
                 else
                     adjustedBounds.origin.x =
@@ -310,11 +308,9 @@
 
 - (void)drawRect:(NSRect)rect {
     BufferTextView *textview = (BufferTextView *)self.textView;
-    GlkTextBufferWindow *bufwin = (GlkTextBufferWindow *)textview.delegate;
     NSSize inset = textview.textContainerInset;
     NSSize size;
     NSRect bounds;
-    BOOL extendflag = NO;
     CGFloat extendneeded = 0;
 
     MarginImage *image;
@@ -331,12 +327,10 @@
             // Check if we need to add padding to increase textview height to
             // accommodate for low image
             if (textview.frame.size.height <= NSMaxY(bounds)) {
-
                 textview.bottomPadding =
                     NSMaxY(bounds) - textview.frame.size.height + inset.height;
                 extendneeded = textview.bottomPadding;
                 [textview setFrameSize:textview.frame.size];
-                extendflag = YES;
             }
             // Check if padding is still needed
             else if (textview.frame.size.height - textview.bottomPadding <=
@@ -358,15 +352,6 @@
                              hints:nil];
             }
         }
-    }
-    // If we were at the bottom before, scroll to bottom of extended area so
-    // that we are still at bottom
-    if (extendflag && bufwin.scrolledToBottom) {
-        NSScrollView *scrollview = textview.enclosingScrollView;
-        CGFloat newY = NSMaxY(textview.frame) - NSHeight(scrollview.contentView.bounds);
-        NSRect newbounds = scrollview.contentView.bounds;
-        newbounds.origin.y = newY;
-        scrollview.contentView.bounds = newbounds;
     }
 
     // Remove bottom padding if it is not needed any more

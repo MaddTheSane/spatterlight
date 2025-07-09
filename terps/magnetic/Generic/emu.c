@@ -273,9 +273,9 @@
 #include <alloc.h>
 
 #define fread(p,s,n,f) lfread(p,s,n,f)
-#define fopen(f,m)     lfopen(f,m)
-#define malloc(s)      farmalloc(s)
-#define free(p)        farfree(p)
+#define fopen(f,m)	   lfopen(f,m)
+#define malloc(s)	   farmalloc(s)
+#define free(p)		   farfree(p)
 
 extern long lfread(void far *, long, long, FILE far *);
 extern FILE far * lfopen(const char far *, const char far *);
@@ -346,11 +346,7 @@ type8 anim_repeat = 0;
 #define MAX_HINTS 260
 #define MAX_HCONTENTS 30000
 struct ms_hint* hints = 0;
-#ifdef GARGLK
-type8s* hint_contents = 0;
-#else
 type8* hint_contents = 0;
-#endif
 const type8s no_hints[] = "[Hints are not available.]\n";
 const type8s not_supported[] = "[This function is not supported.]\n";
 
@@ -369,9 +365,9 @@ void write_reg(int, int, type32);
 type32 spatterlight_rseed(type32 seed);
 #endif
 
-#define MAX_STRING_SIZE  0xFF00
+#define MAX_STRING_SIZE	 0xFF00
 #define MAX_PICTURE_SIZE 0xC800
-#define MAX_MUSIC_SIZE   0x4E20
+#define MAX_MUSIC_SIZE	 0x4E20
 
 #ifdef LOGEMU
 void out(char *format,...)
@@ -455,7 +451,7 @@ type16 read_w2(type8 * ptr)
 void ms_seed(type32 seed)
 {
 #if defined(SPATTERLIGHT)
-    rseed = spatterlight_rseed(seed);
+	rseed = spatterlight_rseed(seed);
 #else
 	rseed = seed;
 #endif
@@ -732,7 +728,7 @@ type8 ms_init(type8s * name, type8s * gfxname, type8s * hntname, type8s * sndnam
 		if (string_size > MAX_STRING_SIZE)
 		{
 			if (!(string = malloc(MAX_STRING_SIZE)) ||
-			    !(string3 = malloc(string_size - MAX_STRING_SIZE)))
+				!(string3 = malloc(string_size - MAX_STRING_SIZE)))
 			{
 				ms_freemem();
 				fclose(fp);
@@ -1086,9 +1082,9 @@ void extract_frame(struct picture * pic)
 			bit_x = 7 - (x & 7);
 			mask = 1 << bit_x;
 			value = ((values[0] & mask) >> bit_x) << 0|
-			        ((values[1] & mask) >> bit_x) << 1|
-			        ((values[2] & mask) >> bit_x) << 2|
-			        ((values[3] & mask) >> bit_x) << 3;
+					((values[1] & mask) >> bit_x) << 1|
+					((values[2] & mask) >> bit_x) << 2|
+					((values[3] & mask) >> bit_x) << 3;
 			value &= 15;
 
 			gfx_buf[yw + x] = (type8)value;
@@ -1249,7 +1245,6 @@ type8 *ms_extract2(type8s * name, type16 * w, type16 * h, type16 * pal, type8 * 
 			}
 
 			/* Get the command sequence table */
-			command_count = read_w2(current);
 			command_table = current + 2;
 
 			for (i = 0; i < MAX_POSITIONS; i++)
@@ -2702,11 +2697,7 @@ void output_number(type16 number)
 	ms_putchar('0'+number);
 }
 
-#ifdef GARGLK
-type16 output_text(const type8s* text)
-#else
 type16 output_text(const type8* text)
-#endif
 {
 	type16 i;
 
@@ -2951,11 +2942,7 @@ void do_line_a(void)
 					{
 						type32 length = 0;
 						type16 tempo = 0;
-#ifdef GARGLK
-						type8* midi = sound_extract((type8s *)code + a1reg + 3,&length,&tempo);
-#else
 						type8* midi = sound_extract(code + a1reg + 3,&length,&tempo);
-#endif
 						if (midi != NULL)
 							ms_playmusic(midi,length,tempo);
 					}
@@ -4297,7 +4284,7 @@ type8 ms_rungame(void)
 		if (version == 0)
 		{
 			/* hardcoded jump */
-			char_out(l1c = (type8)read_reg(1, 0));
+			char_out((type8)read_reg(1, 0));
 		}
 		else if (version == 1)
 		{

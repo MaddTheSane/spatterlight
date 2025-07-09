@@ -2,9 +2,11 @@
 #import "GlkController.h"
 #import "GlkTextGridWindow.h"
 
-#import "ZColor.h"
 #import "InputHistory.h"
+#import "MarginImage.h"
+#import "MyAttachmentCell.h"
 #import "Theme.h"
+#import "ZColor.h"
 
 #include "glkimp.h"
 
@@ -151,10 +153,12 @@ fprintf(stderr, "%s\n",                                                    \
     NSArray *hintsForStyle = _styleHints[style];
 
     valObj = hintsForStyle[hint];
-    if ([valObj isNotEqualTo:[NSNull null]])
+    if ([valObj isNotEqualTo:[NSNull null]]) {
         *value = valObj.integerValue;
+        return YES;
+    }
 
-    return [valObj isNotEqualTo:[NSNull null]];
+    return NO;
 }
 
 - (NSMutableDictionary *)reversedAttributes:(NSMutableDictionary *)dict background:(NSColor *)backCol {
@@ -167,6 +171,42 @@ fprintf(stderr, "%s\n",                                                    \
     if (fg)
         dict[NSBackgroundColorAttributeName] = fg;
     return dict;
+}
+
+// A possible optimization would be to cache this
+// instead of recreating it on every print operation.
+- (NSMutableDictionary *)getCurrentAttributesForStyle:(NSUInteger)stylevalue {
+
+    NSMutableDictionary *attributes = [styles[stylevalue] mutableCopy];
+
+    if (((NSArray *)self.styleHints[stylevalue]).count == 0)
+        return attributes;
+
+    if (currentZColor) {
+        attributes[@"ZColor"] = currentZColor;
+        if (self.theme.doStyles) {
+            if ([self.styleHints[stylevalue][stylehint_ReverseColor] isEqualTo:@(1)]) {
+                // If the style has reverseColor hint set, we apply the zcolors in reverse
+                attributes = [currentZColor reversedAttributes:attributes];
+            } else {
+                attributes = [currentZColor coloredAttributes:attributes];
+            }
+        }
+    }
+
+    if (self.currentReverseVideo) {
+        attributes[@"ReverseVideo"] = @(YES);
+        if (!self.theme.doStyles || [self.styleHints[stylevalue][stylehint_ReverseColor] isNotEqualTo:@(1)]) {
+            // Current style has stylehint_ReverseColor unset, so we reverse colors
+            attributes = [self reversedAttributes:attributes background:[self isKindOfClass:[GlkTextGridWindow class]] ? self.theme.gridBackground : self.theme.bufferBackground];
+        }
+    }
+
+    if (self.currentHyperlink) {
+        attributes[NSLinkAttributeName] = @(self.currentHyperlink);
+    }
+
+    return attributes;
 }
 
 - (BOOL)isOpaque {
@@ -185,9 +225,11 @@ fprintf(stderr, "%s\n",                                                    \
 
 - (void)grabFocus {
     // NSLog(@"grab focus in window %ld", self.name);
-    [self.window makeFirstResponder:self];
-    NSAccessibilityPostNotification(
-                                    self, NSAccessibilityFocusedUIElementChangedNotification);
+    if (self.window.firstResponder != self) {
+        [self.window makeFirstResponder:self];
+        NSAccessibilityPostNotification(
+                                        self, NSAccessibilityFocusedUIElementChangedNotification);
+    }
 }
 
 - (void)flushDisplay {
@@ -500,54 +542,67 @@ fprintf(stderr, "%s\n",                                                    \
             NSError *error = nil;
             BOOL writeResult = NO;
             if (fileFormat == kPlainText) {
+                // If a text buffer window starts with a margin image before any text, we insert a soft hyphen (codepoint U+00AD) before the attachment character to avoid layout glitches. We strip that character from the plain text here.
+                // We also strip the unicode replacement character U+FFFC which both attachments and style changes seem to leave behind, and null characters, which might be hiding anywhere in an NSString.
+                NSCharacterSet *unwanted = [NSCharacterSet characterSetWithCharactersInString:@"\u00AD\0\uFFFC"];
+                NSString *string = [localTextStorage.string stringByTrimmingCharactersInSet:unwanted];
+                string = [string stringByReplacingOccurrencesOfString:@"\uFFFC" withString:@""];
                 unichar nc = '\0';
                 NSString *nullChar = [NSString stringWithCharacters:&nc length:1];
-                NSString *string = [localTextStorage.string stringByReplacingOccurrencesOfString:nullChar withString:@""];
+                string = [string stringByReplacingOccurrencesOfString:nullChar withString:@""];
                 if (![string hasSuffix:@"\n"])
                     string = [string stringByAppendingString:@"\n"];
                 writeResult = [string writeToURL:theFile atomically:NO encoding:NSUTF8StringEncoding error:&error];
             } else {
-
                 NSMutableAttributedString *mutattstr =
                 [localTextStorage mutableCopy];
 
-                if (localTextView.backgroundColor)
-                    [mutattstr
-                     enumerateAttribute:NSBackgroundColorAttributeName
-                     inRange:NSMakeRange(0, mutattstr.length)
-                     options:0
-                     usingBlock:^(id value, NSRange range, BOOL *stop) {
-                        if (!value || [value isEqual:[NSColor textBackgroundColor]]) {
+                NSUInteger __block index = 1;
+
+                if (fileFormat == kRTFD) {
+                    // We replace all image attachments with file wrappers.
+                    // This will of course remove any image alignment settings. There is no support for that in RTFD (Apple's custom rich text format with attachments).
+                    [localTextStorage
+                     enumerateAttribute:NSAttachmentAttributeName
+                     inRange:NSMakeRange(0, localTextStorage.length)
+                     options:NSAttributedStringEnumerationLongestEffectiveRangeNotRequired
+                     usingBlock:^(NSTextAttachment *attachment, NSRange range, BOOL *stop) {
+                        MyAttachmentCell *cell = (MyAttachmentCell *)attachment.attachmentCell;
+                        if (!cell)
+                            return;
+                        NSImage *image = cell.image;
+                        if (!image && cell.marginImage)
+                            image = cell.marginImage.image;
+                        if (image) {
+                            NSData *tiffdata = image.TIFFRepresentation;
+
+                            NSFileWrapper *wrapper = [[NSFileWrapper alloc] initRegularFileWithContents:tiffdata];
+                            wrapper.preferredFilename = [@"image " stringByAppendingFormat:@"%ld.tiff", index++];
+                            NSTextAttachment *newAttachment = [[NSTextAttachment alloc] initWithFileWrapper:wrapper];
                             [mutattstr
-                             addAttribute:NSBackgroundColorAttributeName
-                             value:localTextView.backgroundColor
-                             range:range];
+                             addAttribute:NSAttachmentAttributeName value:newAttachment range:range];
                         }
                     }];
 
-
-                if (fileFormat == kRTFD) {
-                    NSFileWrapper *wrapper;
-                    wrapper = [mutattstr
+                    NSFileWrapper *wrapper = [mutattstr
                                RTFDFileWrapperFromRange:NSMakeRange(0, mutattstr.length)
                                documentAttributes:@{
-                        NSDocumentTypeDocumentAttribute:NSRTFDTextDocumentType
+                        NSDocumentTypeDocumentAttribute:NSRTFDTextDocumentType,
+                        NSBackgroundColorDocumentAttribute:localTextView.backgroundColor
                     }];
 
                     writeResult = [wrapper writeToURL:theFile
                                               options:
-                                   NSFileWrapperWritingAtomic |
-                                   NSFileWrapperWritingWithNameUpdating
-                                  originalContentsURL:nil
+                                   NSFileWrapperWritingAtomic                                  originalContentsURL:nil
                                                 error:&error];
+                    if (writeResult == NO) NSLog(@"Error: %@", error);
 
                 } else {
                     NSData *data = [mutattstr
-                                    RTFFromRange:NSMakeRange(0,
-                                                             mutattstr.length)
+                                    RTFFromRange:NSMakeRange(0, mutattstr.length)
                                     documentAttributes:@{
-                        NSDocumentTypeDocumentAttribute :
-                            NSRTFTextDocumentType
+                           NSDocumentTypeDocumentAttribute: NSRTFTextDocumentType,
+                        NSBackgroundColorDocumentAttribute:localTextView.backgroundColor
                     }];
                     writeResult = [data writeToURL:theFile options:0 error:&error];
                 }
@@ -602,6 +657,8 @@ fprintf(stderr, "%s\n",                                                    \
     [accessoryView addSubview:label];
     [accessoryView addSubview:_accessoryPopUp];
     [_accessoryPopUp selectItemWithTag:defaultType];
+
+    _accessoryPopUp.accessibilityIdentifier = @"saveFormatPopUp";
 
     return accessoryView;
 }

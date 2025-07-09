@@ -1,5 +1,25 @@
 # Change log
 
+## Release 1.4.5
+- Game windows would sometimes autorestore to minimum size.
+- The animation when opening or closing game info panels would trigger the macOS Game Mode, along with an annoying notification.
+- Adds full support for all versions of Infocom's *Shogun* and *Arthur: The Quest for Excalibur* with autosave, window resizing and VoiceOver support. All graphic formats work and can be changed on the fly.
+- Adds a new option to redirect Bocfel and *Shogun* error window text to the main buffer window.
+- Bocfel error windows could sometimes have incorrect colours in games that change colour on the fly, such as *Beyond Zork*.
+- Double copies of margin images would be autosaved, one in `MyAttachmentCell`, one in `MarginImage`.
+- The VoiceOver image rotor was broken.
+- Strips more leftover junk characters when saving scrollback as plain text.
+- The `subheader` Glk grid style text in the DOSBox and MS-DOS built-in themes is now white, which makes *Journey* more playable when using them. The subheader buffer style was already white, for some reason.
+- The `loadimage` function in `glkimp` was broken and leaked memory when not using blorb files.
+- Thanks to the new static analyzer in Xcode 16.3, several file resource leaks (i.e. `fopen()` without a corresponding `fclose()`) were discovered and fixed.
+- Resetting a game will work even if the game file has been moved or renamed.
+- Reduces the number of temporary files created when playing *Journey*.
+- Autorestoring a game during the "Spatterlight wants to access files in the desktop folder" permission dialog could leave a "[Game name] is taking a long time to load" alert that would not go away.
+- After making a selection in the *Journey* VoiceOver menu which opens a dialog, VoiceOver would sometimes focus on a non-existent top level element ("Alert, dialog") that could not be properly navigated.
+- VoiceOver will now speak text printed between dialogs in *Journey*, that it previously skipped, by adding it to the dialog text. It will also properly speak text printed after closing a dialog.
+- Pushing a Settings menu bar button using VoiceOver will now properly select it.
+- The Arrow key usage setting does now default to "Replaced by ⌘↑ and ⌘↓" in all built-in themes. You may have to select Rebuild Default Themes for this to take effect.
+
 ## Release 1.3
 - Fixes the decoding of certain characters in game descriptions downloaded from IFDB.
 - Fixes reading files managed by the File Provider API, such as those on Google Drive. Mostly by opening a lot of dialogs asking the user for permission to read files.

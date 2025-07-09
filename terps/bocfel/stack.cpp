@@ -1,18 +1,6 @@
 // Copyright 2010-2021 Chris Spiegel.
 //
-// This file is part of Bocfel.
-//
-// Bocfel is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License, version
-// 2 or 3, as published by the Free Software Foundation.
-//
-// Bocfel is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with Bocfel. If not, see <http://www.gnu.org/licenses/>.
+// SPDX-License-Identifier: MIT
 
 #include <algorithm>
 #include <array>
@@ -122,6 +110,7 @@ private:
             } catch (...) {
                 // If the locale is invalid, don’t worry about it.
             }
+
             formatted_time << std::put_time(lt, "%c");
 
             return formatted_time.str();
@@ -374,18 +363,20 @@ uint16_t internal_call_with_args(uint16_t routine, uint16_t number_of_args, uint
     return pop_stack();
 }
 
-
 uint16_t internal_call_with_arg(uint16_t routine, uint16_t arg)
 {
     uint16_t args[1] = { arg };
     return internal_call_with_args(routine, 1, args);
 }
 
-
 uint16_t internal_call_with_2_args(uint16_t routine, uint16_t arg1, uint16_t arg2)
 {
     uint16_t args[2] = { arg1 , arg2 };
     return internal_call_with_args(routine, 2, args);
+}
+
+uint16_t internal_arg_count(void) {
+    return CURRENT_FRAME->nargs;
 }
 #endif
 
@@ -958,7 +949,9 @@ static void read_args(IFF &iff, SaveOpcode &saveopcode)
         break;
     case SaveOpcode::ReadChar:
         if (size != 2 && size != 4 && size != 6) {
+#ifndef SPATTERLIGHT
             throw RestoreError(fstring("invalid Args size: %lu", static_cast<unsigned long>(size)));
+#endif
         }
         break;
     default:

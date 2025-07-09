@@ -378,7 +378,7 @@ typedef enum {              // main filesystem format (based on NuFX enum)
     // try to keep this in an unsigned char, e.g. for CP clipboard
 } FSFormat;
 
-PhysicalFormat  fPhysical = kPhysicalFormatNib525_6656;;
+PhysicalFormat  fPhysical = kPhysicalFormatNib525_6656;
 
 static int fHasSectors;    // image is sector-addressable
 static int fHasBlocks;     // image is block-addressable
@@ -1321,7 +1321,7 @@ static int IsLinearBlocks(SectorOrder imageOrder, SectorOrder fsOrder)
      * mapping.  This holds true for reading ProDOS blocks from a ".po"
      * file or reading DOS sectors from a ".do" file.
      */
-    return (fsOrder == kPhysicalFormatSectors && fHasBlocks &&
+    return (fPhysical == kPhysicalFormatSectors && fHasBlocks &&
             imageOrder == fsOrder);
 }
 
@@ -1737,7 +1737,6 @@ static DIError ProDOSOpen(A2File *pOpenFile)
     pOpenFile->fOffset = 0;
 
 bail:
-//    delete pOpenFile;
     return dierr;
 }
 
@@ -2350,7 +2349,7 @@ bail:
  *
  * NOTE: supposedly DOS stops reading the catalog track when it finds the
  * first entry with a 00 byte, which is why deleted files use ff.  If so,
- * it *might* make sense to mimic this behavior, though on a health disk
+ * it *might* make sense to mimic this behavior, though on a healthy disk
  * we shouldn't be finding garbage anyway.
  *
  * Fills out "fCatalogSectors" as it works.

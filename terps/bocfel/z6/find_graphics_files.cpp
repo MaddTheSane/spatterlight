@@ -13,6 +13,7 @@ extern "C" {
 
 #include "zterp.h"
 #include "v6_image.h"
+#include "v6_specific.h"
 #include "extract_apple_2.h"
 
 #include "extract_image_data.hpp"
@@ -346,7 +347,13 @@ void find_and_load_z6_graphics(void) {
     size_t dotpos = file_name.rfind('.');
 
     if (delimiterpos != std::string::npos) {
-        file_name.replace(delimiterpos, dotpos - delimiterpos, "/journey");
+        if (is_spatterlight_journey) {
+            file_name.replace(delimiterpos, dotpos - delimiterpos, "/journey");
+        } else if (is_spatterlight_arthur) {
+            file_name.replace(delimiterpos, dotpos - delimiterpos, "/arthur");
+        } else if (is_spatterlight_shogun) {
+            file_name.replace(delimiterpos, dotpos - delimiterpos, "/shogun");
+        }
         if (file_name != game_file) {
             find_graphics_files(file_name);
         }
