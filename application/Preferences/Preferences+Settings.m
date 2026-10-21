@@ -379,8 +379,8 @@ static const NSUInteger simpleSettingsCount = sizeof(simpleSettings) / sizeof(si
     }
 
     NotificationBezel *notification = [[NotificationBezel alloc] initWithScreen:self.window.screen];
-    [notification showStandardWithText:(counter == 1) ? NSLocalizedString(@"1 alert reset", nil) :
-     [NSString stringWithFormat:NSLocalizedString(@"%ld alerts reset", nil), counter]];
+    [notification showStandardWithText:
+     [NSString localizedStringWithFormat:NSLocalizedString(@"%ld alerts reset", nil), counter]];
 }
 
 // The buffer scrollback limit is a per-theme setting, stored in the theme's
@@ -492,8 +492,8 @@ static const NSUInteger simpleSettingsCount = sizeof(simpleSettings) / sizeof(si
         [Preferences rebuildTextAttributes];
     }
     NotificationBezel *notification = [[NotificationBezel alloc] initWithScreen:self.window.screen];
-    [notification showStandardWithText:(counter == 1) ? NSLocalizedString(@"1 style changed", nil) :
-     [NSString stringWithFormat:NSLocalizedString(@"%ld styles changed", nil), counter]];
+    [notification showStandardWithText:
+     [NSString localizedStringWithFormat:NSLocalizedString(@"%ld styles changed", nil), counter]];
 }
 
 - (IBAction)changeBorderSize:(id)sender {

@@ -19,8 +19,6 @@
 #import "NSAlert+Spatterlight.h"
 
 
-extern NSArray *gGameFileTypes;
-
 @implementation MissingFilesFinder
 
 //! Looks for the old file under an ancestor folder it shares with the folder

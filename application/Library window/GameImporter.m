@@ -42,8 +42,6 @@
 #import "LibraryOrganizer.h"
 #import "NSAlert+Spatterlight.h"
 
-extern NSArray *gGameFileTypes;
-
 // Computes an AGT game's Treaty-of-Babel IFID directly from its .D$$/.DA1
 // data files, in-process, without converting to AGX first. Implemented in
 // terps/agility/agtifid.c (linked into the app). Returns a malloc'd string

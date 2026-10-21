@@ -18,9 +18,6 @@
 #import "NSAlert+Spatterlight.h"
 #import "Constants.h"
 
-extern NSArray *gDocFileTypes;
-extern NSArray *gSaveFileTypes;
-
 NSNotificationName const GlkCommandScriptDidCompleteNotification = @"GlkCommandScriptDidComplete";
 
 @implementation CommandScriptHandler

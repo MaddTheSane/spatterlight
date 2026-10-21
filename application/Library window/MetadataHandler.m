@@ -162,7 +162,7 @@ typedef NS_ENUM(int32_t, MetadataImportResult) {
     NSMutableSet<NSManagedObjectID *> *gameIDs = [NSMutableSet new];
     NSMutableSet<NSManagedObjectID *> *indirectGameIDs = [NSMutableSet new];
 
-    NSString __block *msg = @"There were no library matches for the games in the iFiction file.";
+    NSString __block *msg = NSLocalizedString(@"There were no library matches for the games in the iFiction file.", nil);
     NSString __block *msg2;
 
 
@@ -200,7 +200,7 @@ typedef NS_ENUM(int32_t, MetadataImportResult) {
 
         if (games.count > 0) {
             importResult = kImportResultExactMatchesOnly;
-            msg = [NSString stringWithFormat:@"Found details matching %@ in iFiction file.",
+            msg = [NSString stringWithFormat:NSLocalizedString(@"Found details matching %@ in iFiction file.", nil),
                    [NSString stringWithSummaryOfGames:games.allObjects]];
         } else if (storyDict.count) {
             NSLog(@"askAboutImportingMetadata: None of the %ld direct matches found in database", storyDict.count);
@@ -227,7 +227,7 @@ typedef NS_ENUM(int32_t, MetadataImportResult) {
 
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         BOOL found = (importResult != kImportResultNoneFound);
-        NSAlert *anAlert = [NSAlert alertWithMessage:NSLocalizedString(msg, nil)
+        NSAlert *anAlert = [NSAlert alertWithMessage:msg
                                                 info:found ? NSLocalizedString(@"Would you like to replace existing information?", nil) : nil
                                              buttons:found ? @[ NSLocalizedString(@"Okay", nil), NSLocalizedString(@"Cancel", nil) ] : @[ NSLocalizedString(@"Okay", nil) ]];
 

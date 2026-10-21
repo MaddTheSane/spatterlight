@@ -22,7 +22,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (readonly, copy) NSString *filename;
 @property (readonly) NSUInteger offset;
 @property (readonly) NSUInteger length;
-@property (readonly, nullable) NSData *data;
+@property (readonly, copy, nullable) NSData *data;
 
 // The file is a temporary one the interpreter wrote for the host and left to
 // it (a PURGEIMG replacement), so the handler deletes it: once it is decoded,

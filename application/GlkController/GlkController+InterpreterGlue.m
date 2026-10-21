@@ -167,7 +167,7 @@ static NSString *signalToName(NSTask *task) {
                                                         object:self
                                                       userInfo:nil];
 
-    self.window.title = [self.window.title stringByAppendingString:NSLocalizedString(@" (finished)", nil)];
+    self.window.title = [self.window.title stringByAppendingString:NSLocalizedString(@" (finished)", @"The game has completed")];
     [self performScroll];
     task = nil;
     libcontroller.gameTableDirty = YES;

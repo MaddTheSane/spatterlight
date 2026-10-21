@@ -21,7 +21,7 @@ NS_ASSUME_NONNULL_BEGIN
 @interface ImageHandler : NSObject
 
 // The current picture and its number, or nil and -1.
-@property (readonly, nullable) NSImage *lastimage;
+@property (readonly, strong, nullable) NSImage *lastimage;
 @property (readonly) NSInteger lastimageresno;
 
 // Reads the pictures of the game's Blorb (the game file itself, or a .blb
