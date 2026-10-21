@@ -67,6 +67,8 @@
 		55A01EDD2B189325003D7C18 /* BlorbResource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55A01EDC2B189325003D7C18 /* BlorbResource.swift */; };
 		55A01EE02B1898E9003D7C18 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6D79B0DE223262CA008C9CB7 /* Foundation.framework */; };
 		55A059373089612400A6EC07 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 55A059363089612400A6EC07 /* Localizable.xcstrings */; };
+		55A05938308977BF00A6EC07 /* SpatterlightQuickLook.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C311DEF525C472E500484639 /* SpatterlightQuickLook.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		55A0593B308977BF00A6EC07 /* SpatterlightThumbnailer.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C322714A25CC214A0083BD5B /* SpatterlightThumbnailer.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		579385CB51D49A52A9389561 /* sclibrar_talk.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5C1B1A000000000000000013 /* sclibrar_talk.cpp */; };
 		58DD36D7B76BB2FAEB33D5B9 /* sclibrar_meta.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5C1B1A000000000000000003 /* sclibrar_meta.cpp */; };
 		5A1D0C0E7E3F4B2C9D8A0001 /* ZMenuDetector.m in Sources */ = {isa = PBXBuildFile; fileRef = 5A1D0C0E7E3F4B2C9D8A0002 /* ZMenuDetector.m */; };
@@ -1215,6 +1217,20 @@
 			remoteGlobalIDString = 55368B3C272BF1C500740A0A;
 			remoteInfo = question;
 		};
+		55A05939308977BF00A6EC07 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 961CCE6009F2375A00528FF9 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C311DEF425C472E500484639;
+			remoteInfo = SpatterlightQuickLook;
+		};
+		55A0593C308977BF00A6EC07 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 961CCE6009F2375A00528FF9 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C322714925CC214A0083BD5B;
+			remoteInfo = SpatterlightThumbnailer;
+		};
 		6D77E2BF2518B482008B9C69 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 961CCE6009F2375A00528FF9 /* Project object */;
@@ -1799,6 +1815,18 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
+		55A0593E308977BF00A6EC07 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				55A05938308977BF00A6EC07 /* SpatterlightQuickLook.appex in Embed Foundation Extensions */,
+				55A0593B308977BF00A6EC07 /* SpatterlightThumbnailer.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		9650315509F296CF0083E64E /* Copy Interpreter Files */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -7707,6 +7735,7 @@
 				961CCEC209F239C100528FF9 /* Frameworks */,
 				9650315509F296CF0083E64E /* Copy Interpreter Files */,
 				C344B2CE26E4DA87004B0A8F /* Embed Frameworks */,
+				55A0593E308977BF00A6EC07 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
@@ -7734,6 +7763,8 @@
 				966EFA4309F62D4C00FA7F19 /* PBXTargetDependency */,
 				C3D6AD701ECF372000ADB69C /* PBXTargetDependency */,
 				6230C928BD6C785477ED2461 /* PBXTargetDependency */,
+				55A0593A308977BF00A6EC07 /* PBXTargetDependency */,
+				55A0593D308977BF00A6EC07 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				C338CF402F71B86E00BCBD18 /* GlkController */,
@@ -9863,6 +9894,16 @@
 			isa = PBXTargetDependency;
 			target = 55368B3C272BF1C500740A0A /* question */;
 			targetProxy = 55368B7A272BF28800740A0A /* PBXContainerItemProxy */;
+		};
+		55A0593A308977BF00A6EC07 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C311DEF425C472E500484639 /* SpatterlightQuickLook */;
+			targetProxy = 55A05939308977BF00A6EC07 /* PBXContainerItemProxy */;
+		};
+		55A0593D308977BF00A6EC07 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C322714925CC214A0083BD5B /* SpatterlightThumbnailer */;
+			targetProxy = 55A0593C308977BF00A6EC07 /* PBXContainerItemProxy */;
 		};
 		6230C928BD6C785477ED2461 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;

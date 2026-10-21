@@ -15,7 +15,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeMIMETypes</key>
 			<array>
 				<string>application/x-alan-adventure-game</string>
@@ -43,7 +43,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeMIMETypes</key>
 			<array>
 				<string>application/x-agt</string>
@@ -71,7 +71,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeName</key>
 			<string>AGT dollar Story</string>
 			<key>CFBundleTypeRole</key>
@@ -94,6 +94,8 @@
 			</array>
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
+			<key>CFBundleTypeIconSystemGenerated</key>
+			<true/>
 			<key>CFBundleTypeMIMETypes</key>
 			<array>
 				<string>application/x-adrift</string>
@@ -121,7 +123,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeName</key>
 			<string>DAT Story File</string>
 			<key>CFBundleTypeRole</key>
@@ -145,7 +147,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeMIMETypes</key>
 			<array>
 				<string>application/x-hugo</string>
@@ -173,7 +175,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeMIMETypes</key>
 			<array>
 				<string>application/x-level9</string>
@@ -201,7 +203,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeMIMETypes</key>
 			<array>
 				<string>application/x-magscroll</string>
@@ -229,7 +231,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeMIMETypes</key>
 			<array>
 				<string>application/x-glulx</string>
@@ -257,7 +259,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeMIMETypes</key>
 			<array>
 				<string>application/x-tads</string>
@@ -285,7 +287,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeMIMETypes</key>
 			<array>
 				<string>application/x-t3vm-image</string>
@@ -317,7 +319,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeMIMETypes</key>
 			<array>
 				<string>application/x-zmachine</string>
@@ -346,7 +348,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeName</key>
 			<string>Legacy Z-code Story File</string>
 			<key>CFBundleTypeRole</key>
@@ -371,7 +373,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeMIMETypes</key>
 			<array>
 				<string>application/x-blorb</string>
@@ -402,7 +404,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeName</key>
 			<string>Blorbed Z-code Story File</string>
 			<key>CFBundleTypeRole</key>
@@ -427,7 +429,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeName</key>
 			<string>Blorbed Glulx Story File</string>
 			<key>CFBundleTypeRole</key>
@@ -451,7 +453,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeName</key>
 			<string>Quill Story File</string>
 			<key>CFBundleTypeRole</key>
@@ -475,7 +477,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeName</key>
 			<string>Archetype Story File</string>
 			<key>CFBundleTypeRole</key>
@@ -499,7 +501,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeName</key>
 			<string>iFiction Metadata</string>
 			<key>CFBundleTypeRole</key>
@@ -523,7 +525,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeName</key>
 			<string>ZX Spectrum Snapshot</string>
 			<key>CFBundleTypeRole</key>
@@ -547,7 +549,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeName</key>
 			<string>ZX Spectrum Z80 Snapshot</string>
 			<key>CFBundleTypeRole</key>
@@ -571,7 +573,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeName</key>
 			<string>ZX Spectrum TZX Tape Image</string>
 			<key>CFBundleTypeRole</key>
@@ -595,7 +597,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeName</key>
 			<string>ZX Spectrum TAP Tape Image</string>
 			<key>CFBundleTypeRole</key>
@@ -619,7 +621,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeName</key>
 			<string>Commodore 64 Disk Image</string>
 			<key>CFBundleTypeRole</key>
@@ -643,7 +645,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeName</key>
 			<string>Commodore 64 Tape Image</string>
 			<key>CFBundleTypeRole</key>
@@ -668,7 +670,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeName</key>
 			<string>Quest 4 Story File</string>
 			<key>CFBundleTypeRole</key>
@@ -693,7 +695,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeName</key>
 			<string>Quest 5 Story File</string>
 			<key>CFBundleTypeRole</key>
@@ -718,7 +720,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeName</key>
 			<string>JACL Story File</string>
 			<key>CFBundleTypeRole</key>
@@ -743,7 +745,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeName</key>
 			<string>ScottFree Story File</string>
 			<key>CFBundleTypeRole</key>
@@ -767,7 +769,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeName</key>
 			<string>TI-99/4A File</string>
 			<key>CFBundleTypeRole</key>
@@ -791,7 +793,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeName</key>
 			<string>Disk Image</string>
 			<key>CFBundleTypeRole</key>
@@ -815,7 +817,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeName</key>
 			<string>Atari Disk Image</string>
 			<key>CFBundleTypeRole</key>
@@ -839,7 +841,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeName</key>
 			<string>Atari ST Disk Image</string>
 			<key>CFBundleTypeRole</key>
@@ -863,7 +865,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeName</key>
 			<string>Atari MSA Disk Image</string>
 			<key>CFBundleTypeRole</key>
@@ -887,7 +889,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeName</key>
 			<string>Apple 2 Woz Disk Image</string>
 			<key>CFBundleTypeRole</key>
@@ -907,7 +909,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeName</key>
 			<string>Comprehend DOS Executable</string>
 			<key>CFBundleTypeRole</key>
@@ -932,7 +934,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeName</key>
 			<string>Saga Plus Story File</string>
 			<key>CFBundleTypeRole</key>
@@ -957,7 +959,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>LegacyIcon</string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
+			<true/>
 			<key>CFBundleTypeName</key>
 			<string>TaylorMade Story File</string>
 			<key>CFBundleTypeRole</key>
