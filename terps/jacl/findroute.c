@@ -8,9 +8,6 @@
 #include "types.h"
 #include "prototypes.h"
 
-extern struct object_type       *object[];
-extern int                      objects;
-
 /**************************************/
 /* Queue functions                    */
 /**************************************/
@@ -28,13 +25,13 @@ typedef struct
 	QueueNode *tail;
 } Queue;
 
-void
+static void
 qInit(Queue *q)
 {
 	q->head = q->tail = NULL;
 }
 
-void
+static void
 qDelete(Queue *q)
 {
 	QueueNode *node, *next;
@@ -48,37 +45,21 @@ qDelete(Queue *q)
 	q->head = q->tail = NULL;
 }
 
-int
+static int
 qIsEmpty(Queue *q)
 {
 	return (q->head == NULL);
 }
 
-void
-qDebug(Queue *q)
-{
-	printf("Queue:");
-
-	if (q->head == NULL)
-	{
-		printf(" empty");
-	}
-	else
-	{
-		QueueNode *node;
-		for (node = q->head;node != NULL;node = node->next)
-		{
-			printf(" %d (%d)", node->val, node->val2);
-		}
-	}
-
-	putchar('\n');
-}
-
-void
+/* Returns 0 on success, -1 on OOM. The pathfinder treats an OOM as
+ * "no route" and falls through. Without the NULL check the prior
+ * code dereferenced a NULL `node` -> SIGSEGV on memory-exhausted
+ * CGI workers. */
+static int
 qAppend(Queue *q, int val, int val2)
 {
 	QueueNode *node = (QueueNode*) malloc(sizeof(QueueNode));
+	if (node == NULL) return -1;
 	node->val = val;
 	node->val2 = val2;
 	node->next = NULL;
@@ -92,15 +73,18 @@ qAppend(Queue *q, int val, int val2)
 		q->tail->next = node;
 		q->tail = node;
 	}
+	return 0;
 }
 
-void
+static void
 qPop(Queue *q, int *val, int *val2)
 {
 	//assert(q->head != NULL);
 
-	*val = q->head->val;
-	*val2 = q->head->val2;
+	QueueNode *node = q->head;
+
+	*val = node->val;
+	*val2 = node->val2;
 
 	if (q->head == q->tail)
 	{
@@ -108,57 +92,25 @@ qPop(Queue *q, int *val, int *val2)
 	}
 	else
 	{
-		q->head = q->head->next;
+		q->head = node->next;
 	}
-}
 
-void
-qTest()
-{
-	int val, val2;
-	Queue q;
-
-	qInit(&q);
-	qDebug(&q);
-
-	printf("\nAdd 3, 0\n");
-	qAppend(&q, 3, 0);
-	qDebug(&q);
-
-	printf("\nAdd 4, 2\n");
-	qAppend(&q, 4, 2);
-	qDebug(&q);
-
-	printf("\nAdd 5, 1\n");
-	qAppend(&q, 5, 1);
-	qDebug(&q);
-
-	qPop(&q, &val, &val2);
-	printf("\nPop %d, %d\n", val, val2);
-	qDebug(&q);
-
-	qPop(&q, &val, &val2);
-	printf("\nPop %d, %d\n", val, val2);
-	qDebug(&q);
-
-	printf("\nAdd 6, 3\n");
-	qAppend(&q, 6, 3);
-	qDebug(&q);
-
-	printf("\nDelete all\n");
-	qDelete(&q);
-	qDebug(&q);
+	free(node);
 }
 
 /**************************************/
 /* Set functions                      */
 /**************************************/
 
-/* linked list for hash table */
+/* linked list for hash table; all_next chains every allocation off
+ * `Set.all_nodes` so setDelete can free the whole set in one linear
+ * pass (the per-bucket sweep tripped the static analyzer's limited
+ * loop unrolling and produced a false-positive leak warning). */
 typedef struct SetNode
 {
 	int val;
 	struct SetNode *next;
+	struct SetNode *all_next;
 } SetNode;
 
 #define SET_HASHSIZE 101
@@ -166,9 +118,10 @@ typedef struct SetNode
 typedef struct
 {
 	SetNode *node[SET_HASHSIZE];
+	SetNode *all_nodes;
 } Set;
 
-void
+static void
 setInit(Set *set)
 {
 	int n;
@@ -177,54 +130,31 @@ setInit(Set *set)
 	{
 		set->node[n] = NULL;
 	}
+	set->all_nodes = NULL;
 }
 
-void
+static void
 setDelete(Set *set)
 {
-	int n;
+	SetNode *node, *next;
 
-	for (n = 0;n < SET_HASHSIZE;n++)
+	for (node = set->all_nodes;node != NULL;node = next)
 	{
-		SetNode *node, *next;
-
-		for (node = set->node[n];node != NULL;node = next)
-		{
-			next = node->next;
-			free(node);
-		}
-
-		set->node[n] = NULL;
-	}
-}
-
-void
-setDebug(Set *set)
-{
-	int n;
-
-	printf("Set:");
-
-	for (n = 0;n < SET_HASHSIZE;n++)
-	{
-		SetNode *node;
-
-		for (node = set->node[n];node != NULL;node = node->next)
-		{
-			printf(" %d", node->val);
-		}
+		next = node->all_next;
+		free(node);
 	}
 
-	putchar('\n');
+	set->all_nodes = NULL;
 }
 
-int
+static int
 setHash(int val)
 {
 	return abs(val) % SET_HASHSIZE;
 }
 
-void
+/* Returns 0 on success / already-present, -1 on OOM. */
+static int
 setAdd(Set *set, int val)
 {
 	SetNode *node;
@@ -234,18 +164,22 @@ setAdd(Set *set, int val)
 
 	for (node = set->node[n];node != NULL;node = node->next)
 	{
-		if (node->val == val) { return; }
+		if (node->val == val) { return 0; }
 	}
 
 	node = (SetNode*) malloc(sizeof(SetNode));
+	if (node == NULL) return -1;
 	node->val = val;
 	node->next = set->node[n];
 	set->node[n] = node;
+	node->all_next = set->all_nodes;
+	set->all_nodes = node;
+	return 0;
 }
 
 /* returns 1 if the set contains val, otherwise returns 0 */
 
-int
+static int
 setContains(Set *set, int val)
 {
 	SetNode *node;
@@ -259,38 +193,6 @@ setContains(Set *set, int val)
 	return 0;
 }
 
-void setTest()
-{
-	Set s;
-
-	setInit(&s);
-	setDebug(&s);
-
-	printf("\nAdd 34\n");
-	setAdd(&s, 34);
-	setDebug(&s);
-
-	printf("\nAdd 56\n");
-	setAdd(&s, 56);
-	setDebug(&s);
-
-	printf("\nAdd 34 again\n");
-	setAdd(&s, 34);
-	setDebug(&s);
-
-	printf("\nAdd %d\n", 34 + SET_HASHSIZE);
-	setAdd(&s, 34 + SET_HASHSIZE);
-	setDebug(&s);
-
-	printf("\nAdd 78\n");
-	setAdd(&s, 78);
-	setDebug(&s);
-
-	printf("\nDelete all\n");
-	setDelete(&s);
-	setDebug(&s);
-}
-
 /**************************************/
 
 #define DIR_NONE   -1
@@ -298,31 +200,62 @@ void setTest()
 int
 find_route(int fromRoom, int toRoom, int known)
 {
-	Set visited;
-	Queue q;
-	int firstTime;
-	int result = DIR_NONE;
+	// KNOWN INDICATES WHETHER THE LOCATION MUST HAVE BEEN
+	// VISITED PREVIOUSLY. THIS IS NOT REQUIRED FOR NPCS.
 
-	setInit(&visited);
+	/* Refuse impossible inputs up-front. Without this the BFS reads
+	 * `object[fromRoom]` on the first iteration with no validity
+	 * check, which OOBs for fromRoom outside [1, objects]. The same
+	 * could happen for toRoom via the n==toRoom equality check. */
+	if (fromRoom < 1 || fromRoom > objects || object[fromRoom] == NULL)
+		return DIR_NONE;
+	if (toRoom < 1 || toRoom > objects || object[toRoom] == NULL)
+		return DIR_NONE;
+
+	// CREATE AND INITIALISE THE QUEUE OF LOCATION TO PROCESS
+	Queue q;
 	qInit(&q);
 
-	qAppend(&q, fromRoom, DIR_NONE);
-	setAdd(&visited, fromRoom);
-	firstTime = 1;
+	// CREATE AND INITIALISE THE SET OF VISITED LOCATIONS
+	Set visited;
+	setInit(&visited);
 
+	int firstTime = TRUE;
+
+	int result = DIR_NONE;
+
+	// ADD THE STARTING LOCATION TO THE QUEUE FOR PROCESSING
+	if (qAppend(&q, fromRoom, DIR_NONE) != 0) {
+		setDelete(&visited);
+		return DIR_NONE;
+	}
+
+	// ADD THE STARTING LOCATION TO THE SET OF VISITED LOCATIONS
+	setAdd(&visited, fromRoom);
+
+	// KEEP PROCESSING WHILE THERE ARE LOCATIONS LEFT IN THE QUEUE
 	while (!qIsEmpty(&q))
 	{
 		int n, dir, firstDir;
+
+		// POP THE LOCATION AT THE HEAD OF THE QUEUE (FIRST IN FIRST OUT)
+		// n IS THE LOCATION, firstDir IS THE EXIT THAT WAS PUSHED IN
+		// THE QUEUE.
 		qPop(&q, &n, &firstDir);
 
 		if (n == toRoom)
 		{
+			// HAVE ARRIVED AT THE DESTINATION, RETURN THE FIRST
+			// DIRECTION WALKED IN TO GET TO THE DESTINATION.
 			result = firstDir;
 			break;
 		}
 
+		// LOOP THROUGH ALL THE EXITS OF THE CURRENT LOCATION
 		for (dir = 0;dir < 12 ;dir++)
 		{
+			// SET THE DESTINATION TO THE LOCATION THIS DIRECTION
+			// LEADS TO.
 			int dest = object[n]->integer[dir];
 
 			if (dest < 1 || dest > objects) continue;
@@ -332,13 +265,24 @@ find_route(int fromRoom, int toRoom, int known)
 			if (dest != NOWHERE && !setContains(&visited, dest))
 			{
 				if (!known || (object[dest]->attributes & KNOWN)) {
+					// PUT THE DESTINATION LOCATION INTO THE QUEUE
+					// (IF THIS IS THE STARTING LOCATION) 
+					// AND STORE THE DIRECTION THAT LEAD TO IT
+					// firstTime IS CHECKED AS THE LOCATIONS REACHED
+					// FROM THE STARTING LOCATION ARE THE ONLY
+					// ONES THAT REALLY MATTER AS THIS FUNCTION
+					// ONLY RETURNS THE FIRST STEP, NOT THE FULL
+					// PATH. firstDir IS THE ORIGINAL DIRECTION
+					// SET OUT IN FROM THE STARTING LOCATION
 					qAppend(&q, dest, (firstTime ? dir : firstDir));
+
+					// ADD THE LOCATION TO THE SET OF LOCATIONS VISITED
 					setAdd(&visited, dest);
 				}
 			}
 		}
 
-		firstTime = 0;
+		firstTime = FALSE;
 	}
 
 	setDelete(&visited);

@@ -8,40 +8,20 @@
 
 #import "ThemeArrayController.h"
 #import "Theme.h"
+#import "Fetches.h"
 
 @implementation ThemeArrayController
 
 - (id)newObject {
     Theme *newObj = [super newObject];
     [newObj copyAttributesFrom:self.selectedTheme];
-    NSString *name = @"New theme";
-    NSUInteger counter = 2;
-    while ([self findThemeByName:name]) {
-        name = [NSString stringWithFormat:@"New theme %ld", counter++];
-    }
-    newObj.name = name;
+    newObj.name = [Theme unusedNameBasedOn:@"New theme" inContext:self.managedObjectContext];
     newObj.defaultParent = self.selectedTheme;
     return newObj;
 }
 
 - (Theme *)findThemeByName:(NSString *)name {
-
-    if (!name)
-        return nil;
-
-    NSFetchRequest *fetchRequest = [[NSFetchRequest alloc] init];
-    NSArray *fetchedObjects;
-    NSError *error;
-    fetchRequest.entity = [NSEntityDescription entityForName:@"Theme" inManagedObjectContext:self.managedObjectContext];
-    fetchRequest.predicate = [NSPredicate predicateWithFormat:@"name like[c] %@", name];
-    fetchRequest.includesPropertyValues = NO;
-    fetchedObjects = [self.managedObjectContext executeFetchRequest:fetchRequest error:&error];
-
-    if (fetchedObjects == nil || fetchedObjects.count == 0) {
-        return nil;
-    }
-
-    return fetchedObjects[0];
+    return [Fetches findTheme:name inContext:self.managedObjectContext];
 }
 
 - (Theme *)selectedTheme {

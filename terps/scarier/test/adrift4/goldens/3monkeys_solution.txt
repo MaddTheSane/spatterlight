@@ -1,0 +1,126 @@
+quiet
+stand up
+get hook
+# SEEN-MODEL RE-DERIVE (2026-08-24): a dynamic object lying loose in a room
+# is not referenceable until something LISTS it -- the Runner stamps the seen
+# byte in its room lister, not once a turn.  Measured live in run400
+# (Adrift_22_xfiles.txt, The X-Files): `take knife` in a room entered through a
+# ShowRoomDesc=0 task answers "Take what?" although the knife is on the floor.
+# The flint stone is a loose dynamic and nothing has listed the hut yet.  The
+# turn is paid for by dropping the `z` that used to follow: the mandrill's walk
+# step lands on the `look` instead, so the route is turn-for-turn unchanged.
+look
+get stone
+x bed
+look in bed
+get all from bed
+put the sheet over my head
+ne
+get fork
+sw
+make fire
+turn on fan
+put blanket in fire
+turn fan north
+n
+get banana
+throw banana on platform
+s
+z
+get bucket
+turn fan east
+e
+tie cord to hook
+throw cord over bar
+lift bucket with fork
+put bucket on hook
+z
+z
+z
+z
+z
+z
+z
+chimp, get coconut
+turn fan northeast
+ne
+get coconut
+hit coconut with stone
+get husk
+z
+give coconut to chimp
+z
+z
+z
+z
+z
+z
+chimp, put coconut on trough
+lift trough with fork
+s
+push up gate
+w
+# The husk is still lying in the NE corner.  run400 fetches it from there
+# ("(Taking the coconut husk first)", runner_transcripts/); Scarier
+# deliberately does not (2026-10-17), so walk over and carry it back.
+ne
+get husk
+sw
+put husk in fire
+lift husk with fork
+turn fan east
+e
+burn cord with torch
+put out torch
+put fork in gate
+z
+get cord
+tie cord to me
+w
+get sheet
+put the sheet over my head
+n
+throw stone at nest
+s
+get mattress
+e
+throw mattress through gate
+z
+z
+z
+z
+z
+z
+z
+z
+z
+z
+z
+z
+z
+z
+z
+z
+z
+z
+z
+z
+z
+z
+z
+z
+z
+z
+z
+w
+hide under bed
+z
+z
+z
+z
+z
+z
+get out
+e
+tie cord to me
+jump out

@@ -1,3 +1,6 @@
+#ifndef GLKIMP_PROTOCOL
+#define GLKIMP_PROTOCOL
+
 #define GLKBUFSIZE (1024 * 64)
 
 struct message
@@ -22,6 +25,13 @@ struct drawrect
 {
     glsi32 x, y;
     glui32 width, height, style;
+    /* Glk 0.7.6 (GLK_MODULE_IMAGE2) scaling rule. 0 = legacy draw call
+       (glk_image_draw / glk_image_draw_scaled): width/height are final
+       pixel sizes and the pre-0.7.6 behaviour is kept. Nonzero = a
+       glk_image_draw_scaled_ext() imagerule; width/height are then that
+       rule's raw arguments and maxwidth is the fixed-point ($10000 = 1.0)
+       window-width bound, resolved (and re-resolved on resize) app-side. */
+    glui32 imagerule, maxwidth;
 };
 
 struct settings_struct
@@ -55,10 +65,12 @@ struct settings_struct
     int z6_colorize;
     int determinism;
     int error_handling;
+    int comprehend_graphics;
     int force_arrange;
 };
 
-void sendmsg_glk(int msg, int a1, int a2, int a3, int a4, int a5, size_t len, char *buf);
+void sendmsg_glk(int msg, int a1, int a2, int a3, int a4, int a5, size_t len, const char *buf);
+/* buf must have room for GLKBUFSIZE + 1 bytes; the payload is NUL-terminated. */
 void readmsg(struct message *msgbuf, char *buf);
 
 enum
@@ -145,5 +157,11 @@ enum
 	EVTVOLUME,
 
     EVTPREFS,
-    EVTQUIT
+    EVTQUIT,
+    EVTTEST,
+    /* The window server is about to close the game: autosave now, whatever
+       the terp's own autosave pacing says, then ask for the next event. */
+    EVTAUTOSAVE
 };
+
+#endif

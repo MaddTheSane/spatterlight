@@ -35,17 +35,15 @@
 - (instancetype)initWithCoder:(NSCoder *)decoder {
     self = [super init];
     if (self) {
-    _pos = (NSUInteger)[decoder decodeIntegerForKey:@"pos"];
-    _bounds = [decoder decodeRectForKey:@"bounds"];
-    recalc = [decoder decodeBoolForKey:@"recalc"];
+        _pos = (NSUInteger)[decoder decodeIntegerForKey:@"pos"];
+        _bounds = NSZeroRect;
+        recalc = YES;
     }
     return self;
 }
 
 - (void)encodeWithCoder:(NSCoder *)encoder {
     [encoder encodeInteger:(NSInteger)_pos forKey:@"pos"];
-    [encoder encodeRect:_bounds forKey:@"bounds"];
-    [encoder encodeBool:recalc forKey:@"recalc"];
 }
 
 - (NSRect)boundsWithLayout:(NSLayoutManager *)layout {
@@ -62,7 +60,7 @@
         theline = [layout lineFragmentRectForGlyphAtIndex:ourglyph.location
                                            effectiveRange:nil];
 
-        _bounds = NSMakeRect(0, theline.origin.y, FLT_MAX, theline.size.height);
+        _bounds = NSMakeRect(0, theline.origin.y, CGFLOAT_MAX, theline.size.height);
 
         /* invalidate our fake layout *after* we set the bounds ... to avoid
          * infiniloop */

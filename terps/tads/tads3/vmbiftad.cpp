@@ -369,25 +369,20 @@ public:
         }
         else
         {
-            /* allocate a buffer */
             char *buf = new char[len];
-
-            /* make sure we delete the allocated buffer */
             err_try
             {
-                /* get the state into our buffer */
                 get_state_buf(buf);
-
-                /* create a ByteArray from the state vector */
                 val->set_obj(CVmObjByteArray::create_from_bytes(
                     vmg_ FALSE, buf, len));
             }
-            err_finally
+            err_catch_disc
             {
-                /* done with the buffer */
                 delete [] buf;
+                err_rethrow();
             }
             err_end;
+            delete [] buf;
         }
     }
 
@@ -411,21 +406,19 @@ public:
             if (cnt != len)
                 err_throw(VMERR_BAD_VAL_BIF);
 
-            /* retrieve the bytes and restore the state */
             char *buf = new char[len];
             err_try
             {
-                /* retrieve the bytes */
                 barr->copy_to_buf((unsigned char *)buf, 1, len);
-
-                /* restore the state */
                 put_state_buf(buf);
             }
-            err_finally
+            err_catch_disc
             {
                 delete [] buf;
+                err_rethrow();
             }
             err_end;
+            delete [] buf;
         }
     }
 
@@ -1189,13 +1182,14 @@ public:
          *   the list.  Otherwise, generate a character according to our
          *   character class code.  
          */
-        wchar_t outc;
+        wchar_t outc = L'\0';
         if (listChars != 0)
         {
             /* pick a random index in our range */
             wchar_t n = (wchar_t)rand_range(rng_next(vmg0_), listChars);
 
             /* find the range containing this character */
+            int picked = FALSE;
             for (RandStrNode *chi = firstChild ; chi != 0 ;
                  chi = chi->nextSibling)
             {
@@ -1206,12 +1200,20 @@ public:
                 if (n <= r->c2 - r->c1)
                 {
                     outc = r->c1 + n;
+                    picked = TRUE;
                     break;
                 }
 
                 /* deduct the size of this range from the index */
                 n -= (r->c2 - r->c1 + 1);
             }
+
+            /*
+             *   if we didn't pick a character, something's wrong - return
+             *   without generating anything
+             */
+            if (!picked)
+                return;
         }
         else if (isLit)
         {
@@ -1694,24 +1696,20 @@ void CVmBifTADS::rand(VMG_ uint argc)
         tpl += VMB_LEN;
 
 #if 1
-        /* parse it */
         RandStrParser *rsp = new RandStrParser(tpl, tplbytes);
-
+        vm_val_t ret;
         err_try
         {
-            /* generate the string */
-            vm_val_t ret;
             rsp->exec(vmg_ &ret);
-
-            /* return it */
-            retval(vmg_ &ret);
         }
-        err_finally
+        err_catch_disc
         {
-            /* delete our parser on the way out */
             delete rsp;
+            err_rethrow();
         }
         err_end;
+        delete rsp;
+        retval(vmg_ &ret);
         
 #else
         /* figure its character length */
@@ -2513,6 +2511,8 @@ void CVmBifTADS::re_match(VMG_ uint argc)
     else
     {
         /* match the pattern to the regular expression string */
+        if (pat_str == 0)
+            err_throw(VMERR_STRING_VAL_REQD);
         match_len = G_bif_tads_globals->rex_searcher->
                     compile_and_match(pat_str + VMB_LEN, vmb_get_len(pat_str),
                                       str + VMB_LEN, p.getptr(), len);
@@ -2623,6 +2623,8 @@ template<int dir> inline void CVmBifTADS::re_search_common(VMG_ uint argc)
     else
     {
         /* try finding the regular expression string pattern */
+        if (pat_str == 0)
+            err_throw(VMERR_STRING_VAL_REQD);
         match_idx =
             (dir > 0
              ? G_bif_tads_globals->rex_searcher->compile_and_search(
@@ -3928,7 +3930,7 @@ struct bpwriter
              *   Roman numeral value from the remaining number balance until
              *   we reach zero
              */
-            for (int ri = 0 ; i != 0 && ri < countof(r) ; )
+            for (size_t ri = 0 ; i != 0 && ri < countof(r) ; )
             {
                 /* if this one fits, append this Roman numeral */
                 if (r[ri].val <= i)

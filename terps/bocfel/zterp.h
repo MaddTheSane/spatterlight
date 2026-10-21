@@ -24,7 +24,7 @@ private:
 
 extern std::string game_file;
 
-#define ZTERP_VERSION	"2.2.3"
+#define ZTERP_VERSION	"2.6"
 
 // v3
 constexpr uint8_t FLAGS1_STATUSTYPE  = 1U << 1;
@@ -45,7 +45,7 @@ constexpr uint8_t FLAGS1_TIMED    = 1U << 7;
 
 constexpr uint16_t FLAGS2_TRANSCRIPT = 1U << 0;
 constexpr uint16_t FLAGS2_FIXED      = 1U << 1;
-constexpr uint16_t FLAGS2_STATUS     = 1U << 2;
+constexpr uint16_t FLAGS2_REDRAW     = 1U << 2;
 constexpr uint16_t FLAGS2_PICTURES   = 1U << 3;
 constexpr uint16_t FLAGS2_UNDO       = 1U << 4;
 constexpr uint16_t FLAGS2_MOUSE      = 1U << 5;
@@ -73,8 +73,8 @@ struct Header {
     uint32_t file_length;
     uint8_t  serial[6];
     uint16_t checksum;
-    uint32_t R_O;
-    uint32_t S_O;
+    uint32_t routines_offset;
+    uint32_t strings_offset;
     uint16_t terminating_characters_table;
     uint16_t extension_table;
     uint16_t extension_entries;
@@ -88,14 +88,10 @@ extern std::array<uint8_t, 26 * 3> atable;
 extern int pixversion;
 #endif
 
-#ifdef ZTERP_GLK_BLORB
-extern int zterp_blorb_expected_release;
-extern std::array<uint8_t, 6> zterp_blorb_expected_serial;
-#endif
-
 const std::string &get_story_id();
 
 enum class Game {
+    AMFV,
     Arthur,
     Infocom1234,
     Journey,
@@ -108,7 +104,11 @@ enum class Game {
     MadBomber,
 #endif
     ZorkZero,
+    ZorkZeroDOS,
     MysteriousAdventures,
+#ifdef SPATTERLIGHT
+    MysteriousAdventuresInline,
+#endif
 };
 
 bool is_game(Game game);

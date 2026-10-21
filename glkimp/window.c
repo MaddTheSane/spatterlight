@@ -24,84 +24,50 @@ void gli_windows_rearrange(void);
 
 window_t *gli_new_window(glui32 type, glui32 rock)
 {
-    window_t *win = (window_t *)malloc(sizeof(window_t));
+    switch (type)
+    {
+        case wintype_Blank:
+        case wintype_Pair:
+        case wintype_TextGrid:
+        case wintype_TextBuffer:
+        case wintype_Graphics:
+            break;
+        default:
+            /* Unknown window type -- do not print a warning, just return 0
+             to indicate that it's not possible. */
+            return 0;
+    }
+
+    /* Zeroed: no requests, no parent, no line buffer or terminators */
+    window_t *win = (window_t *)calloc(1, sizeof(window_t));
     if (!win) {
         gli_strict_warning("gli_new_window: malloc error. Failed to create new window");
         return NULL;
     }
 
     win->peer = -1;
-    win->tag = generate_tag(); /* For serialization */
-
-    switch (type)
+    if (type == wintype_TextGrid || type == wintype_TextBuffer || type == wintype_Graphics)
     {
-        case wintype_Blank:
-            break;
-        case wintype_TextGrid:
-            win->peer = win_newwin(wintype_TextGrid);
-            if (win->peer == -1)
-            {
-                gli_strict_warning("gli_new_window: failed to create peer window");
-                free(win);
-                return 0;
-            }
-            break;
-        case wintype_TextBuffer:
-            win->peer = win_newwin(wintype_TextBuffer);
-            if (win->peer == -1)
-            {
-                gli_strict_warning("gli_new_window: failed to create peer window");
-                free(win);
-                return 0;
-            }
-            break;
-        case wintype_Graphics:
-            win->background = 0x00ffffff;
-            win->peer = win_newwin(wintype_Graphics);
-            if (win->peer == -1)
-            {
-                gli_strict_warning("gli_new_window: failed to create peer window");
-                free(win);
-                return 0;
-            }
-            break;
-        case wintype_Pair:
-            break;
-        default:
-            /* Unknown window type -- do not print a warning, just return 0
-             to indicate that it's not possible. */
+        win->peer = win_newwin(type);
+        if (win->peer == -1)
+        {
+            gli_strict_warning("gli_new_window: failed to create peer window");
             free(win);
             return 0;
+        }
     }
+    if (type == wintype_Graphics)
+        win->background = 0x00ffffff;
 
-    win->magicnum = MAGIC_WINDOW_NUM;
+    win->tag = generate_tag(); /* For serialization */
     win->rock = rock;
     win->type = type;
-
-    win->echostr = NULL;
-
-    win->parent = NULL; /* for now */
-    memset(&win->pair, 0, sizeof(win->pair));
-    memset(&win->line, 0, sizeof(win->line));
-
-    win->char_request = FALSE;
-    win->char_request_uni = FALSE;
-    win->line_request = FALSE;
-    win->line_request_uni = FALSE;
-    win->mouse_request = FALSE;
-    win->hyper_request = FALSE;
-    win->echo_line_input = FALSE;
-    win->line_terminators = NULL;
-    win->termct = 0;
-    win->line.buf = NULL;
-    win->line.len = 0;
+    win->echo_line_input = TRUE; /* Glk default: the library echoes line input */
 
     win->style = style_Normal;
 
     win->str = gli_stream_open_window(win);
-    win->echostr = NULL;
 
-    win->prev = NULL;
     win->next = gli_windowlist;
     gli_windowlist = win;
     if (win->next)
@@ -150,8 +116,6 @@ void gli_delete_window(window_t *win)
         (*gli_unregister_obj)(win, gidisp_Class_Window, win->disprock);
         win->disprock.ptr = NULL;
     }
-
-    win->magicnum = 0;
 
     /* Close window's stream. */
     if (win->str != NULL) {
@@ -244,6 +208,12 @@ winid_t glk_window_open(winid_t splitwin,
     {
         /* create pairwin, with newwin as the key */
         pairwin = gli_new_window(wintype_Pair, 0);
+        if (!pairwin)
+        {
+            gli_strict_warning("window_open: unable to create pair window");
+            gli_delete_window(newwin);
+            return 0;
+        }
 
         pairwin->pair.dir = method & winmethod_DirMask;
         pairwin->pair.division = method & winmethod_DivisionMask;
@@ -504,7 +474,6 @@ void glk_window_get_size(window_t *win, glui32 *width, glui32 *height)
         return;
     }
 
-//    fprintf(stderr, "glk_window_get_size: window %d\n", win->tag);
 
     switch (win->type)
     {
@@ -525,8 +494,6 @@ void glk_window_get_size(window_t *win, glui32 *width, glui32 *height)
                 wid = round(((win->bbox.x1 - win->bbox.x0) - gbuffermarginx * 2 - LINE_FRAGMENT_PADDING) / gbufcellw);
             if (win->bbox.y0 + gbuffermarginy * 2 <= win->bbox.y1)
                 hgt = round(((win->bbox.y1 - win->bbox.y0) - gbuffermarginy * 2) / gbufcellh);
-//            fprintf(stderr, "wintype_TextBuffer: width: bbox.x1(%d) - bbox.x0:(%d) / gcellw (%f) = %d\n", win->bbox.x1, win->bbox.x0, gbufcellw, wid);
-//            fprintf(stderr, "height: ( bbox.y1(%d) - bbox.y0:(%d) ) - gbuffermarginy (%d) * 2 / gbufcellh (%f) = %d\n", win->bbox.y1, win->bbox.y0, gbuffermarginy, gbufcellh, hgt);
             break;
         case wintype_Graphics:
             wid = win->bbox.x1 - win->bbox.x0;
@@ -558,12 +525,10 @@ window_t *gli_window_for_peer(int peer)
 
 window_t *gli_window_for_tag(int tag)
 {
-    /* fprintf(stderr, "gli_window_for_tag: looking for window with tag %d\n", tag);*/
 
     window_t *win = gli_windowlist;
     while (win)
     {
-        /* fprintf(stderr, "Found window with tag %d\n", win->tag); */
         if (win->tag == tag)
             return win;
         win = win->next;
@@ -614,12 +579,11 @@ winid_t glk_window_get_root(void)
                 return win;
             }
             if (win->parent == NULL) {
-                fprintf(stderr, "glk_window_get_root: found window with no parent, but win->peer was %d\n", win->peer);
+                gli_debug_log("glk_window_get_root: found window with no parent, but win->peer was %d\n", win->peer);
             }
         }
-        fprintf(stderr, "glk_window_get_root: no root window found\n");
-        if (gli_windowlist == NULL)
-            fprintf(stderr, "because there are no windows\n");
+        gli_debug_log("glk_window_get_root: no root window found%s\n",
+                      gli_windowlist ? "" : ", because there are no windows");
         return NULL;
     }
     return gli_rootwin;
@@ -661,7 +625,7 @@ glui32 glk_window_get_type(window_t *win)
 {
     if (!win)
     {
-        gli_strict_warning("window_get_parent: invalid ref");
+        gli_strict_warning("window_get_type: invalid ref");
         return 0;
     }
     return win->type;
@@ -735,7 +699,6 @@ void gli_windows_unechostream(stream_t *str)
 
 void gli_window_rearrange(window_t *win, grect_t *box)
 {
-//    fprintf(stderr, "gli_window_rearrange win %d box x0:%u y0:%u x1:%u y1:%u\n", win->peer, box->x0, box->y0, box->x1, box->y1);
     win->bbox = *box;
 
     switch (win->type)
@@ -900,6 +863,12 @@ void gli_windows_rearrange(void)
 
 void gli_init_line_event(window_t *win, void *buf, int maxlen, int initlen)
 {
+    if (initlen > maxlen)
+    {
+        gli_strict_warning("request_line_event: initlen exceeds maxlen");
+        initlen = maxlen;
+    }
+
     win_initline(win->peer, maxlen, initlen, buf);
 
     win->line.buf = buf;
@@ -909,41 +878,30 @@ void gli_init_line_event(window_t *win, void *buf, int maxlen, int initlen)
     if (gli_register_arr)
         win->line.inarrayrock = (*gli_register_arr)(buf, maxlen, win->line_request_uni ? "&+#!Iu" : "&+#!Cn");
 
-    if (win->line_request_uni)
-        ((glui32*)buf)[initlen] = 0;
-    else
-        ((char*)buf)[initlen] = 0;
+    /* Terminate the pre-loaded text when there is room for it; the buffer is
+       exactly maxlen characters, so a full one cannot be terminated. */
+    if (initlen < maxlen)
+    {
+        if (win->line_request_uni)
+            ((glui32*)buf)[initlen] = 0;
+        else
+            ((char*)buf)[initlen] = 0;
+    }
 }
 
 void gli_cancel_line_event(window_t *win, event_t *ev)
 {
-    win_cancelline(win->peer, win->line.cap, &win->line.len, win->line.buf);
+    win->line.len = win_cancelline(win->peer, win->line.cap, win->line_request_uni, win->line.buf);
 
-    unsigned short *unicharbuf = (unsigned short *)win->line.buf;
-    glui32 *tempbuf = malloc(win->line.len * sizeof(glui32));
-    for (int i = 0; i < win->line.len; i++) {
-        tempbuf[i] = unicharbuf[i];
-    }
-
-    if (win->line_request_uni)
+    if (win->echostr)
     {
-        glui32 *unicode = win->line.buf;
-        for (int i = 0; i < win->line.len; i++)
-            unicode[i] = tempbuf[i];
-        if (win->echostr)
+        if (win->line_request_uni)
             gli_stream_echo_line_uni(win->echostr, win->line.buf, win->line.len);
-    }
-    else
-    {
-        unsigned char *latin1 = win->line.buf;
-        for (int i = 0; i < win->line.len; i++)
-            latin1[i] = tempbuf[i] < 0x100 ? tempbuf[i] : '?';
-        if (win->echostr)
+        else
             gli_stream_echo_line(win->echostr, win->line.buf, win->line.len);
     }
-    free(tempbuf);
 
-    win->str->readcount +=  win->line.len;
+    win->str->readcount += win->line.len;
 
     if (gli_unregister_arr)
         (*gli_unregister_arr)(win->line.buf, win->line.cap, win->line_request_uni ? "&+#!Iu" : "&+#!Cn", win->line.inarrayrock);
@@ -980,7 +938,9 @@ void glk_request_char_event(window_t *win)
     if (win->char_request || win->line_request)
     {
         gli_strict_warning("request_char_event: window already has keyboard request");
-//        return;
+        /* The spec says to return here, but Adrian Mole and Dead Cities
+           re-request without cancelling, and expect the new request to
+           take (commit 95bbadfe1). */
     }
 
     switch (win->type)
@@ -1007,12 +967,12 @@ void glk_request_line_event(window_t *win, char *buf, glui32 maxlen, glui32 init
         return;
     }
 
-//    fprintf(stderr, "%s window %d requesting  line event\n", win->type == wintype_TextGrid ? "Grid" : "Buffer", win->peer);
-
     if (win->char_request || win->line_request)
     {
         gli_strict_warning("request_line_event: window already has keyboard request");
-//        return;
+        /* The spec says to return here, but Adrian Mole and Dead Cities
+           re-request without cancelling, and expect the new request to
+           take (commit 95bbadfe1). */
     }
 
     switch (win->type)
@@ -1046,7 +1006,8 @@ void glk_request_char_event_uni(window_t *win)
 
     if (win->char_request)
     {
-        fprintf(stderr, "ERROR! request_char_event_uni: window %d already has character request\n",  win->peer);
+        /* Allowed, as for the narrow version above */
+        gli_debug_log("request_char_event_uni: window %d already has character request\n", win->peer);
     }
 
     switch (win->type)
@@ -1271,22 +1232,8 @@ void gli_window_put_char(window_t *win, unsigned chr)
     {
         case wintype_TextBuffer:
         case wintype_TextGrid:
-            if (chr <= 0xffff) {
-                // This is a UCS-2 character
-                win_print(win->peer, chr, win->style);
-            } else if (chr <= 0x10ffff) {
-                // This is a character that can be represented by a surrogate pair
-                // 000uuuuuxxxxxxxxxxxxxxxx -> 110110wwwwxxxxxx 110111xxxxxxxxxx (wwww = uuuuu-1)
-                win_flush();
-                int w = (chr >> 16) - 1;
-                int x = (chr & 0xffff);
-                win_print(win->peer, 0xd800 | (w << 6) | (x >> 10), win->style);
-                win_print(win->peer, 0xdc00 | (x & 0x3ff), win->style);
-            } else {
-                // This is a UCS-4 character outside the range of allowed unicode values
-                win_print(win->peer, 0xfffd, win->style);
-            }
-
+            /* win_print takes care of the UTF-16 encoding. */
+            win_print(win->peer, chr, win->style);
             break;
     }
 }
@@ -1348,9 +1295,7 @@ void gli_replace_window_list(window_t *newlist) /* Only used by autorestore */
         while (gli_windowlist)
         {
             win = gli_windowlist;
-            //#ifdef DEBUG
-            fprintf(stderr, "gli_replace_window_list: Deleted a window with tag:%d \n",win->tag);
-            //#endif /*DEBUG*/
+            gli_debug_log("gli_replace_window_list: Deleted a window with tag:%d \n",win->tag);
             glk_window_close(win, NULL);
         }
     }
@@ -1365,7 +1310,6 @@ void gli_sanity_check_windows(void)
     if (!gli_rootwin && gli_windowlist)
     {
         fprintf(stderr, "sanity_check: no root window but listed windows.\n");
-//        gli_window_set_root(gli_windowlist);
     }
     if (gli_rootwin && !gli_window_for_tag(gli_rootwin->tag))
         fprintf(stderr, "sanity_check: root window not listed\n");

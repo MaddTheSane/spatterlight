@@ -1,4 +1,4 @@
-// Copyright 2010-2021 Chris Spiegel.
+// Copyright 2010-2025 Chris Spiegel.
 //
 // SPDX-License-Identifier: MIT
 
@@ -24,12 +24,18 @@ extern "C" {
 #include "stack.h"
 #include "types.h"
 #include "util.h"
-#include "zoom.h"
 #include "zterp.h"
+
+#ifdef ZTERP_ZOOM_OPCODES
+#include "zoom.h"
+#endif
 
 #ifdef SPATTERLIGHT
 #include "spatterlight-autosave.h"
+#endif
+#if defined(SPATTERLIGHT) || defined(HEADLESS_V6)
 #include "entrypoints.hpp"
+#include "v6_specific.h"
 #endif
 
 unsigned long pc;
@@ -38,14 +44,32 @@ unsigned long current_instruction;
 std::array<uint16_t, 8> zargs;
 int znargs;
 
+uint16_t zarg_or(int n, uint16_t def)
+{
+    if (n < znargs) {
+        return zargs[n];
+    } else {
+        return def;
+    }
+}
+
 // Track the current processing level: 1 for the “main” loop, 2 if
-// inside of an interrupt, 3 if inside of an interrupt inside of an
-// interrupt, and so on.
+// inside of an internal call, 3 if inside of an internal call inside of
+// an internal call, and so on.
 static int processing_level = 0;
+
+// In general an “internal” call is used for interrupts, and saving is
+// not allowed in an interrupt. But the @shogun_menu hack has to use an
+// internal call as well, and in that call, saving must work. This flag
+// indicates that the current internal call is not actually an
+// interrupt. Theoretically this is insufficient because an interrupt
+// could be called while inside of @shogun_menu’s internal call, but
+// that doesn’t actually happen.
+bool interrupt_override = false;
 
 bool in_interrupt()
 {
-    return processing_level > 1;
+    return processing_level > 1 && !interrupt_override;
 }
 
 // Returns true if decoded, false otherwise (omitted)
@@ -71,9 +95,8 @@ static bool decode_base(uint8_t type, uint16_t &loc)
 
 static void decode_var(uint8_t types)
 {
-    uint16_t ret;
-
     for (int i = 6; i >= 0; i -= 2) {
+        uint16_t ret;
         if (!decode_base((types >> i) & 0x03, ret)) {
             return;
         }
@@ -92,17 +115,14 @@ enum class Opcount {
     Ext,
 };
 
-#define op_call(opcode)		opcodes[opcode]()
-#define extended_call(opcode)	ext_opcodes[opcode]()
-
 // This nifty trick is from Frotz.
 static void zextended()
 {
-    uint8_t opnumber = byte(pc++);
+    uint8_t opcode = byte(pc++);
 
     decode_var(byte(pc++));
 
-    extended_call(opnumber);
+    ext_opcodes[opcode]();
 }
 
 [[noreturn]]
@@ -252,17 +272,31 @@ void setup_opcodes()
     setup_single_opcode(5, 6, Opcount::Ext, 0x02, zlog_shift);
     setup_single_opcode(5, 6, Opcount::Ext, 0x03, zart_shift);
     setup_single_opcode(5, 6, Opcount::Ext, 0x04, zset_font);
+#ifndef ZTERP_NO_V6
     setup_single_opcode(6, 6, Opcount::Ext, 0x05, zdraw_picture);
+#if defined(SPATTERLIGHT) || defined(HEADLESS_V6)
+    // picture_data is officially V6-only, but the pre-release V5 builds of Zork
+    // Zero (e.g. r74-s880114, r96-s880224) already emit it — and crucially with
+    // a *branch*. Unregistered EXT opcodes default to znop (see setup_opcodes),
+    // and znop does not consume the branch byte, so the decoder desyncs and dies
+    // on the next "instruction" (the dropped branch byte). Registering the real
+    // branching handler for V5 too lets those builds run. Standard V5 games never
+    // emit EXT:6, so this is inert for them.
+    setup_single_opcode(5, 6, Opcount::Ext, 0x06, zpicture_data);
+#else
     setup_single_opcode(6, 6, Opcount::Ext, 0x06, zpicture_data);
+#endif
     setup_single_opcode(6, 6, Opcount::Ext, 0x07, znop); // XXX erase_picture
     setup_single_opcode(6, 6, Opcount::Ext, 0x08, znop); // XXX set_margins
+#endif
     setup_single_opcode(5, 6, Opcount::Ext, 0x09, zsave_undo);
     setup_single_opcode(5, 6, Opcount::Ext, 0x0a, zrestore_undo);
     setup_single_opcode(5, 6, Opcount::Ext, 0x0b, zprint_unicode);
     setup_single_opcode(5, 6, Opcount::Ext, 0x0c, zcheck_unicode);
     setup_single_opcode(5, 6, Opcount::Ext, 0x0d, zset_true_colour);
-    setup_single_opcode(6, 6, Opcount::Ext, 0x10, znop); // XXX move_window
-    setup_single_opcode(6, 6, Opcount::Ext, 0x11, znop); // XXX window_size
+#ifndef ZTERP_NO_V6
+    setup_single_opcode(6, 6, Opcount::Ext, 0x10, zmove_window);
+    setup_single_opcode(6, 6, Opcount::Ext, 0x11, zwindow_size);
     setup_single_opcode(6, 6, Opcount::Ext, 0x12, zwindow_style);
     setup_single_opcode(6, 6, Opcount::Ext, 0x13, zget_wind_prop);
     setup_single_opcode(6, 6, Opcount::Ext, 0x14, znop); // XXX scroll_window
@@ -275,25 +309,35 @@ void setup_opcodes()
     setup_single_opcode(6, 6, Opcount::Ext, 0x1b, zmake_menu);
     setup_single_opcode(6, 6, Opcount::Ext, 0x1c, znop); // XXX picture_table
     setup_single_opcode(6, 6, Opcount::Ext, 0x1d, zbuffer_screen);
+#endif
 
+#ifdef ZTERP_ZOOM_OPCODES
     // Zoom extensions.
     setup_single_opcode(5, 6, Opcount::Ext, 0x80, zstart_timer);
     setup_single_opcode(5, 6, Opcount::Ext, 0x81, zstop_timer);
     setup_single_opcode(5, 6, Opcount::Ext, 0x82, zread_timer);
     setup_single_opcode(5, 6, Opcount::Ext, 0x83, zprint_timer);
+#endif
 
-    // Journey hack.
-    setup_single_opcode(6, 6, Opcount::Ext, JOURNEY_DIAL_EXT, zjourney_dial);
+#ifndef SPATTERLIGHT
+#ifndef ZTERP_NO_V6
+    // V6 hacks.
+    if (is_game(Game::Journey)) {
+        setup_single_opcode(6, 6, Opcount::Ext, JOURNEY_DIAL_EXT, zjourney_dial);
+    } else if (is_game(Game::Shogun)) {
+        setup_single_opcode(6, 6, Opcount::Ext, SHOGUN_MENU_EXT, zshogun_menu);
+    }
+#endif
+#endif
 }
 
 // The main processing loop. This decodes and dispatches instructions.
-// It will be called both at program start and whenever a @read or
-// @read_char interrupt routine is called.
+// It will be called both at program start and on an internal call.
 void process_instructions()
 {
     static bool handled_autosave = false;
 
-    if (options.autosave && !handled_autosave) {
+    if (options.autosave && !options.skip_autorestore && !handled_autosave) {
         SaveOpcode saveopcode;
 
         handled_autosave = true;
@@ -301,8 +345,11 @@ void process_instructions()
 #ifdef SPATTERLIGHT
         if (spatterlight_restore_autosave(&saveopcode)) {
 #else
-        if (do_restore(SaveType::Autosave, saveopcode)) {
-            show_message("Continuing last session from autosave");
+        SaveType savetype = options.autosave_librarystate ? SaveType::AutosaveLib : SaveType::Autosave;
+        if (do_restore(savetype, saveopcode)) {
+            if (savetype == SaveType::Autosave) {
+                show_message("Continuing last session from autosave");
+            }
 #endif
             throw Operation::Restore(saveopcode);
         }
@@ -311,19 +358,18 @@ void process_instructions()
     processing_level++;
 
     while (true) {
-        uint8_t opcode;
-
 #ifdef ZTERP_GLK_TICK
         glk_tick();
 #endif
 
         current_instruction = pc;
-#ifdef SPATTERLIGHT
+#if defined(SPATTERLIGHT) || defined(HEADLESS_V6)
+//        fprintf(stderr, "pc == 0x%04lx\n", pc);
         if (is_spatterlight_v6) {
             check_entrypoints(pc);
         }
 #endif
-        opcode = byte(pc++);
+        uint8_t opcode = byte(pc++);
 
         if (opcode < 0x80) { // long 2OP
             znargs = 2;
@@ -353,12 +399,10 @@ void process_instructions()
         } else if (opcode < 0xc0) { // short 0OP (plus EXT)
             znargs = 0;
         } else if (opcode == 0xec || opcode == 0xfa) { // Double variable VAR
-            uint8_t types1, types2;
+            uint8_t types1 = byte(pc++);
+            uint8_t types2 = byte(pc++);
 
             znargs = 0;
-
-            types1 = byte(pc++);
-            types2 = byte(pc++);
             decode_var(types1);
             decode_var(types2);
         } else { // variable 2OP and VAR
@@ -368,8 +412,8 @@ void process_instructions()
         }
 
         try {
-            op_call(opcode);
-        } catch (const Operation::Return &) {
+            opcodes[opcode]();
+        } catch (const Operation::ReturnFromInternal &) {
             processing_level--;
             return;
         }
@@ -394,10 +438,30 @@ void process_loop()
         } catch (const Operation::Restart &) {
             start_story();
         } catch (const Operation::Restore &restore) {
-            if (restore.saveopcode == SaveOpcode::Read) {
+            switch (restore.saveopcode) {
+            case SaveOpcode::None:
+                synthetic_call = nullptr;
+                break;
+            case SaveOpcode::Read:
                 synthetic_call = zread;
-            } else if (restore.saveopcode == SaveOpcode::ReadChar) {
+                break;
+            case SaveOpcode::ReadChar:
                 synthetic_call = zread_char;
+                break;
+            case SaveOpcode::Save:
+                if (zversion < 5) {
+                    synthetic_call = zsave;
+                } else {
+                    synthetic_call = zsave5;
+                }
+                break;
+            case SaveOpcode::Restore:
+                if (zversion < 5) {
+                    synthetic_call = zrestore;
+                } else {
+                    synthetic_call = zrestore5;
+                }
+                break;
             }
 #ifdef SPATTERLIGHT
             v6_restore_hacks();

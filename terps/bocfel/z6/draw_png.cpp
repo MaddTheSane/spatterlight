@@ -1,4 +1,4 @@
-// Copyright 2010-2021 Chris Spiegel.
+// Copyright 2010-2026 Chris Spiegel.
 //
 // This file is part of Bocfel.
 //
@@ -14,17 +14,28 @@
 // You should have received a copy of the GNU General Public License
 // along with Bocfel. If not, see <http://www.gnu.org/licenses/>.
 
+// Minimal PNG decoder for the indexed-color images shipped in the Blorb
+// resources used by Infocom V6 games. Only the chunks we care about (IHDR,
+// PLTE, IDAT, IEND) are inspected, and only bit depths 2 and 4 with paletted
+// color are rendered. The decoded pixels are composited onto a 32-bit RGBA
+// canvas using a gamma-corrected palette.
+
 extern "C" {
+#include <cstdio>
 #include <zlib.h>
 #include <math.h>
 #include "glkimp.h"
 }
+
+#include <algorithm>
+#include <memory>
 
 #include "iff.h"
 #include "draw_png.h"
 #include "draw_image.hpp"
 #include "zterp.h"
 
+// Set to 1 to enable verbose chunk/header/palette logging on stderr.
 #define DEBUG_PNG 0
 
 #define debug_png_print(fmt, ...)                    \
@@ -33,9 +44,9 @@ if (DEBUG_PNG)                       \
 fprintf(stderr, fmt, ##__VA_ARGS__); \
 } while (0)
 
-extern float imagescalex;
-extern float imagescaley;
-
+// One PNG chunk as it appears on disk: a 32-bit big-endian length, a
+// 4-byte FourCC type, a pointer into the source buffer for the chunk's
+// payload, and a 32-bit CRC trailer.
 struct png_chunk {
     uint32_t length;
     uint32_t type;
@@ -43,6 +54,7 @@ struct png_chunk {
     uint32_t crc;
 };
 
+// Decoded fields of the PNG IHDR chunk.
 struct png_header {
     uint32_t width;
     uint32_t height;
@@ -53,114 +65,194 @@ struct png_header {
     uint8_t interlace_method;
 };
 
-uint8_t global_palette[16 * 3];
+// Number of entries in `global_palette`. Color indices >= this are treated
+// as out of range by set_pixel().
+static constexpr int kMaxPaletteEntries = 16;
 
-static struct png_header pngheader;
+static const int kBytesPerColor = 3;
 
-static uint8_t *decompress_idat(uint8_t *data, size_t datalength, size_t max_output_size)
+// The most chunks read_png() looks at in one PNG.
+static constexpr int kMaxChunks = 64;
+
+// The chunk types read_png() and decompress_idat() look for.
+static const uint32_t kIHDR = IFF::TypeID("IHDR").val();
+static const uint32_t kPLTE = IFF::TypeID("PLTE").val();
+static const uint32_t kIDAT = IFF::TypeID("IDAT").val();
+static const uint32_t kIEND = IFF::TypeID("IEND").val();
+
+// Active 16-entry RGB palette used by set_pixel. Populated by
+// extract_palette() (defined elsewhere) or extract_palette_from_png_data().
+uint8_t global_palette[kMaxPaletteEntries * kBytesPerColor];
+
+// zlib-inflate the image data into a freshly allocated buffer of exactly
+// max_output_size bytes. The zlib stream may be split across several
+// consecutive IDAT chunks starting at chunks[first_idat]; they are fed to
+// zlib in order. (read_png only reports chunks that lie wholly inside the
+// file and has verified that the chunk list ends with IEND, so the walk
+// below always terminates within the parsed chunks.) If *produced is non-null
+// it receives the number of bytes zlib actually decoded; a truncated or
+// corrupt stream produces fewer than max_output_size bytes. The buffer is
+// zero-initialized so any tail zlib never wrote reads as palette index 0
+// (transparent) rather than garbage.
+static std::unique_ptr<uint8_t[]> decompress_idat(struct png_chunk *chunks, int first_idat, size_t max_output_size, size_t *produced)
 {
-    char* output = new char[max_output_size];
+    std::unique_ptr<uint8_t[]> output(new uint8_t[max_output_size]());  // () => zero-initialized
+    if (produced != nullptr)
+        *produced = 0;
 
     z_stream infstream;
     infstream.zalloc = Z_NULL;
     infstream.zfree = Z_NULL;
     infstream.opaque = Z_NULL;
-    infstream.avail_in = (unsigned)datalength; // size of input
-    infstream.next_in = (Bytef *)data; // input char array
+    infstream.avail_in = 0;
+    infstream.next_in = Z_NULL;
     infstream.avail_out = (unsigned)max_output_size; // size of output
-    infstream.next_out = (Bytef *)output; // output char array
+    infstream.next_out = output.get();
 
-    inflateInit2(&infstream, MAX_WBITS|0x20);
-    inflate(&infstream, Z_NO_FLUSH);
+    if (inflateInit2(&infstream, MAX_WBITS|0x20) != Z_OK)
+        return output;  // all-zero buffer; nothing decoded
+
+    int ret = Z_OK;
+    for (int i = first_idat; chunks[i].type == kIDAT; i++) {
+        if (chunks[i].length == 0)
+            continue;
+        infstream.avail_in = (unsigned)chunks[i].length;
+        infstream.next_in = (Bytef *)chunks[i].data;
+        ret = inflate(&infstream, Z_NO_FLUSH);
+        if (ret != Z_OK)
+            break;
+    }
+    // Z_OK / Z_STREAM_END are the success cases; anything else (Z_DATA_ERROR,
+    // Z_BUF_ERROR, ...) means the stream was truncated or corrupt, but
+    // total_out still reflects the valid prefix decoded so far.
+    if (produced != nullptr && (ret == Z_OK || ret == Z_STREAM_END || ret == Z_BUF_ERROR || ret == Z_DATA_ERROR))
+        *produced = infstream.total_out;
+
     inflateEnd(&infstream);
 
-    return (uint8_t *)output;
+    return output;
 }
 
+// Read a big-endian 32-bit integer from ptr starting at byte offset index.
 static uint32_t read32be(uint8_t *ptr, int index) { return (static_cast<uint32_t>(ptr[index]) << 24) | (static_cast<uint32_t>(ptr[index + 1]) << 16) | (static_cast<uint32_t>(ptr[index + 2]) <<  8) | (static_cast<uint32_t>(ptr[index + 3]) <<  0);
 }
 
-static bool read_png(uint8_t *data, size_t datalength, struct png_chunk *chunks, int *dataidx, int *palidx) {
+// Parse the PNG signature and walk the chunk table, recording each chunk
+// in `chunks` (caller-provided, must hold at least kMaxChunks entries) and
+// filling in `header` from the IHDR chunk.
+//
+// On success, *idat_index is set to the index of the first IDAT chunk, and (if
+// non-null) *plte_index is set to the PLTE chunk index, or -1 if absent.
+// Returns false if the data is too short, not a PNG, has a missing IHDR
+// or IEND, or has a truncated chunk.
+static bool read_png(uint8_t *png_data, size_t png_size, struct png_chunk *chunks, int *idat_index, int *plte_index, struct png_header *header) {
+    static const uint8_t kPNGSignature[8] = {0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a};
+    static const size_t kSignatureSize = 8;
+    static const size_t kChunkHeaderSize = 8;
+    static const size_t kChunkCRCSize = 4;
+    static const size_t kIHDRDataSize = 13;
 
-    *dataidx = -1;
-    if (palidx != nullptr)
-        *palidx = -1;
-
-    if (datalength <= 16)
+    if (png_data == nullptr || idat_index == nullptr)
         return false;
-    uint8_t *ptr = data;
-    if (ptr[0] != 0x89 ||
-        ptr[1] != 0x50 ||
-        ptr[2] != 0x4e ||
-        ptr[3] != 0x47 ||
-        ptr[4] != 0x0d ||
-        ptr[5] != 0x0a ||
-        ptr[6] != 0x1a ||
-        ptr[7] != 0x0a) {
+
+    *idat_index = -1;
+    if (plte_index != nullptr)
+        *plte_index = -1;
+
+    if (png_size < kSignatureSize + kChunkHeaderSize)
+        return false;
+
+    if (memcmp(png_data, kPNGSignature, kSignatureSize) != 0) {
         debug_png_print("Not a png!\n");
         return false;
     }
 
-    ptr += 8;
+    uint8_t *read_ptr = png_data + kSignatureSize;
+    uint8_t *data_end = png_data + png_size;
 
-    int i;
+    int chunk_count;
+    for (chunk_count = 0; chunk_count < kMaxChunks; chunk_count++) {
+        size_t bytes_remaining = (size_t)(data_end - read_ptr);
+        if (bytes_remaining < kChunkHeaderSize)
+            break;
 
-    for (i = 0; i < 64 && ptr - data < datalength; i++) {
-        chunks[i].length = read32be(ptr, 0);
-        chunks[i].type = read32be(ptr, 4);
-        debug_png_print("Chunk %d is of type 0x%08x (%c%c%c%c)\n", i, chunks[i].type, ptr[4], ptr[5], ptr[6], ptr[7]);
-        if (chunks[i].type == IFF::TypeID("IDAT").val())
-            *dataidx = i;
-        if (palidx != nullptr && chunks[i].type == IFF::TypeID("PLTE").val())
-            *palidx = i;
-        if (chunks[i].type == IFF::TypeID("gAMA").val()) {
-//            int gamma = read32be(ptr, 8);
-//            debug_png_print("Found gAMA chunk with value %d (%f)\n", gamma, 1/((double)gamma / 100000.0));
-        }
-        chunks[i].data = &ptr[8];
-        ptr = ptr + 8 + chunks[i].length;
-        chunks[i].crc = read32be(ptr, 0);
-        ptr += 4;
+        chunks[chunk_count].length = read32be(read_ptr, 0);
+        chunks[chunk_count].type = read32be(read_ptr, 4);
+        debug_png_print("Chunk %d is of type 0x%08x (%c%c%c%c)\n", chunk_count, chunks[chunk_count].type, read_ptr[4], read_ptr[5], read_ptr[6], read_ptr[7]);
+
+        chunks[chunk_count].data = &read_ptr[kChunkHeaderSize];
+
+        // Verify chunk data + CRC fits within the file
+        size_t chunk_payload = (size_t)chunks[chunk_count].length + kChunkCRCSize;
+        if (bytes_remaining - kChunkHeaderSize < chunk_payload)
+            break;
+
+        // Only record a chunk once it is known to fit, so the indices never
+        // refer to a truncated chunk (which is not counted in chunk_count).
+        if (chunks[chunk_count].type == kIDAT && *idat_index == -1)
+            *idat_index = chunk_count;
+        if (plte_index != nullptr && chunks[chunk_count].type == kPLTE)
+            *plte_index = chunk_count;
+
+        read_ptr += kChunkHeaderSize + chunks[chunk_count].length;
+        chunks[chunk_count].crc = read32be(read_ptr, 0);
+        read_ptr += kChunkCRCSize;
     }
 
-    if (i < 2) {
+    if (chunk_count < 2) {
         debug_png_print("Bad PNG Data\n");
         return false;
     }
 
-    int l = i - 1;
+    int last_chunk = chunk_count - 1;
 
-    if (chunks[l].type != IFF::TypeID("IEND").val()) {
-        debug_png_print("IEND chunk not found! Wanted 0x%08x, got 0x%08x!\n",IFF::TypeID("IEND").val(), chunks[l].type);
+    if (chunks[last_chunk].type != kIEND) {
+        debug_png_print("IEND chunk not found! Wanted 0x%08x, got 0x%08x!\n", kIEND, chunks[last_chunk].type);
         return false;
     } else {
         debug_png_print("IEND chunk found!\n");
     }
 
-    if (chunks[0].type != IFF::TypeID("IHDR").val()) {
-        debug_png_print("IHDR chunk not found! Wanted 0x%08x, got 0x%08x!\n",IFF::TypeID("IHDR").val(), chunks[0].type);
+    if (chunks[0].type != kIHDR) {
+        debug_png_print("IHDR chunk not found! Wanted 0x%08x, got 0x%08x!\n", kIHDR, chunks[0].type);
         return false;
     }
 
-    ptr = chunks[0].data;
-    pngheader.width = read32be(ptr, 0);
-    debug_png_print("Width: %d\n", pngheader.width);
-    pngheader.height = read32be(ptr, 4);
-    debug_png_print("Height: %d\n", pngheader.height);
-    pngheader.bit_depth = ptr[8];
-    debug_png_print("Bit depth: %d\n", pngheader.bit_depth);
-    pngheader.colour_type = ptr[9];
-    debug_png_print("Colour type: %d\n", pngheader.colour_type);
-    pngheader.compression_method = ptr[10];
-    debug_png_print("Compression method: %d\n", pngheader.compression_method);
-    pngheader.filter_method = ptr[11];
-    debug_png_print("Filter method: %d\n", pngheader.filter_method);
-    pngheader.interlace_method = ptr[12];
-    debug_png_print("Interlace method: %d\n", pngheader.interlace_method);
+    if (chunks[0].length < kIHDRDataSize)
+        return false;
+
+    uint8_t *ihdr_data = chunks[0].data;
+    header->width = read32be(ihdr_data, 0);
+    debug_png_print("Width: %d\n", header->width);
+    header->height = read32be(ihdr_data, 4);
+    debug_png_print("Height: %d\n", header->height);
+
+    // Reject absurd dimensions up front, using the same cap image_alloc()
+    // applies to every other decoder. Infocom V6 artwork is tiny; capping both
+    // axes well below the point where width*height*4 could overflow a 32-bit
+    // int keeps every downstream size computation from wrapping.
+    if (header->width == 0 || header->height == 0 ||
+        header->width > (uint32_t)kMaxImageDimension || header->height > (uint32_t)kMaxImageDimension) {
+        debug_png_print("Rejecting PNG with dimensions %u x %u\n", header->width, header->height);
+        return false;
+    }
+    header->bit_depth = ihdr_data[8];
+    debug_png_print("Bit depth: %d\n", header->bit_depth);
+    header->colour_type = ihdr_data[9];
+    debug_png_print("Colour type: %d\n", header->colour_type);
+    header->compression_method = ihdr_data[10];
+    debug_png_print("Compression method: %d\n", header->compression_method);
+    header->filter_method = ihdr_data[11];
+    debug_png_print("Filter method: %d\n", header->filter_method);
+    header->interlace_method = ihdr_data[12];
+    debug_png_print("Interlace method: %d\n", header->interlace_method);
 
     return true;
 }
 
+// Convert a single 0..255 color sample from the gamma-1.8 space used by the
+// Infocom V6 artwork to approximate sRGB (gamma ~2.2), so the palette colors
+// look correct on modern displays.
 static int adjust_gamma(int intValue) {
     float theLinearValue = (float)intValue / 256.0f;
 
@@ -169,55 +261,69 @@ static int adjust_gamma(int intValue) {
     return theLinearValue <= 0.0031308f ? (int)(theLinearValue * 12.92f * 256) : (int)((powf (theLinearValue, 1.0f/x) * 1.055f - 0.055f) * 256) ;
 }
 
-uint8_t *extract_palette_from_png_data(uint8_t *data, size_t length) {
-    struct png_chunk chunks[64];
-    int dataidx, palidx;
-    if (read_png(data, length, chunks, &dataidx, &palidx) == false || palidx == -1)
+// Allocate and return a gamma-corrected 16-entry RGB palette (48 bytes,
+// caller frees with free()) from the PLTE chunk of the given PNG. Returns
+// nullptr if the PNG has no PLTE, the PLTE length isn't a multiple of 3,
+// or memory allocation fails. Excess entries beyond 16 are ignored; fewer
+// than 16 entries leaves the trailing slots zeroed.
+uint8_t *extract_palette_from_png_data(uint8_t *png_data, size_t png_size) {
+    struct png_chunk chunks[kMaxChunks];
+    struct png_header header;
+    int idat_index, plte_index;
+    if (!read_png(png_data, png_size, chunks, &idat_index, &plte_index, &header) || plte_index == -1)
         return nullptr;
-    if (chunks[palidx].length % 3 != 0)
+    if (chunks[plte_index].length % kBytesPerColor != 0)
         return nullptr;
-    int numcolors = chunks[palidx].length / 3;
-    debug_png_print("Constructing palette with %d entries\n", numcolors);
-    uint8_t local_palette[16][3];
-    for (int i = 0; i < chunks[palidx].length; i += 3) {
-        int index = i / 3;
-        local_palette[index][0] = adjust_gamma(chunks[palidx].data[i]);
-        local_palette[index][1] = adjust_gamma(chunks[palidx].data[i + 1]);
-        local_palette[index][2] = adjust_gamma(chunks[palidx].data[i + 2]);
-        debug_png_print("Palette %d: red 0x%x green 0x%x blue 0x%x\n", index, local_palette[index][0], local_palette[index][1], local_palette[index][2]);
+
+    int color_count = chunks[plte_index].length / kBytesPerColor;
+    if (color_count > kMaxPaletteEntries)
+        color_count = kMaxPaletteEntries;
+
+    debug_png_print("Constructing palette with %d entries\n", color_count);
+
+    uint8_t *palette = (uint8_t *)calloc(kMaxPaletteEntries, kBytesPerColor);
+    if (palette == nullptr)
+        return nullptr;
+
+    for (int color_index = 0; color_index < color_count; color_index++) {
+        int offset = color_index * kBytesPerColor;
+        palette[offset + 0] = adjust_gamma(chunks[plte_index].data[offset + 0]);
+        palette[offset + 1] = adjust_gamma(chunks[plte_index].data[offset + 1]);
+        palette[offset + 2] = adjust_gamma(chunks[plte_index].data[offset + 2]);
+        debug_png_print("Palette %d: red 0x%x green 0x%x blue 0x%x\n", color_index, palette[offset], palette[offset + 1], palette[offset + 2]);
     }
-    uint8_t *result = (uint8_t *)calloc(16, 3);
-    if (result != nullptr) {
-        memcpy(result, local_palette, numcolors * 3);
-    }
-    return result;
+
+    return palette;
 }
 
-static uint8_t *set_pixel(int palval, uint8_t *ptr) {
-    if (palval >= palentries) {
-        return ptr + 4;
-    }
-    if (palval != 0) {
-        int index = palval * 3;
-        *ptr++ = global_palette[index++]; // Red
-        *ptr++ = global_palette[index++]; // Green
-        *ptr++ = global_palette[index];   // Blue
-        *ptr++ = 0xff; // Fully opaque
-    } else {
-        ptr += 4;
-    }
-    return ptr;
+// Write one fully-opaque RGBA pixel at write_ptr using global_palette entry
+// color_index. Index 0 is treated as transparent (left untouched), as are
+// indices that fall outside the active palette.
+static void set_pixel(int color_index, uint8_t *write_ptr) {
+    if (color_index <= 0 || color_index >= kMaxPaletteEntries)
+        return;
+    int palette_offset = color_index * kBytesPerColor;
+    write_ptr[0] = global_palette[palette_offset + 0];
+    write_ptr[1] = global_palette[palette_offset + 1];
+    write_ptr[2] = global_palette[palette_offset + 2];
+    write_ptr[3] = 0xff;
 }
 
-static bool draw_indexed_png(uint8_t **pixmapptr, int *pixmapsize, int pixwidth, int x, int y, uint8_t *data, size_t datasize, bool flipped) {
+// Decode the indexed PNG at png_data into `canvas`, an RGBA buffer of
+// canvas_size bytes and image_width pixels to the row, using global_palette
+// for color lookup. Only bit depths 2 and 4 are supported. Returns false on
+// malformed PNG data or an unsupported bit depth.
+static bool draw_indexed_png(uint8_t *canvas, size_t canvas_size, int image_width, uint8_t *png_data, size_t png_size) {
 
-    struct png_chunk chunks[64];
+    struct png_chunk chunks[kMaxChunks];
+    struct png_header pngheader;
 
-    int dataidx, xpos, ypos;
+    int idat_index;
 
-    bool result = read_png(data, datasize, chunks, &dataidx, nullptr);
+    if (!read_png(png_data, png_size, chunks, &idat_index, nullptr, &pngheader))
+        return false;
 
-    if (!result)
+    if (idat_index < 0)
         return false;
 
     if (pngheader.bit_depth != 2 && pngheader.bit_depth != 4) {
@@ -225,72 +331,63 @@ static bool draw_indexed_png(uint8_t **pixmapptr, int *pixmapsize, int pixwidth,
         return false;
     }
 
-    uint8_t *pixmap = *pixmapptr;
+    // The canvas has the size the image table gives the picture. That is
+    // read from this same header, but clip to it all the same.
+    int width = std::min((int)pngheader.width, image_width);
 
-    int newsize = pixwidth * (y + pngheader.height) * 4;
-    if (*pixmapsize < newsize) {
-        uint8_t *temp = (uint8_t *)calloc(1, newsize);
-        memcpy(temp, pixmap, *pixmapsize);
-        *pixmapsize = newsize;
-        free(pixmap);
-        pixmap = temp;
-    }
+    int pixels_per_byte = 8 / pngheader.bit_depth;
 
-    int bits_per_col = 8 / pngheader.bit_depth;
+    // One filter byte plus the packed pixels, rounded up to a whole byte.
+    int row_stride = 1 + ((int)pngheader.width * pngheader.bit_depth + 7) / 8;
 
-    int stride = pngheader.width / bits_per_col + 1 + (pngheader.width % 2);
+    size_t decompressed_size = (size_t)row_stride * pngheader.height;
+    debug_png_print("Needed space for image data: %zu\n", decompressed_size);
 
-    size_t needed = stride * pngheader.height;
-    debug_png_print("Needed space for image data: %zu\n", needed);
+    size_t produced = 0;
+    std::unique_ptr<uint8_t[]> decompressed = decompress_idat(chunks, idat_index, decompressed_size, &produced);
 
-    uint8_t *inflate_output = decompress_idat(chunks[dataidx].data, chunks[dataidx].length, needed);
+    // Only iterate over bytes zlib actually decoded; the rest of the buffer is
+    // zeroed (transparent) rather than indeterminate, but there's no reason to
+    // walk it.
+    for (size_t byte_index = 0; byte_index < produced; byte_index++) {
+        int draw_y = (int)(byte_index / row_stride);
 
-    uint8_t *pixptr;
-
-    for (int i = 0; i < needed; i++) {
-        ypos = y + (i / stride);
-        if (flipped)
-            ypos = pngheader.height + y - ypos - 1;
-        
-        xpos = x + (i % stride - 1) * bits_per_col;
-
-        // Skip the "filter" byte at the start of each row
-        if (xpos < x || xpos > pngheader.width + x)
+        // Column of the first pixel packed in this byte; -1 * pixels_per_byte
+        // for the filter byte at the start of each row, which is skipped.
+        int column = ((int)(byte_index % row_stride) - 1) * pixels_per_byte;
+        if (column < 0)
             continue;
-        if (ypos >= pngheader.height + y || ypos < y)
-            break;
-        uint8_t nibble = inflate_output[i] >> (8 - pngheader.bit_depth);
-        pixptr = &pixmap[(ypos * pixwidth + xpos) * 4];
-        if (pixptr - pixmap + 4 > *pixmapsize)
-            break;
-        set_pixel(nibble, pixptr);
-        pixptr = &pixmap[(ypos * pixwidth + xpos + 1) * 4];
-        uint8_t nibble2;
-        if (pngheader.bit_depth == 4) {
-            nibble2 = inflate_output[i] & 0xf;
-        } else {
-            nibble2 = (inflate_output[i] >> 4) & 3;
-            set_pixel(nibble2, pixptr);
-            pixptr = &pixmap[(ypos * pixwidth + xpos + 2) * 4];
-            nibble2 = (inflate_output[i] >> 2) & 3;
-            set_pixel(nibble2, pixptr);
-            pixptr = &pixmap[(ypos * pixwidth + xpos + 3) * 4];
-            nibble2 = inflate_output[i] & 3;
+
+        // Unpack the pixels in this byte, most significant bits first. The
+        // last byte of a row may carry padding bits beyond the image width;
+        // those are not pixels and must not be drawn.
+        for (int i = 0; i < pixels_per_byte; i++) {
+            int draw_x = column + i;
+            if (draw_x >= width)
+                break;
+
+            size_t offset = ((size_t)draw_y * image_width + draw_x) * kBytesPerPixel;
+            if (offset + kBytesPerPixel > canvas_size)
+                break;
+
+            int shift = 8 - pngheader.bit_depth * (i + 1);
+            int color_index = (decompressed[byte_index] >> shift) & ((1 << pngheader.bit_depth) - 1);
+            set_pixel(color_index, &canvas[offset]);
         }
-        set_pixel(nibble2, pixptr);
     }
-    *pixmapptr = pixmap;
     return true;
 }
 
-uint8_t *draw_png(ImageStruct *image, bool use_previous_palette) {
-    int32_t pixmapsize = image->width * image->height * 4;
-    uint8_t *pixmap = (uint8_t *)calloc(1, pixmapsize);
-    if (!use_previous_palette)
-        extract_palette(image);
-    if (draw_indexed_png(&pixmap, &pixmapsize, image->width, 0, 0, image->data, image->datasize, false) == false) {
-        free(pixmap);
-        pixmap = nullptr;
-    }
-    return pixmap;
+// Top-level entry: allocate a fresh RGBA pixmap sized to the image and
+// render the PNG into it with the colors of global_palette (the caller loads
+// the image's own palette there first if it wants that). Returns nullptr on
+// failure; the caller frees the result.
+uint8_t *draw_png(ImageStruct *image) {
+    size_t pixmapsize = 0;
+    ImageBuf rgba(image_alloc(image->width, image->height, kBytesPerPixel, &pixmapsize));
+    if (rgba == nullptr)
+        return nullptr;
+    if (!draw_indexed_png(rgba.get(), pixmapsize, image->width, image->data, image->datasize))
+        return nullptr;
+    return rgba.release();
 }

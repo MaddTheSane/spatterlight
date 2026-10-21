@@ -1,0 +1,2565 @@
+//
+//  GameImportXCTests.m
+//  SpatterlightTests
+//
+//   Tests for importing game files into the Core Data database
+//
+
+#import <XCTest/XCTest.h>
+#import <CoreData/CoreData.h>
+
+#import "TableViewController.h"
+#import "GameImporter.h"
+#import "GameLauncher.h"
+#import "GlkController.h"
+#import "CommandScriptHandler.h"
+#import "GlkController+Autorestore.h"
+#import "Game.h"
+#import "Theme.h"
+#import "Metadata.h"
+#import "CoreDataManager.h"
+#import "Fetches.h"
+#import "ProgressiveMigrator.h"
+#import "NSString+Categories.h"
+#import "BuiltInThemes.h"
+#import "GlkTextBufferWindow.h"
+#import "BufferTextView.h"
+#import "GlkGraphicsWindow.h"
+#import "MarginContainer.h"
+#import "MarginImage.h"
+#import "PreferencesPrivate.h"
+#import "Constants.h"
+#import <BlorbFramework/BlorbFramework.h>
+#import <BlorbFramework/BlorbFramework-Swift.h>
+#include "glk.h"
+
+// Little helpers for hand-assembling Blorb test fixtures.
+static void blorbAppendFourCC(NSMutableData *data, const char *fourCC) {
+    [data appendBytes:fourCC length:4];
+}
+
+static void blorbAppendBE32(NSMutableData *data, uint32_t value) {
+    uint8_t bytes[4] = {
+        (uint8_t)(value >> 24), (uint8_t)(value >> 16),
+        (uint8_t)(value >> 8),  (uint8_t)value
+    };
+    [data appendBytes:bytes length:4];
+}
+
+@interface GameImportXCTests : XCTestCase
+
+@property (nonatomic, strong) CoreDataManager *coreDataManager;
+@property (nonatomic, strong) TableViewController *tableViewController;
+@property (nonatomic, strong) NSManagedObjectContext *testContext;
+@property (nonatomic) BOOL originalCloseAlertSuppression;
+
+// Helper methods
++ (NSURL *)tempDir;
+- (NSURL *)cursesGameFileURL;
+- (NSURL *)commandScriptFileURLForGame:(NSString *)gameName;
+- (void)deleteGameAtPath:(NSString *)path;
+- (NSUInteger)currentGameCount;
+- (Game *)fetchGameAtPath:(NSString *)path;
+- (void)observeImportCompletionWithInitialCount:(NSUInteger)initialCount
+                                      gameFileURL:(NSURL *)gameFileURL
+                                   fetchRequest:(NSFetchRequest *)fetchRequest
+                                     onComplete:(void (^)(Game *importedGame))completionBlock;
+- (void)verifyGame:(Game *)game hasPath:(NSString *)path;
+- (GameImporter *)createGameImporter;
+- (GameLauncher *)createAndSetupGameLauncher;
+- (void)importAndRunGameFile:(NSString *)gameFileName
+           commandScriptName:(NSString *)scriptName;
+- (void)importAndRunGameFile:(NSString *)gameFileName
+           commandScriptName:(NSString *)scriptName
+      keepScrollbackTrimming:(BOOL)keepTrimming;
+
+@end
+
+@implementation GameImportXCTests
+
+- (void)setUp {
+    [super setUp];
+
+    // Without this, closing a game that is still running puts up the
+    // "abandon the game?" sheet instead: the window stays open after the
+    // test and the interpreter log is never finished.
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    _originalCloseAlertSuppression = [defaults boolForKey:kCloseAlertSuppressionKey];
+    [defaults setBool:YES forKey:kCloseAlertSuppressionKey];
+
+    // Interpreters inherit the app's environment. Start Scarier with its map
+    // showing, rather than as the player last left it in each game, so the
+    // ADRIFT logs don't depend on the machine and do cover the map.
+    setenv("SCR_MAP_ENABLED", "1", 1);
+
+    // Set up an in-memory Core Data stack for testing
+    [self setUpInMemoryCoreDataStack];
+
+    // Initialize TableViewController
+    self.tableViewController = [[TableViewController alloc] init];
+
+    // Without this it falls back to the app delegate's manager, i.e. the real
+    // library, for saves the importer makes outside the test context.
+    self.tableViewController.coreDataManager = self.coreDataManager;
+
+    // Set the test context on the table view controller
+    // This ensures it uses our in-memory database instead of the real one
+    if ([self.tableViewController respondsToSelector:@selector(setManagedObjectContext:)]) {
+        [self.tableViewController setValue:self.testContext forKey:@"managedObjectContext"];
+    }
+
+    // Initialize other required properties
+    if ([self.tableViewController respondsToSelector:@selector(setGameTableModel:)]) {
+        [self.tableViewController setValue:[NSMutableArray new] forKey:@"gameTableModel"];
+    }
+
+    if ([self.tableViewController respondsToSelector:@selector(setGameSessions:)]) {
+        [self.tableViewController setValue:[NSMutableDictionary new] forKey:@"gameSessions"];
+    }
+
+    self.tableViewController.currentlyAddingGames = YES;
+}
+
+- (void)tearDown {
+    self.tableViewController = nil;
+    self.testContext = nil;
+    self.coreDataManager = nil;
+
+    [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"LogInterpreterOutput"];
+    [[NSUserDefaults standardUserDefaults] setBool:_originalCloseAlertSuppression forKey:kCloseAlertSuppressionKey];
+    unsetenv("SCR_MAP_ENABLED");
+
+    [super tearDown];
+}
+
+- (void)setUpInMemoryCoreDataStack {
+    // A private in-memory store per test. initWithModelName: would open the
+    // real on-disk library -- the one the host app has open too -- so tests
+    // would read and write the user's games and race the app's own stack.
+    self.coreDataManager = [[CoreDataManager alloc] initInMemoryWithModelName:@"Spatterlight"];
+    self.testContext = self.coreDataManager.mainManagedObjectContext;
+    XCTAssertNotNil(self.testContext, @"In-memory Core Data stack should load");
+}
+
+#pragma mark - Helper Methods
+
+// Get the URL for curses.z5 in the test bundle
+- (NSURL *)cursesGameFileURL {
+    return [self gameFileURLForFileNamed:@"curses.z5"];
+}
+
+// Get the URL for the file name in the test bundle
+- (NSURL *)gameFileURLForFileNamed:(NSString *)fileName {
+    NSBundle *bundle = [NSBundle bundleForClass:[self class]];
+    NSString *name = [fileName stringByDeletingPathExtension];
+    NSString *extension = [fileName pathExtension];
+    NSURL *gameFileURL = [bundle URLForResource:name withExtension:extension];
+    XCTAssertNotNil(gameFileURL, @"%@should exist in Supporting Files", fileName);
+    XCTAssertTrue([[NSFileManager defaultManager] fileExistsAtPath:gameFileURL.path],
+                  @"%@ file should be accessible", fileName);
+    return gameFileURL;
+}
+
+// Get the URL for the command script file in the test bundle
+- (NSURL *)commandScriptFileURLForGame:(NSString *)gameName {
+    NSString *fileName = [NSString stringWithFormat:@"%@ command script", gameName];
+    NSBundle *bundle = [NSBundle bundleForClass:[self class]];
+    return [bundle URLForResource:fileName withExtension:@"txt"];
+}
+
++ (NSURL *)tempDir {
+    NSURL *usersURL = [NSURL fileURLWithPath:@"/Users"
+                                 isDirectory:YES];
+
+    NSError *error = nil;
+
+    NSURL *tempURL = [[NSFileManager defaultManager] URLForDirectory:NSItemReplacementDirectory
+                                                            inDomain:NSUserDomainMask
+                                                   appropriateForURL:usersURL
+                                                              create:YES
+                                                               error:&error];
+    if (error)
+        NSLog(@"tempDir: Error: %@", error);
+
+    return tempURL;
+}
+
+// Delete a game at the given path if it exists
+- (void)deleteGameAtPath:(NSString *)path {
+    NSFetchRequest *gameFetch = [Game fetchRequest];
+    NSString *hash = [path signatureFromFile];
+    gameFetch.predicate = [NSPredicate predicateWithFormat:@"hashTag == %@", hash];
+
+    NSError *error = nil;
+    NSArray<Game *> *results = [self.testContext executeFetchRequest:gameFetch error:&error];
+    
+    XCTAssertNil(error, @"Should be able to fetch games for deletion");
+    
+    if (results.count) {
+        [self.testContext deleteObject:results.firstObject];
+        NSError *saveError = nil;
+        [self.testContext save:&saveError];
+        XCTAssertNil(saveError, @"Should be able to save after deletion");
+    }
+}
+
+// Get the current count of games in the database
+- (NSUInteger)currentGameCount {
+    NSFetchRequest *fetchRequest = [Game fetchRequest];
+    NSError *error = nil;
+    NSUInteger count = [self.testContext countForFetchRequest:fetchRequest error:&error];
+    XCTAssertNil(error, @"Should be able to count games");
+    return count;
+}
+
+// Fetch a game at the given path
+- (Game *)fetchGameAtPath:(NSString *)path {
+    NSFetchRequest *gameFetch = [Game fetchRequest];
+    gameFetch.predicate = [NSPredicate predicateWithFormat:@"path == %@", path];
+    
+    NSError *error = nil;
+    NSArray<Game *> *results = [self.testContext executeFetchRequest:gameFetch error:&error];
+    
+    XCTAssertNil(error, @"Should be able to fetch game");
+    return results.firstObject;
+}
+
+// Observe import completion and call the completion block when done
+- (void)observeImportCompletionWithInitialCount:(NSUInteger)initialCount
+                                      gameFileURL:(NSURL *)gameFileURL
+                                     fetchRequest:(NSFetchRequest *)fetchRequest
+                                       onComplete:(void (^)(Game *importedGame))completionBlock {
+    
+    __block id observer = [[NSNotificationCenter defaultCenter] 
+        addObserverForName:NSManagedObjectContextDidSaveNotification
+                    object:self.testContext
+                     queue:nil
+                usingBlock:^(NSNotification * _Nonnull note) {
+        // Verify on the context's queue to avoid priority inversion
+        [self.testContext performBlock:^{
+            NSError *countError = nil;
+            NSUInteger finalCount = [self.testContext countForFetchRequest:fetchRequest error:&countError];
+            
+            if (finalCount > initialCount) {
+                // Import completed, remove observer
+                [[NSNotificationCenter defaultCenter] removeObserver:observer];
+                
+                XCTAssertNil(countError, @"Should be able to count games after import");
+                XCTAssertEqual(finalCount, initialCount + 1, @"One game should have been added");
+                
+                // Fetch the imported game
+                Game *game = [self fetchGameAtPath:gameFileURL.path];
+                XCTAssertNotNil(game, @"Should be able to fetch the imported game");
+                
+                if (game && completionBlock) {
+                    completionBlock(game);
+                }
+            }
+        }];
+    }];
+}
+
+// Verify standard game properties
+- (void)verifyGame:(Game *)game hasPath:(NSString *)path {
+    XCTAssertEqualObjects(game.path, path, @"Game path should match");
+    XCTAssertNotNil(game.metadata, @"Game should have metadata");
+    XCTAssertTrue(game.found, @"Game should be marked as found");
+    // The launcher picks the interpreter from this, so it must be the format
+    // babel reported and not, say, a string read from a released babel context.
+    XCTAssertEqualObjects(game.detectedFormat, game.metadata.format,
+                          @"Game should have the format it was detected as");
+    
+    if (game.metadata) {
+        XCTAssertNotNil(game.metadata.title, @"Game should have a title");
+        XCTAssertTrue(game.metadata.title.length > 0, @"Game title should not be empty");
+    }
+}
+
+// Create a GameImporter instance
+- (GameImporter *)createGameImporter {
+    return [[GameImporter alloc] initWithTableViewController:self.tableViewController];
+}
+
+// Create and setup a GameLauncher instance
+- (GameLauncher *)createAndSetupGameLauncher {
+    GameLauncher *launcher = [[GameLauncher alloc] initWithTableViewController:self.tableViewController];
+    
+    // Set the launcher on the table view controller
+    if ([self.tableViewController respondsToSelector:@selector(setGameLauncher:)]) {
+        [self.tableViewController setValue:launcher forKey:@"gameLauncher"];
+    }
+    
+    return launcher;
+}
+
++ (NSString *)comparisonLogFor:(NSString *)name {
+    name = [NSString stringWithFormat:@"%@ log output", name];
+
+    NSBundle *bundle = [NSBundle bundleForClass:[self class]];
+
+    NSURL *url = [bundle URLForResource:name
+                              withExtension:@"txt"
+                               subdirectory:nil];
+
+    XCTAssertNotNil(url, @"%@ should exist in Supporting Files", name);
+
+    NSError *error = nil;
+    NSString *facit = [NSString stringWithContentsOfURL:url encoding:NSUTF8StringEncoding error:&error];
+    if (error)
+        NSLog(@"Error: %@", error);
+    return facit;
+}
+
+// A resource registered from a plain file (glkimp fileresource.c) is numbered
+// by a hash of its absolute path, which for a test game lies inside this
+// checkout's DerivedData folder. Replace those numbers (bit 30 set, bit 31
+// clear) with a placeholder so a facit isn't tied to one machine. Blorb
+// resource numbers are small and are left alone. LOADIMAGE and LOADSOUND
+// carry the path of the file to load, so their payload length is replaced too.
++ (NSString *)normalizedProtocolLog:(NSString *)log {
+    static NSRegularExpression *regex;
+    static NSRegularExpression *loadRegex;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        regex = [NSRegularExpression
+                 regularExpressionWithPattern:@"^(\\[MSG\\] cmd=(?:FINDIMAGE|LOADIMAGE|PURGEIMG|FINDSOUND|LOADSOUND) a1=)(\\d+)"
+                 options:NSRegularExpressionAnchorsMatchLines
+                 error:nil];
+        loadRegex = [NSRegularExpression
+                     regularExpressionWithPattern:@"^(\\[MSG\\] cmd=(?:LOADIMAGE|LOADSOUND) .* len=)\\d+$"
+                     options:NSRegularExpressionAnchorsMatchLines
+                     error:nil];
+    });
+
+    NSMutableString *result = [log mutableCopy];
+    NSArray<NSTextCheckingResult *> *matches = [regex matchesInString:log options:0 range:NSMakeRange(0, log.length)];
+    // Replace back to front so earlier ranges stay valid.
+    for (NSTextCheckingResult *match in matches.reverseObjectEnumerator) {
+        NSRange numberRange = [match rangeAtIndex:2];
+        long long number = [log substringWithRange:numberRange].longLongValue;
+        if (number >= 0x40000000LL && number <= 0x7fffffffLL)
+            [result replaceCharactersInRange:numberRange withString:@"<fileresource>"];
+    }
+    [loadRegex replaceMatchesInString:result options:0
+                                range:NSMakeRange(0, result.length)
+                         withTemplate:@"$1<path>"];
+    return result;
+}
+
+#pragma mark - Tests
+
+- (void)testImportCursesGameFile {
+    XCTestExpectation *importExpectation = [self expectationWithDescription:@"Game import completes"];
+
+    // Get the game file URL
+    NSURL *gameFileURL = [self cursesGameFileURL];
+    
+    // Delete any existing copy
+    [self deleteGameAtPath:gameFileURL.path];
+    
+    // Get initial game count
+    NSUInteger initialCount = [self currentGameCount];
+    NSFetchRequest *fetchRequest = [Game fetchRequest];
+
+    // Create GameImporter
+    GameImporter *importer = [self createGameImporter];
+
+    // Observe import completion
+    [self observeImportCompletionWithInitialCount:initialCount
+                                        gameFileURL:gameFileURL
+                                       fetchRequest:fetchRequest
+                                         onComplete:^(Game *game) {
+        // Verify game properties
+        [self verifyGame:game hasPath:gameFileURL.path];
+        
+        NSLog(@"Successfully imported game: %@", game.metadata.title);
+        [importExpectation fulfill];
+    }];
+
+    // Set up options (with images and download)
+    NSDictionary *options = @{
+        @"lookForImages": @(YES),
+        @"downloadInfo": @(YES),
+        @"context": self.testContext
+    };
+
+    // Import the game
+    [importer addFiles:@[gameFileURL] options:options];
+
+    // Wait for expectations with a longer timeout for network operations
+    [self waitForExpectationsWithTimeout:10.0 handler:^(NSError * _Nullable error) {
+        if (error) {
+            XCTFail(@"Import operation timed out: %@", error);
+        }
+    }];
+}
+
+- (void)testImportCursesWithoutImages {
+    XCTestExpectation *importExpectation = [self expectationWithDescription:@"Game import without images"];
+
+    // Get the game file URL
+    NSURL *gameFileURL = [self cursesGameFileURL];
+    
+    // Delete any existing copy
+    [self deleteGameAtPath:gameFileURL.path];
+    
+    // Get initial game count
+    NSUInteger initialCount = [self currentGameCount];
+    NSFetchRequest *fetchRequest = [Game fetchRequest];
+
+    // Create GameImporter
+    GameImporter *importer = [self createGameImporter];
+
+    // Observe import completion
+    [self observeImportCompletionWithInitialCount:initialCount
+                                        gameFileURL:gameFileURL
+                                       fetchRequest:fetchRequest
+                                         onComplete:^(Game *game) {
+        XCTAssertNotNil(game, @"Game should be imported");
+        [importExpectation fulfill];
+    }];
+
+    // Set up options (no images, no download)
+    NSDictionary *options = @{
+        @"lookForImages": @(NO),
+        @"downloadInfo": @(NO),
+        @"context": self.testContext
+    };
+
+    [importer addFiles:@[gameFileURL] options:options];
+
+    [self waitForExpectationsWithTimeout:10.0 handler:^(NSError * _Nullable error) {
+        if (error) {
+            XCTFail(@"Import operation timed out: %@", error);
+        }
+    }];
+}
+
+- (void)testImportAndStartCursesGame {
+    XCTestExpectation *importExpectation = [self expectationWithDescription:@"Game import completes"];
+    XCTestExpectation *gameStartExpectation = [self expectationWithDescription:@"Game starts running"];
+    XCTestExpectation *commandScriptExpectation = [self expectationWithDescription:@"Command script completes"];
+
+    // Get file URLs
+    NSURL *gameFileURL = [self cursesGameFileURL];
+    NSURL *scriptURL = [self commandScriptFileURLForGame:@"ScottFree"];
+
+    // Delete any existing copy
+    [self deleteGameAtPath:gameFileURL.path];
+    
+    // Get initial game count
+    NSUInteger initialCount = [self currentGameCount];
+    NSFetchRequest *fetchRequest = [Game fetchRequest];
+
+    // Create GameImporter and GameLauncher
+    GameImporter *importer = [self createGameImporter];
+    GameLauncher *launcher = [self createAndSetupGameLauncher];
+
+    // Observe command script completion notification
+    __block id scriptObserver = [[NSNotificationCenter defaultCenter] 
+        addObserverForName:GlkCommandScriptDidCompleteNotification
+                    object:nil
+                     queue:[NSOperationQueue mainQueue]
+                usingBlock:^(NSNotification *note) {
+        // Command script has completed
+        NSLog(@"Command script completed successfully");
+        
+        // Get the game controller to verify it's still running
+        GlkController *glkController = nil;
+        for (GlkController *controller in self.tableViewController.gameSessions.allValues) {
+            if (controller.isAlive) {
+                glkController = controller;
+                break;
+            }
+        }
+        
+        if (glkController) {
+            XCTAssertTrue(glkController.isAlive, @"Game should still be running after command script");
+            
+            // Clean up: close the game window
+            [glkController.window performClose:nil];
+        }
+        
+        [commandScriptExpectation fulfill];
+        [[NSNotificationCenter defaultCenter] removeObserver:scriptObserver];
+    }];
+
+    // Observe import completion
+    [self observeImportCompletionWithInitialCount:initialCount
+                                        gameFileURL:gameFileURL
+                                       fetchRequest:fetchRequest
+                                         onComplete:^(Game *game) {
+        // Verify game properties
+        [self verifyGame:game hasPath:gameFileURL.path];
+        [importExpectation fulfill];
+        
+        // Now try to start the game
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NSWindow *gameWindow = [launcher playGame:game restorationHandler:nil];
+            
+            // Give the game a moment to initialize
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                XCTAssertNotNil(gameWindow, @"Game window should be created");
+                
+                // Check if the game is actually running
+                GlkController *glkController = self.tableViewController.gameSessions[game.hashTag];
+                XCTAssertNotNil(glkController, @"GlkController should be created");
+                
+                if (glkController) {
+                    XCTAssertTrue(glkController.isAlive, @"Game should be running");
+                    XCTAssertNotNil(glkController.window, @"Game window should exist");
+                    
+                    NSLog(@"Successfully started game: %@", game.metadata.title);
+                    [gameStartExpectation fulfill];
+                    
+                    // Run command script if available
+                    if (scriptURL) {
+                        NSLog(@"Running command script: %@", scriptURL.path);
+                        
+                        // Start once the game waits for input. The scriptObserver
+                        // fulfils commandScriptExpectation when the
+                        // GlkCommandScriptDidComplete notification is posted.
+                        [self runCommandsFromFile:scriptURL.path
+                              whenInputReadyIn:glkController
+                                        attempts:100];
+                    } else {
+                        NSLog(@"No command script found, skipping");
+                        [[NSNotificationCenter defaultCenter] removeObserver:scriptObserver];
+                        [commandScriptExpectation fulfill];
+                        
+                        // Clean up: close the game window
+                        [glkController.window performClose:nil];
+                    }
+                } else {
+                    [gameStartExpectation fulfill];
+                    [[NSNotificationCenter defaultCenter] removeObserver:scriptObserver];
+                    [commandScriptExpectation fulfill];
+                }
+            });
+        });
+    }];
+
+    // Set up options (no images/download to speed up test)
+    NSDictionary *options = @{
+        @"lookForImages": @(NO),
+        @"downloadInfo": @(NO),
+        @"context": self.testContext
+    };
+
+    // Import the game
+    [importer addFiles:@[gameFileURL] options:options];
+
+    // Wait for expectations with a longer timeout for game startup and command script
+    [self waitForExpectationsWithTimeout:30.0 handler:^(NSError * _Nullable error) {
+        [[NSNotificationCenter defaultCenter] removeObserver:scriptObserver];
+        if (error) {
+            XCTFail(@"Test timed out: %@", error);
+        }
+    }];
+}
+
+// Polls every 0.1 s until a game window has a pending line or char request,
+// then runs the command script on that game's own handler.
+//
+// A game that never asks for input (Czech, a self-running test suite with an
+// empty script) finishes by itself: when the interpreter exits, terpDidStop
+// posts GlkCommandScriptDidComplete, so the poll just stops. A game still
+// running without asking for input when the attempts run out is a failure,
+// recorded here rather than left to the test's overall timeout.
+- (void)runCommandsFromFile:(NSString *)path
+           whenInputReadyIn:(GlkController *)glkController
+                   attempts:(NSUInteger)attempts {
+    if (!glkController.alive)
+        return;
+    NSDictionary<NSFileAttributeKey, id> *attributes =
+        [[NSFileManager defaultManager] attributesOfItemAtPath:path error:nil];
+    if (attributes.fileSize == 0)
+        return; // Nothing to send; the game runs to its own end.
+    if (glkController.commandScriptHandler.findGlkWindowWithInput) {
+        // Straight to this game's handler: GameLauncher finds "the active
+        // game" through the preferences window, which works on the library's
+        // store and so never sees a game in the test's in-memory one.
+        [glkController.commandScriptHandler runCommandsFromFile:path];
+        return;
+    }
+    if (attempts == 0) {
+        XCTFail(@"%@: game never asked for input, so the command script could not start",
+                path.lastPathComponent);
+        return;
+    }
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [self runCommandsFromFile:path
+                 whenInputReadyIn:glkController
+                         attempts:attempts - 1];
+    });
+}
+
+- (void)importAndRunGameFile:(NSString *)gameFileName
+           commandScriptName:(NSString *)scriptName {
+    [self importAndRunGameFile:gameFileName
+             commandScriptName:scriptName
+        keepScrollbackTrimming:NO];
+}
+
+// Scrollback is UI-only, so the limit never changes a protocol log. These runs
+// turn it off by default: each front trim forces a full relayout of the text
+// kept, about 90 ms (Debug) each, and Fortress of Fear trims 61 times. Pass
+// keepTrimming = YES to run with the theme's limit instead, so the trim path
+// (trimScrollbackIfNeeded:) stays covered by a real game.
+- (void)importAndRunGameFile:(NSString *)gameFileName
+           commandScriptName:(NSString *)scriptName
+      keepScrollbackTrimming:(BOOL)keepTrimming {
+    XCTestExpectation *importExpectation = [self expectationWithDescription:@"Game import completes"];
+    XCTestExpectation *gameStartExpectation = [self expectationWithDescription:@"Game starts running"];
+    XCTestExpectation *commandScriptExpectation = [self expectationWithDescription:@"Command script completes"];
+    XCTestExpectation *logsMatchedExpectation = [self expectationWithDescription:@"Interpreter log output matched"];
+
+    // Get file URLs
+    NSURL *gameFileURL = [self gameFileURLForFileNamed:gameFileName];
+    NSURL *scriptURL = [self commandScriptFileURLForGame:scriptName];
+
+    XCTAssertNotNil(scriptURL, @"%@ should exist in Supporting Files", scriptName);
+
+    // Delete any existing copy
+    [self deleteGameAtPath:gameFileURL.path];
+
+    // Get initial game count
+    NSUInteger initialCount = [self currentGameCount];
+    NSFetchRequest *fetchRequest = [Game fetchRequest];
+
+    // Create GameImporter and GameLauncher
+    GameImporter *importer = [self createGameImporter];
+    GameLauncher *launcher = [self createAndSetupGameLauncher];
+
+    // Store original determinism setting to restore later
+    __block BOOL originalDeterminismSetting = NO;
+    __block BOOL originalSlowDrawSetting = NO;
+    __block BOOL originalAutosaveSetting = NO;
+    __block BOOL originalSADelaysSetting = NO;
+    __block NSURL *tempDir = [GameImportXCTests tempDir];
+    __block Theme *oldtheme = nil;
+
+    // Observe command script completion notification
+    __block id scriptObserver = [[NSNotificationCenter defaultCenter]
+                                 addObserverForName:GlkCommandScriptDidCompleteNotification
+                                 object:nil
+                                 queue:[NSOperationQueue mainQueue]
+                                 usingBlock:^(NSNotification *note) {
+        // Command script has completed
+        NSLog(@"Command script completed successfully");
+
+        // Get the game controller
+        GlkController *glkController = self.tableViewController.gameSessions.allValues.firstObject;
+
+        if (glkController) {
+            Game *game = glkController.game;
+
+            // Clean up: close the game window. This also finishes the log.
+            [glkController.window performClose:nil];
+
+            // Restore the original settings, now that the game no longer
+            // reads them (closing with autosave back on would write one).
+            if (game && game.theme) {
+                game.theme.determinism = originalDeterminismSetting;
+                game.theme.slowDrawing = originalSlowDrawSetting;
+                game.theme.autosave = originalAutosaveSetting;
+                game.theme.sADelays = originalSADelaysSetting;
+                game.theme = oldtheme;
+                NSLog(@"Restored determinism setting to %@", originalDeterminismSetting ? @"YES" : @"NO");
+                NSLog(@"Restored slow draw setting to %@", originalSlowDrawSetting ? @"YES" : @"NO");
+                NSLog(@"Restored autosave setting to %@", originalAutosaveSetting ? @"YES" : @"NO");
+            }
+
+            // Compare log against comparison file in test bundle
+            NSArray *contentsOfDir = [[NSFileManager defaultManager]
+                                      contentsOfDirectoryAtURL:tempDir
+                                      includingPropertiesForKeys:@[ NSURLNameKey ]
+                                      options:NSDirectoryEnumerationSkipsHiddenFiles
+                                      error:nil];
+
+            NSURL *logURL = contentsOfDir.firstObject;
+
+            XCTAssertNotNil(logURL, @"Log file should be created");
+
+            NSError *error = nil;
+            NSString *log = [NSString stringWithContentsOfURL:logURL encoding:NSUTF8StringEncoding error:&error];
+            if (error)
+                NSLog(@"Error: %@", error);
+            XCTAssertNil(error, @"There should be no error");
+            XCTAssert(log.length > 0, @"Log file should contain text");
+
+            // Set GAME_IMPORT_LOG_DUMP=<dir> to keep the log, for diffing
+            // against the facit or replacing it
+            NSString *dumpDir = NSProcessInfo.processInfo.environment[@"GAME_IMPORT_LOG_DUMP"];
+            if (dumpDir.length && log.length) {
+                NSString *dumpName = [NSString stringWithFormat:@"%@ log output.txt", scriptName];
+                [log writeToFile:[dumpDir stringByAppendingPathComponent:dumpName]
+                      atomically:YES encoding:NSUTF8StringEncoding error:nil];
+            }
+
+            NSString *facit = [GameImportXCTests comparisonLogFor:scriptName];
+            XCTAssert(facit.length > 0, @"Comparison file should contain text");
+            XCTAssert([[GameImportXCTests normalizedProtocolLog:log]
+                       isEqualToString:[GameImportXCTests normalizedProtocolLog:facit]],
+                      @"Log file text should match comparison file text");
+            [logsMatchedExpectation fulfill];
+        }
+
+        [commandScriptExpectation fulfill];
+        [[NSNotificationCenter defaultCenter] removeObserver:scriptObserver];
+    }];
+
+    // Observe import completion
+    [self observeImportCompletionWithInitialCount:initialCount
+                                      gameFileURL:gameFileURL
+                                     fetchRequest:fetchRequest
+                                       onComplete:^(Game *game) {
+        // Verify game properties
+        [self verifyGame:game hasPath:gameFileURL.path];
+        [importExpectation fulfill];
+
+        // Delete any existing autosaves
+        GlkController *tempgctl = [[GlkController alloc] init];
+        [tempgctl deleteAutosaveFilesForGame:game];
+
+        // Set theme to default
+        Theme *theme = [BuiltInThemes createDefaultThemeInContext:self.testContext forceRebuild:NO];
+        oldtheme = game.theme;
+        game.theme = theme;
+
+        // Enable determinism setting for reproducible test results
+        if (game.theme) {
+            originalDeterminismSetting = game.theme.determinism;
+            game.theme.determinism = YES;
+            NSLog(@"Enabled determinism setting for test");
+            originalSlowDrawSetting = game.theme.slowDrawing;
+            game.theme.slowDrawing = NO;
+            NSLog(@"Disabled slow drawing setting for test");
+            originalAutosaveSetting = game.theme.autosave;
+            game.theme.autosave = NO;
+            NSLog(@"Disabled autosave setting for test");
+            originalSADelaysSetting = game.theme.sADelays;
+            game.theme.sADelays = NO;
+            NSLog(@"Disabled real-time delays (sADelays) for test");
+            if (!keepTrimming)
+                game.theme.scrollbackLimit = 0; // unlimited: no trims
+        }
+
+        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+        [defaults setBool:YES forKey:@"LogInterpreterOutput"];
+        [defaults setObject:tempDir.path forKey:@"InterpreterLogDirectory"];
+
+        // Now try to start the game
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NSWindow *gameWindow = [launcher playGame:game restorationHandler:nil];
+
+            // Give the game a moment to initialize
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                XCTAssertNotNil(gameWindow, @"Game window should be created");
+
+                // Check if the game is actually running
+                GlkController *glkController = self.tableViewController.gameSessions[game.hashTag];
+                XCTAssertNotNil(glkController, @"GlkController should be created");
+
+                if (glkController) {
+                    XCTAssertNotNil(glkController.window, @"Game window should exist");
+
+                    NSLog(@"Successfully started game: %@", game.metadata.title);
+                    [gameStartExpectation fulfill];
+
+                    // Run command script if available
+                    if (scriptURL) {
+                        NSLog(@"Running command script: %@", scriptURL.path);
+
+                        // Start the script once the game is waiting for input, rather than
+                        // after a fixed delay: a slow start (e.g. under a profiler) would
+                        // otherwise hit the modal "Cannot find an input prompt" alert,
+                        // which stalls the interpreter's pipe for the rest of the run.
+                        [self runCommandsFromFile:scriptURL.path
+                              whenInputReadyIn:glkController
+                                        attempts:100];
+                    } else {
+                        NSLog(@"No command script found, skipping");
+                        [[NSNotificationCenter defaultCenter] removeObserver:scriptObserver];
+                        [logsMatchedExpectation fulfill];
+
+                        // Clean up: close the game window
+                        [glkController.window performClose:nil];
+                    }
+                } else {
+                    [gameStartExpectation fulfill];
+                    [[NSNotificationCenter defaultCenter] removeObserver:scriptObserver];
+                    [commandScriptExpectation fulfill];
+                    [logsMatchedExpectation fulfill];
+                }
+                // The theme settings are put back when the script completes,
+                // not here: the game is still running, and a slow first
+                // launch may not even have read them yet.
+            });
+        });
+    }];
+
+    // Set up options (no images/download to speed up test)
+    NSDictionary *options = @{
+        @"lookForImages": @(NO),
+        @"downloadInfo": @(NO),
+        @"context": self.testContext
+    };
+
+    // Import the game
+    [importer addFiles:@[gameFileURL] options:options];
+
+    // Wait for expectations with a longer timeout for game startup and command script
+    [self waitForExpectationsWithTimeout:60.0 handler:^(NSError * _Nullable error) {
+        [[NSNotificationCenter defaultCenter] removeObserver:scriptObserver];
+        [self deleteGameAtPath:gameFileURL.path];
+        if (error) {
+            XCTFail(@"Test timed out: %@", error);
+        }
+    }];
+}
+
+- (void)testAdrift {
+    [self importAndRunGameFile:@"Hamper.taf"
+             commandScriptName:@"To Hell in a Hamper"];
+}
+
+- (void)testAdrift37CastleQuest {
+    [self importAndRunGameFile:@"castle.taf"
+             commandScriptName:@"Castle Quest"];
+}
+
+- (void)testAdrift38Cloak {
+    [self importAndRunGameFile:@"cloak.taf"
+             commandScriptName:@"Cloak of Darkness"];
+}
+
+- (void)testAdrift38Akron {
+    [self importAndRunGameFile:@"akron.taf"
+             commandScriptName:@"Akron"];
+}
+
+- (void)testAdrift39TownOfAzra {
+    [self importAndRunGameFile:@"The Town Of Azra.taf"
+             commandScriptName:@"The Town Of Azra"];
+}
+
+- (void)testAdrift39Veteran {
+    [self importAndRunGameFile:@"veteran.taf"
+             commandScriptName:@"Veteran"];
+}
+
+// Keeps the theme's scrollback limit: Humbug prints enough to trim many times
+// in about five seconds, so it is the trim path's real-game coverage.
+- (void)testAdrift40Humbug {
+    [self importAndRunGameFile:@"humbug.taf"
+             commandScriptName:@"Humbug"
+        keepScrollbackTrimming:YES];
+}
+
+- (void)testAdrift40Shadowpeak {
+    [self importAndRunGameFile:@"Shadowpeak.taf"
+             commandScriptName:@"Shadowpeak"];
+}
+
+- (void)testAdrift50FortressOfFear {
+    [self importAndRunGameFile:@"TheFortressOfFear.blorb"
+             commandScriptName:@"The Fortress Of Fear"];
+}
+
+- (void)testAdrift50AxeOfKolt {
+    [self importAndRunGameFile:@"TheAxeOfKolt.blorb"
+             commandScriptName:@"The Axe Of Kolt"];
+}
+
+- (void)testAdrift50DarkRoom {
+    [self importAndRunGameFile:@"DarkRoom.taf"
+             commandScriptName:@"Dark Room"];
+}
+
+- (void)testAdvSys {
+    [self importAndRunGameFile:@"onehand.dat"
+             commandScriptName:@"The Sound of One Hand Clapping"];
+}
+
+- (void)testAGT {
+    [self importAndRunGameFile:@"AGT-03201-0000E16C.agx"
+             commandScriptName:@"Shades of Gray"];
+}
+
+
+- (void)testAlan2 {
+    [self importAndRunGameFile:@"bugged.acd"
+             commandScriptName:@"Bugged"];
+}
+
+- (void)testAlan3 {
+    [self importAndRunGameFile:@"00 Wyldkynd Project.a3c"
+             commandScriptName:@"The Wyldkynd Project"];
+}
+
+- (void)testArthur {
+    [self importAndRunGameFile:@"arthur.zblorb"
+             commandScriptName:@"Arthur"];
+}
+
+- (void)testCzech {
+    [self importAndRunGameFile:@"czech.z5"
+             commandScriptName:@"Czech"];
+}
+
+- (void)testQuestion {
+    [self importAndRunGameFile:@"Gatheredindarkness.cas"
+             commandScriptName:@"Gathered in Darkness"];
+}
+
+- (void)testHugo {
+    [self importAndRunGameFile:@"guilty.hex"
+             commandScriptName:@"Guilty Bastards"];
+}
+
+- (void)testJacl {
+    [self importAndRunGameFile:@"grail.j2"
+             commandScriptName:@"Unholy Grail"];
+}
+
+- (void)testJourney {
+    [self importAndRunGameFile:@"journey.zblorb"
+             commandScriptName:@"Journey"];
+}
+
+- (void)testLevel9 {
+    [self importAndRunGameFile:@"Q.L9"
+             commandScriptName:@"Level 9"];
+}
+
+- (void)testMagnetic {
+    [self importAndRunGameFile:@"mag.mag"
+             commandScriptName:@"Magnetic"];
+}
+
+- (void)testPlus {
+    [self importAndRunGameFile:@"SPL13P.plus"
+             commandScriptName:@"Plus"];
+}
+
+- (void)testPraxix {
+    [self importAndRunGameFile:@"praxix.z5"
+             commandScriptName:@"Praxix"];
+}
+
+- (void)testScottFree {
+    [self importAndRunGameFile:@"adv01.dat"
+             commandScriptName:@"ScottFree"];
+}
+
+- (void)testShogun {
+    [self importAndRunGameFile:@"shogun.zblorb"
+             commandScriptName:@"Shogun"];
+}
+
+- (void)testTADS2 {
+    [self importAndRunGameFile:@"tildeath.gam"
+             commandScriptName:@"Till Death Makes a Monk-Fish out of Me"];
+}
+
+- (void)testTADS3 {
+    [self importAndRunGameFile:@"Elysium.t3"
+             commandScriptName:@"The Elysium Enigma"];
+}
+
+- (void)testTaylorMade {
+    [self importAndRunGameFile:@"tot.tay"
+             commandScriptName:@"TaylorMade"];
+}
+
+- (void)testTerpEtude {
+    [self importAndRunGameFile:@"etude.z5"
+             commandScriptName:@"TerpEtude"];
+}
+
+// Keeps the theme's scrollback limit, so trimming also runs under a V6 game.
+- (void)testZorkZero {
+    [self importAndRunGameFile:@"zork0.zblorb"
+             commandScriptName:@"Zork Zero"
+        keepScrollbackTrimming:YES];
+}
+
+#pragma mark - Scrollback cap (#1)
+
+// The cut-point helper must always land on a line boundary, respect the
+// safe limit that protects the active input region, and decline to trim when
+// there is nothing safe to remove.
+- (void)testScrollbackCutPoint {
+    // Build 10 lines of "line\n" (5 chars each => 50 chars, '\n' at 4,9,...,49).
+    NSMutableString *text = [NSMutableString string];
+    for (int i = 0; i < 10; i++)
+        [text appendString:@"line\n"];
+    XCTAssertEqual(text.length, 50u);
+
+    // Under the keep target: nothing to trim.
+    XCTAssertEqual([GlkTextBufferWindow scrollbackCutPointForString:text
+                                                        targetKeep:1000
+                                                         safeLimit:text.length],
+                   0u);
+
+    // Keep ~10 chars => want = 40, which already sits just after a newline,
+    // so the cut is exactly 40 and the kept text starts at a line boundary.
+    NSUInteger cut = [GlkTextBufferWindow scrollbackCutPointForString:text
+                                                          targetKeep:10
+                                                           safeLimit:text.length];
+    XCTAssertEqual(cut, 40u);
+    XCTAssertEqual([text characterAtIndex:cut - 1], (unichar)'\n');
+
+    // want lands mid-line => scan forward to the next newline boundary.
+    // targetKeep 8 => want = 42; next '\n' is at index 44, so cut = 45.
+    NSUInteger cut2 = [GlkTextBufferWindow scrollbackCutPointForString:text
+                                                           targetKeep:8
+                                                            safeLimit:text.length];
+    XCTAssertEqual(cut2, 45u);
+    XCTAssertEqual([text characterAtIndex:cut2 - 1], (unichar)'\n');
+
+    // A tight safe limit (e.g. the input fence) leaves no boundary to cut at:
+    // decline rather than trim into protected text.
+    XCTAssertEqual([GlkTextBufferWindow scrollbackCutPointForString:text
+                                                        targetKeep:10
+                                                         safeLimit:3],
+                   0u);
+
+    // No newline anywhere => no clean boundary => no trim.
+    XCTAssertEqual([GlkTextBufferWindow scrollbackCutPointForString:@"a single very long line with no breaks"
+                                                        targetKeep:5
+                                                         safeLimit:38],
+                   0u);
+}
+
+// After a front trim of `cut` characters, margin images and flow breaks whose
+// anchor was removed must be dropped, and the survivors' positions shifted
+// down by exactly `cut` so they stay attached to the same text.
+- (void)testMarginContainerAnchorShift {
+    MarginContainer *container =
+        [[MarginContainer alloc] initWithContainerSize:NSMakeSize(100, 100)];
+    NSImage *image = [[NSImage alloc] initWithSize:NSMakeSize(10, 10)];
+
+    [container addImage:image alignment:imagealign_MarginLeft  at:10   linkid:0];
+    [container addImage:image alignment:imagealign_MarginLeft  at:100  linkid:0];
+    [container addImage:image alignment:imagealign_MarginRight at:1000 linkid:0];
+    // Flow breaks exercise the parallel shift path (no assertion: just no crash).
+    [container flowBreakAt:20];
+    [container flowBreakAt:500];
+
+    XCTAssertEqual(container.marginImages.count, 3u);
+
+    [container shiftAnchorsAfterTrimOf:50];
+
+    // The image anchored at pos 10 was inside the trimmed range and is gone.
+    XCTAssertEqual(container.marginImages.count, 2u);
+    XCTAssertEqual(container.marginImages[0].pos, 50u);   // 100 - 50
+    XCTAssertEqual(container.marginImages[1].pos, 950u);  // 1000 - 50
+
+    // A zero cut is a no-op.
+    [container shiftAnchorsAfterTrimOf:0];
+    XCTAssertEqual(container.marginImages.count, 2u);
+    XCTAssertEqual(container.marginImages[0].pos, 50u);
+}
+
+// Resizing a buffer window whose scrollback holds many margin images must
+// remain responsive. Without the unoverlap: pos-distance early-exit, every
+// laid-out line did an O(M) overlap scan against every margin image, making
+// a single resize pass O(L * M^2). This test exercises that path without
+// loading a game: stand up a minimal NSTextStorage / NSLayoutManager /
+// MarginContainer / NSTextView pipeline, populate it with the shape of a
+// long Zork Zero session (~500 short paragraphs, ~100 margin images), and
+// measure a sequence of textview-frame resizes - the same code path a live
+// window drag triggers.
+- (void)testMarginContainerResizePerformance {
+    NSTextStorage *storage = [[NSTextStorage alloc] init];
+    NSLayoutManager *lm = [[NSLayoutManager alloc] init];
+    [storage addLayoutManager:lm];
+
+    MarginContainer *container =
+        [[MarginContainer alloc] initWithContainerSize:NSMakeSize(600, CGFLOAT_MAX)];
+    [lm addTextContainer:container];
+
+    NSTextView *textview =
+        [[NSTextView alloc] initWithFrame:NSMakeRect(0, 0, 600, 10000)
+                            textContainer:container];
+
+    NSImage *image = [[NSImage alloc] initWithSize:NSMakeSize(80, 80)];
+
+    // 500 short paragraphs with a margin image every fifth one represents a
+    // realistic long Zork Zero session (~18KB of text, ~100 inline margin
+    // images held by the MarginContainer at once). Enough to demonstrate the
+    // O(M^2) layout cost without dominating the rest of the test suite.
+    NSUInteger imageCount = 0;
+    for (int i = 0; i < 500; i++) {
+        NSUInteger pos = storage.length;
+        NSAttributedString *para = [[NSAttributedString alloc]
+            initWithString:@"A short room description paragraph.\n"];
+        [storage appendAttributedString:para];
+        if ((i % 5) == 0) {
+            [container addImage:image
+                      alignment:(i & 1) ? imagealign_MarginLeft
+                                        : imagealign_MarginRight
+                             at:pos
+                         linkid:0];
+            imageCount++;
+        }
+    }
+    XCTAssertGreaterThan(imageCount, 50u);
+
+    // Establish a baseline layout and warm caches with one full resize cycle
+    // before measuring, so a cold first iteration doesn't skew the average.
+    [lm ensureLayoutForTextContainer:container];
+    [textview setFrameSize:NSMakeSize(500, 10000)];
+    [container invalidateLayout:nil];
+    [lm ensureLayoutForTextContainer:container];
+    [textview setFrameSize:NSMakeSize(700, 10000)];
+    [container invalidateLayout:nil];
+    [lm ensureLayoutForTextContainer:container];
+
+    // Each iteration runs two full re-layouts at different widths. Per-pass
+    // cost is O(L * M) just for lineFragmentRectForProposedRect:, so at this
+    // scrollback size a single iteration already takes several seconds; cap
+    // measure-block iterations to keep total test time bounded.
+    XCTMeasureOptions *opts = [XCTMeasureOptions defaultOptions];
+    opts.iterationCount = 3;
+    [self measureWithMetrics:@[[[XCTClockMetric alloc] init]]
+                     options:opts
+                       block:^{
+        [textview setFrameSize:NSMakeSize(500, 10000)];
+        [container invalidateLayout:nil];
+        [lm ensureLayoutForTextContainer:container];
+
+        [textview setFrameSize:NSMakeSize(700, 10000)];
+        [container invalidateLayout:nil];
+        [lm ensureLayoutForTextContainer:container];
+    }];
+
+    XCTAssertEqual(container.marginImages.count, imageCount,
+                   @"resize must not lose margin images");
+}
+
+// The scrollback limit is a per-theme value (the Theme.scrollbackLimit Core
+// Data attribute), clamped via +clampScrollbackLimit:. A positive value is
+// honoured, tiny values are clamped up to the floor, and 0 or negative means
+// unlimited.
+- (void)testScrollbackLimitSetting {
+    // A positive value is honoured.
+    XCTAssertEqual([GlkTextBufferWindow clampScrollbackLimit:50000], 50000u);
+
+    // The built-in default value passes through unchanged.
+    XCTAssertEqual([GlkTextBufferWindow clampScrollbackLimit:30000], 30000u);
+
+    // Below the floor => clamped up.
+    XCTAssertEqual([GlkTextBufferWindow clampScrollbackLimit:100], 2000u);
+
+    // Explicit 0 => unlimited.
+    XCTAssertEqual([GlkTextBufferWindow clampScrollbackLimit:0], 0u);
+
+    // Negative is also treated as unlimited.
+    XCTAssertEqual([GlkTextBufferWindow clampScrollbackLimit:-5], 0u);
+}
+
+// A trim keeps two thirds of the limit. With a large limit it triggers at the
+// limit itself; with a small one it waits until at least 4000 characters of
+// new text have arrived, so it does not re-layout on every turn.
+- (void)testScrollbackTrimThreshold {
+    XCTAssertEqual([GlkTextBufferWindow scrollbackKeepForLimit:30000], 20000u);
+    XCTAssertEqual([GlkTextBufferWindow scrollbackTrimThresholdForLimit:30000], 30000u);
+
+    XCTAssertEqual([GlkTextBufferWindow scrollbackKeepForLimit:2000], 1333u);
+    XCTAssertEqual([GlkTextBufferWindow scrollbackTrimThresholdForLimit:2000], 5333u);
+
+    // Crossover: a third of the limit equals the minimum slack.
+    XCTAssertEqual([GlkTextBufferWindow scrollbackTrimThresholdForLimit:12000], 12000u);
+}
+
+// The Preferences nib must instantiate with the new scrollback controls wired
+// up. A mismatched outlet name would raise NSUnknownKeyException here, and a
+// missing action would leave the controller unable to respond - this guards
+// the hand-edited PrefsWindow.xib against both.
+- (void)testPreferencesNibConnectsScrollbackControls {
+    Preferences *owner = [[Preferences alloc] init];
+    NSNib *nib = [[NSNib alloc] initWithNibNamed:@"PrefsWindow"
+                                          bundle:[NSBundle bundleForClass:[Preferences class]]];
+    XCTAssertNotNil(nib, @"PrefsWindow nib should load");
+
+    NSArray *topLevelObjects = nil;
+    BOOL instantiated = NO;
+    @try {
+        instantiated = [nib instantiateWithOwner:owner topLevelObjects:&topLevelObjects];
+    } @catch (NSException *exception) {
+        XCTFail(@"Instantiating PrefsWindow raised: %@", exception);
+    }
+    XCTAssertTrue(instantiated, @"PrefsWindow should instantiate");
+
+    // Connected outlets (would have thrown above on a name mismatch).
+    XCTAssertNotNil(owner.scrollbackLimitTextField,
+                    @"scrollbackLimitTextField outlet should be connected");
+    XCTAssertNotNil(owner.scrollbackLimitStepper,
+                    @"scrollbackLimitStepper outlet should be connected");
+    XCTAssertNotNil(owner.scrollbackUnitLabel,
+                    @"scrollbackUnitLabel outlet should be connected");
+
+    // The action target must respond to the selector wired in the xib.
+    XCTAssertTrue([owner respondsToSelector:@selector(changeScrollbackLimit:)],
+                  @"changeScrollbackLimit: action should exist on Preferences");
+}
+
+- (void)testSecretDiaryScrolling {
+    [self performMoleScrollingTestWithFileName:@"The Secret Diary Of Adrian Mole - Side 1.tzx" smoothScroll:YES];
+}
+
+- (void)testArchersScrolling {
+    [self performMoleScrollingTestWithFileName:@"The Archers - Side 1.tzx" smoothScroll:YES];
+}
+
+- (void)testSecretDiaryScrollingNoSmooth {
+    [self performMoleScrollingTestWithFileName:@"The Secret Diary Of Adrian Mole - Side 1.tzx" smoothScroll:NO];
+}
+
+- (void)testArchersScrollingNoSmooth {
+    [self performMoleScrollingTestWithFileName:@"The Archers - Side 1.tzx" smoothScroll:NO];
+}
+
+// Shared scrolling test body for the Adrian Mole / Archers Level 9 games.
+// These games rapidly request and cancel char events on a timer, and the GUI
+// must distinguish that from real user keypresses so it only scrolls by one
+// screenful when the user actually presses space.
+- (void)performMoleScrollingTestWithFileName:(NSString *)fileName smoothScroll:(BOOL)smoothScroll {
+    XCTestExpectation *importExpectation = [self expectationWithDescription:@"Game import completes"];
+    XCTestExpectation *scrollTestExpectation = [self expectationWithDescription:@"Scroll test completes"];
+
+    NSURL *gameFileURL = [self gameFileURLForFileNamed:fileName];
+
+    [self deleteGameAtPath:gameFileURL.path];
+
+    NSUInteger initialCount = [self currentGameCount];
+    NSFetchRequest *fetchRequest = [Game fetchRequest];
+
+    GameImporter *importer = [self createGameImporter];
+    GameLauncher *launcher = [self createAndSetupGameLauncher];
+
+    __block BOOL originalDeterminismSetting = NO;
+    __block BOOL originalSlowDrawSetting = NO;
+    __block BOOL originalAutosaveSetting = NO;
+    __block BOOL originalSmoothScrollSetting = NO;
+    __block Theme *oldTheme = nil;
+
+    [self observeImportCompletionWithInitialCount:initialCount
+                                      gameFileURL:gameFileURL
+                                     fetchRequest:fetchRequest
+                                       onComplete:^(Game *game) {
+        [self verifyGame:game hasPath:gameFileURL.path];
+        [importExpectation fulfill];
+
+        GlkController *tempgctl = [[GlkController alloc] init];
+        [tempgctl deleteAutosaveFilesForGame:game];
+
+        Theme *theme = [BuiltInThemes createDefaultThemeInContext:self.testContext forceRebuild:NO];
+        oldTheme = game.theme;
+        game.theme = theme;
+
+        originalDeterminismSetting = game.theme.determinism;
+        game.theme.determinism = YES;
+        originalSlowDrawSetting = game.theme.slowDrawing;
+        game.theme.slowDrawing = NO;
+        originalAutosaveSetting = game.theme.autosave;
+        game.theme.autosave = NO;
+        originalSmoothScrollSetting = game.theme.smoothScroll;
+        game.theme.smoothScroll = smoothScroll;
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NSWindow *gameWindow = [launcher playGame:game restorationHandler:nil];
+
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                XCTAssertNotNil(gameWindow, @"Game window should be created");
+
+                GlkController *glkController = self.tableViewController.gameSessions[game.hashTag];
+                XCTAssertNotNil(glkController, @"GlkController should be created");
+
+                if (!glkController) {
+                    [scrollTestExpectation fulfill];
+                    return;
+                }
+
+                XCTAssertNotNil(glkController.window, @"Game window should exist");
+
+                // Resize window to half the default content size
+                NSSize defaultSize = gameWindow.contentView.frame.size;
+                NSSize halfSize = NSMakeSize(defaultSize.width / 2.0, defaultSize.height / 2.0);
+                NSRect contentRect = NSMakeRect(0, 0, halfSize.width, halfSize.height);
+                NSRect newWindowFrame = [gameWindow frameRectForContentRect:contentRect];
+                newWindowFrame.origin = gameWindow.frame.origin;
+                [gameWindow setFrame:newWindowFrame display:YES];
+
+                // Wait for the resize to take effect and the game to settle
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+
+                    // Find the text buffer window
+                    GlkTextBufferWindow *bufferWin = nil;
+                    for (GlkWindow *win in glkController.gwindows.allValues) {
+                        if ([win isKindOfClass:[GlkTextBufferWindow class]]) {
+                            bufferWin = (GlkTextBufferWindow *)win;
+                            break;
+                        }
+                    }
+
+                    XCTAssertNotNil(bufferWin, @"Should have a text buffer window");
+
+                    if (!bufferWin) {
+                        game.theme.determinism = originalDeterminismSetting;
+                        game.theme.slowDrawing = originalSlowDrawSetting;
+                        game.theme.autosave = originalAutosaveSetting;
+                        game.theme = oldTheme;
+                        [glkController.window performClose:nil];
+                        [scrollTestExpectation fulfill];
+                        return;
+                    }
+
+                    NSScrollView *scrollView = bufferWin.textview.enclosingScrollView;
+                    XCTAssertNotNil(scrollView, @"Buffer window should have a scroll view");
+
+                    CGFloat viewportHeight = scrollView.contentView.bounds.size.height;
+                    NSLog(@"Viewport height: %f", viewportHeight);
+
+                    CGFloat scrollPositionBefore = scrollView.contentView.bounds.origin.y;
+                    NSLog(@"Scroll position before wait: %f", scrollPositionBefore);
+
+                    // Wait 3 seconds and check that scroll position has not changed
+                    // (The Adrian Mole games cycle char events rapidly, which should
+                    // not cause scrolling)
+                    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+
+                        CGFloat scrollPositionAfterWait = scrollView.contentView.bounds.origin.y;
+                        NSLog(@"Scroll position after wait: %f", scrollPositionAfterWait);
+
+                        XCTAssertEqual(scrollPositionBefore, scrollPositionAfterWait,
+                                       @"Scroll position should not change during idle wait (was %f, now %f)",
+                                       scrollPositionBefore, scrollPositionAfterWait);
+
+                        // Drive the game by repeatedly pressing '1' (picks the first
+                        // multiple-choice option, also advances past "more"/"press
+                        // any key" prompts in these Level 9 games). After each
+                        // press, verify the scroll position did not advance past
+                        // more than one viewport — that's the real "don't skip
+                        // unread text" invariant.
+                        const NSInteger kMaxPresses = 20;
+                        const NSInteger kNoProgressLimit = 3;
+                        const CGFloat scrollTolerance = 20.0;
+
+                        __block NSInteger pressCount = 0;
+                        __block NSInteger noProgressCount = 0;
+
+                        void (^finishUp)(void) = ^{
+                            game.theme.determinism = originalDeterminismSetting;
+                            game.theme.slowDrawing = originalSlowDrawSetting;
+                            game.theme.autosave = originalAutosaveSetting;
+                            game.theme.smoothScroll = originalSmoothScrollSetting;
+                            game.theme = oldTheme;
+
+                            [glkController.window performClose:nil];
+                            [scrollTestExpectation fulfill];
+                        };
+
+                        // Note: pressOneAndCheck self-references via __block, which
+                        // forms a retain cycle. Don't break it by nil-ing inside the
+                        // block — that releases the block we're currently executing
+                        // and crashes on the next captured-variable access. The
+                        // cycle is short-lived (one per test invocation) and
+                        // released along with the dispatch_after task chain.
+                        __block void (^pressOneAndCheck)(void) = nil;
+                        pressOneAndCheck = ^{
+                            if (pressCount >= kMaxPresses) {
+                                NSLog(@"Reached press cap of %ld; ending playthrough.", (long)kMaxPresses);
+                                finishUp();
+                                return;
+                            }
+
+                            CGFloat scrollBefore = scrollView.contentView.bounds.origin.y;
+                            CGFloat docBefore = scrollView.documentView.frame.size.height;
+
+                            [bufferWin sendKeypress:'1'];
+                            pressCount++;
+
+                            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                                CGFloat scrollAfter = scrollView.contentView.bounds.origin.y;
+                                CGFloat docAfter = scrollView.documentView.frame.size.height;
+                                CGFloat scrollDelta = scrollAfter - scrollBefore;
+                                CGFloat docDelta = docAfter - docBefore;
+
+                                NSLog(@"Press %ld: scroll %f -> %f (delta %f), doc %f -> %f (delta %f)",
+                                      (long)pressCount, scrollBefore, scrollAfter, scrollDelta,
+                                      docBefore, docAfter, docDelta);
+
+                                XCTAssertLessThanOrEqual(scrollDelta, viewportHeight + scrollTolerance,
+                                                         @"Press %ld: scroll delta %f exceeds one viewport (%f)",
+                                                         (long)pressCount, scrollDelta, viewportHeight);
+
+                                if (scrollDelta == 0 && docDelta == 0) {
+                                    noProgressCount++;
+                                    if (noProgressCount >= kNoProgressLimit) {
+                                        NSLog(@"%ld consecutive presses with no progress — assuming end of part 1.",
+                                              (long)kNoProgressLimit);
+                                        finishUp();
+                                        return;
+                                    }
+                                } else {
+                                    noProgressCount = 0;
+                                }
+
+                                pressOneAndCheck();
+                            });
+                        };
+
+                        pressOneAndCheck();
+                    });
+                });
+            });
+        });
+    }];
+
+    NSDictionary *options = @{
+        @"lookForImages": @(NO),
+        @"downloadInfo": @(NO),
+        @"context": self.testContext
+    };
+
+    [importer addFiles:@[gameFileURL] options:options];
+
+    [self waitForExpectationsWithTimeout:90.0 handler:^(NSError * _Nullable error) {
+        [self deleteGameAtPath:gameFileURL.path];
+        if (error) {
+            XCTFail(@"Test timed out: %@", error);
+        }
+    }];
+}
+
+// Scrolling up to read the scrollback while a timer-driven game keeps printing
+// must hold the view where the user put it: the output (and the input request
+// that follows it) may not drag the view back down. Scrolling back to the
+// bottom, or answering the prompt, resumes following.
+//
+// The Archers runs a Glk timer throughout, so pressing a key here stands in
+// for output arriving by itself: sendKeypress: goes straight to the
+// interpreter, without passing through the key handling that a real keypress
+// would use to page or to return to the prompt.
+- (void)testScrollingUpPausesAutoScrollInTimerGame {
+    XCTestExpectation *importExpectation = [self expectationWithDescription:@"Game import completes"];
+    XCTestExpectation *scrollTestExpectation = [self expectationWithDescription:@"Scroll pause test completes"];
+
+    NSURL *gameFileURL = [self gameFileURLForFileNamed:@"The Archers - Side 1.tzx"];
+
+    [self deleteGameAtPath:gameFileURL.path];
+
+    NSUInteger initialCount = [self currentGameCount];
+    NSFetchRequest *fetchRequest = [Game fetchRequest];
+
+    GameImporter *importer = [self createGameImporter];
+    GameLauncher *launcher = [self createAndSetupGameLauncher];
+
+    void (^after)(double, dispatch_block_t) = ^(double seconds, dispatch_block_t block) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(seconds * NSEC_PER_SEC)), dispatch_get_main_queue(), block);
+    };
+
+    [self observeImportCompletionWithInitialCount:initialCount
+                                      gameFileURL:gameFileURL
+                                     fetchRequest:fetchRequest
+                                       onComplete:^(Game *game) {
+        [self verifyGame:game hasPath:gameFileURL.path];
+        [importExpectation fulfill];
+
+        GlkController *tempgctl = [[GlkController alloc] init];
+        [tempgctl deleteAutosaveFilesForGame:game];
+
+        Theme *oldTheme = game.theme;
+        game.theme = [BuiltInThemes createDefaultThemeInContext:self.testContext forceRebuild:NO];
+
+        BOOL originalDeterminismSetting = game.theme.determinism;
+        game.theme.determinism = YES;
+        BOOL originalSlowDrawSetting = game.theme.slowDrawing;
+        game.theme.slowDrawing = NO;
+        BOOL originalAutosaveSetting = game.theme.autosave;
+        game.theme.autosave = NO;
+        BOOL originalSmoothScrollSetting = game.theme.smoothScroll;
+        game.theme.smoothScroll = NO;
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NSWindow *gameWindow = [launcher playGame:game restorationHandler:nil];
+
+            after(3.0, ^{
+                GlkController *glkController = self.tableViewController.gameSessions[game.hashTag];
+                XCTAssertNotNil(glkController, @"GlkController should be created");
+
+                dispatch_block_t finishUp = ^{
+                    game.theme.determinism = originalDeterminismSetting;
+                    game.theme.slowDrawing = originalSlowDrawSetting;
+                    game.theme.autosave = originalAutosaveSetting;
+                    game.theme.smoothScroll = originalSmoothScrollSetting;
+                    game.theme = oldTheme;
+
+                    [glkController.window performClose:nil];
+                    [scrollTestExpectation fulfill];
+                };
+
+                GlkTextBufferWindow *bufferWin = nil;
+                for (GlkWindow *win in glkController.gwindows.allValues) {
+                    if ([win isKindOfClass:[GlkTextBufferWindow class]]) {
+                        bufferWin = (GlkTextBufferWindow *)win;
+                        break;
+                    }
+                }
+                XCTAssertNotNil(bufferWin, @"Should have a text buffer window");
+                if (!bufferWin) {
+                    finishUp();
+                    return;
+                }
+
+                // Half the default size, so a few responses overflow the viewport.
+                NSSize defaultSize = gameWindow.contentView.frame.size;
+                NSRect newWindowFrame = [gameWindow frameRectForContentRect:
+                                         NSMakeRect(0, 0, defaultSize.width / 2.0, defaultSize.height / 2.0)];
+                newWindowFrame.origin = gameWindow.frame.origin;
+                [gameWindow setFrame:newWindowFrame display:YES];
+
+                NSScrollView *scrollView = bufferWin.textview.enclosingScrollView;
+                NSClipView *clipView = scrollView.contentView;
+
+                CGFloat (^position)(void) = ^{ return clipView.bounds.origin.y; };
+                NSUInteger (^textLength)(void) = ^{ return bufferWin.textview.string.length; };
+
+                // Run `press` until `satisfied` holds or we run out of
+                // presses, then give any scroll that the new output set off
+                // a second to land before reporting back.
+                // The block refers to itself through a __block variable; see
+                // the note in performMoleScrollingTestWithFileName: on why
+                // that cycle is left alone.
+                __block void (^repeatUntil)(NSInteger, dispatch_block_t, BOOL (^)(void), void (^)(BOOL)) = nil;
+                repeatUntil = ^(NSInteger pressesLeft, dispatch_block_t press, BOOL (^satisfied)(void), void (^completion)(BOOL)) {
+                    press();
+                    after(0.7, ^{
+                        if (satisfied()) {
+                            after(1.0, ^{ completion(YES); });
+                        } else if (pressesLeft <= 1) {
+                            completion(NO);
+                        } else {
+                            repeatUntil(pressesLeft - 1, press, satisfied, completion);
+                        }
+                    });
+                };
+
+                // '1' picks the first choice, and acknowledges "more" prompts.
+                // Sent straight to the interpreter:
+                dispatch_block_t sendOne = ^{
+                    [bufferWin sendKeypress:'1'];
+                };
+                // and typed, going through keyDown:
+                dispatch_block_t typeOne = ^{
+                    [bufferWin keyDown:[NSEvent keyEventWithType:NSEventTypeKeyDown
+                                                        location:NSZeroPoint
+                                                   modifierFlags:0
+                                                       timestamp:NSProcessInfo.processInfo.systemUptime
+                                                    windowNumber:gameWindow.windowNumber
+                                                         context:nil
+                                                      characters:@"1"
+                                     charactersIgnoringModifiers:@"1"
+                                                       isARepeat:NO
+                                                         keyCode:18]];
+                };
+
+                // A wheel event to hand to the buffer window. Only its
+                // direction matters; the scroll itself is done by the test.
+                NSEvent *(^wheelEvent)(int32_t) = ^(int32_t lines) {
+                    CGEventRef cgEvent = CGEventCreateScrollWheelEvent(NULL, kCGScrollEventUnitLine, 1, lines);
+                    NSEvent *event = [NSEvent eventWithCGEvent:cgEvent];
+                    CFRelease(cgEvent);
+                    return event;
+                };
+
+                // Move the view the way a wheel tick would, then report it.
+                void (^wheelTo)(CGFloat) = ^(CGFloat target) {
+                    CGFloat oldPosition = position();
+                    NSRect bounds = clipView.bounds;
+                    bounds.origin.y = target;
+                    [clipView scrollToPoint:[clipView constrainBoundsRect:bounds].origin];
+                    [scrollView reflectScrolledClipView:clipView];
+                    [bufferWin scrollWheelchanged:wheelEvent(target < oldPosition ? 1 : -1)
+                                     fromPosition:oldPosition];
+                };
+
+                after(3.0, ^{
+                    XCTAssertTrue(glkController.timerActive,
+                                  @"The Archers should be running a Glk timer");
+
+                    // Play until the view has scrolled well away from the top.
+                    CGFloat viewportHeight = NSHeight(clipView.bounds);
+                    repeatUntil(20, sendOne, ^BOOL{ return position() > viewportHeight; }, ^(BOOL scrolledDown) {
+                        XCTAssertTrue(scrolledDown, @"The buffer should overflow and scroll during play");
+                        if (!scrolledDown) {
+                            finishUp();
+                            return;
+                        }
+
+                        // 1. Jump to the top of the scrollback, as the Find bar
+                        // does when it reveals a match there.
+                        [bufferWin.textview scrollRangeToVisible:NSMakeRange(0, 1)];
+                        CGFloat parked = position();
+                        NSUInteger parkedLength = textLength();
+                        XCTAssertLessThan(parked, viewportHeight,
+                                          @"scrollRangeToVisible: should have moved the view up");
+
+                        repeatUntil(5, sendOne, ^BOOL{ return textLength() > parkedLength; }, ^(BOOL grew) {
+                            XCTAssertTrue(grew, @"The game should have printed more text");
+                            XCTAssertEqual(position(), parked,
+                                           @"New output dragged the view away from a Find match (was %f, now %f)",
+                                           parked, position());
+
+                            // 2. Back at the bottom, output is followed again.
+                            wheelTo(NSHeight(scrollView.documentView.frame));
+                            CGFloat bottom = position();
+                            NSUInteger bottomLength = textLength();
+                            XCTAssertTrue(bufferWin.scrolledToBottom, @"Should be back at the bottom");
+
+                            repeatUntil(5, sendOne, ^BOOL{ return textLength() > bottomLength; }, ^(BOOL grewAgain) {
+                                XCTAssertTrue(grewAgain, @"The game should have printed more text");
+                                XCTAssertGreaterThan(position(), bottom,
+                                                     @"Auto-scroll should resume once the user is back at the bottom");
+
+                                // 3. Scroll up by wheel; the view stays put again.
+                                wheelTo(position() - viewportHeight);
+                                CGFloat wheeled = position();
+                                NSUInteger wheeledLength = textLength();
+
+                                repeatUntil(5, sendOne, ^BOOL{ return textLength() > wheeledLength; }, ^(BOOL grewOnceMore) {
+                                    XCTAssertTrue(grewOnceMore, @"The game should have printed more text");
+                                    XCTAssertEqual(position(), wheeled,
+                                                   @"New output dragged the view down after scrolling up (was %f, now %f)",
+                                                   wheeled, position());
+                                    XCTAssertFalse(bufferWin.scrolledToBottom, @"Should still be up in the scrollback");
+
+                                    // 4. Answering the prompt from up here is a
+                                    // request to go back to it.
+                                    NSUInteger typedLength = textLength();
+                                    repeatUntil(5, typeOne, ^BOOL{ return textLength() > typedLength; }, ^(BOOL grewLast) {
+                                        XCTAssertTrue(grewLast, @"The game should have printed more text");
+                                        XCTAssertGreaterThan(position(), wheeled,
+                                                             @"Typing at the prompt should resume auto-scroll");
+                                        finishUp();
+                                    });
+                                });
+                            });
+                        });
+                    });
+                });
+            });
+        });
+    }];
+
+    NSDictionary *options = @{
+        @"lookForImages": @(NO),
+        @"downloadInfo": @(NO),
+        @"context": self.testContext
+    };
+
+    [importer addFiles:@[gameFileURL] options:options];
+
+    [self waitForExpectationsWithTimeout:120.0 handler:^(NSError * _Nullable error) {
+        [self deleteGameAtPath:gameFileURL.path];
+        if (error) {
+            XCTFail(@"Test timed out: %@", error);
+        }
+    }];
+}
+
+// Regression tests for autorestored scroll position.
+//
+// During autorestore, postRestoreAdjustments seeds the saved scroll state
+// (scrolled to bottom / scrolled to top / a mid-document character index) and
+// schedules restoreScroll: to re-apply it once the restored text has laid out.
+// restoreScroll: has three branches — scroll to bottom, scroll to top, and
+// scrollToCharacter: for anything in between — and each should land the
+// viewport back where the autosave captured it.
+//
+// The "bottom" case is the one commit cde1e69d regressed: the layoutManager
+// didCompleteLayout callback also calls restoreScroll:, but with a non-nil
+// sender, and that commit made the non-nil-sender path cap the scroll to
+// _lastseen so live game output can't race past unread text. The same callback
+// fires while an autorestore is still in flight, and on a fresh restore
+// _lastseen is 0, so the cap pinned the window to the TOP instead of the saved
+// bottom. restoreScroll: now treats a pending restore (pendingScrollRestore ==
+// YES) as uncapped regardless of sender; the bottom test locks that in.
+//
+// Rather than drive a full autosave/relaunch round-trip (which depends on the
+// interpreter process's autosave timing), each test reproduces the restore
+// condition on a real, overflowing buffer window and asserts restoreScroll:
+// returns the viewport to the saved position.
+
+// Shared scaffold: import and launch Curses (a game that actually autosaves and
+// autorestores), shrink to a realistic window size, and type a few commands so
+// the buffer overflows the viewport, then hand the settled buffer window and its
+// scroll view to `scenario`. The scenario performs its own setup + assertions
+// and calls `done` when finished (including after any of its own async waits).
+- (void)runCursesScrollRestoreScenario:(void (^)(GlkTextBufferWindow *bufferWin, NSScrollView *scrollView, dispatch_block_t done))scenario {
+    XCTestExpectation *importExpectation = [self expectationWithDescription:@"Game import completes"];
+    XCTestExpectation *scrollTestExpectation = [self expectationWithDescription:@"Scroll restore test completes"];
+
+    NSURL *gameFileURL = [self cursesGameFileURL];
+    [self deleteGameAtPath:gameFileURL.path];
+
+    NSUInteger initialCount = [self currentGameCount];
+    NSFetchRequest *fetchRequest = [Game fetchRequest];
+
+    GameImporter *importer = [self createGameImporter];
+    GameLauncher *launcher = [self createAndSetupGameLauncher];
+
+    __block BOOL originalDeterminismSetting = NO;
+    __block BOOL originalSlowDrawSetting = NO;
+    __block BOOL originalAutosaveSetting = NO;
+    __block BOOL originalSmoothScrollSetting = NO;
+    __block BOOL originalSADelaysSetting = NO;
+    __block Theme *oldTheme = nil;
+
+    [self observeImportCompletionWithInitialCount:initialCount
+                                      gameFileURL:gameFileURL
+                                     fetchRequest:fetchRequest
+                                       onComplete:^(Game *game) {
+        [self verifyGame:game hasPath:gameFileURL.path];
+        [importExpectation fulfill];
+
+        GlkController *tempgctl = [[GlkController alloc] init];
+        [tempgctl deleteAutosaveFilesForGame:game];
+
+        Theme *theme = [BuiltInThemes createDefaultThemeInContext:self.testContext forceRebuild:NO];
+        oldTheme = game.theme;
+        game.theme = theme;
+
+        originalDeterminismSetting = game.theme.determinism;
+        game.theme.determinism = YES;
+        originalSlowDrawSetting = game.theme.slowDrawing;
+        game.theme.slowDrawing = NO;
+        originalAutosaveSetting = game.theme.autosave;
+        game.theme.autosave = NO;
+        originalSmoothScrollSetting = game.theme.smoothScroll;
+        game.theme.smoothScroll = NO; // deterministic, non-animated scrolling
+        originalSADelaysSetting = game.theme.sADelays;
+        game.theme.sADelays = NO; // no real-time delays, for deterministic timing
+
+        void (^restoreTheme)(void) = ^{
+            game.theme.determinism = originalDeterminismSetting;
+            game.theme.slowDrawing = originalSlowDrawSetting;
+            game.theme.autosave = originalAutosaveSetting;
+            game.theme.smoothScroll = originalSmoothScrollSetting;
+            game.theme.sADelays = originalSADelaysSetting;
+            game.theme = oldTheme;
+        };
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NSWindow *gameWindow = [launcher playGame:game restorationHandler:nil];
+
+            // Let the game boot to its first prompt, then shrink to a realistic
+            // window size.
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                XCTAssertNotNil(gameWindow, @"Game window should be created");
+
+                GlkController *glkController = self.tableViewController.gameSessions[game.hashTag];
+                XCTAssertNotNil(glkController, @"GlkController should be created");
+                if (!glkController) {
+                    restoreTheme();
+                    [scrollTestExpectation fulfill];
+                    return;
+                }
+
+                GlkTextBufferWindow *bufferWin = nil;
+                for (GlkWindow *win in glkController.gwindows.allValues) {
+                    if ([win isKindOfClass:[GlkTextBufferWindow class]]) {
+                        bufferWin = (GlkTextBufferWindow *)win;
+                        break;
+                    }
+                }
+
+                XCTAssertNotNil(bufferWin, @"Should have a text buffer window");
+                if (!bufferWin) {
+                    restoreTheme();
+                    [glkController.window performClose:nil];
+                    [scrollTestExpectation fulfill];
+                    return;
+                }
+
+                NSScrollView *scrollView = bufferWin.textview.enclosingScrollView;
+                XCTAssertNotNil(scrollView, @"Buffer window should have a scroll view");
+
+                NSSize defaultSize = gameWindow.contentView.frame.size;
+                NSSize halfSize = NSMakeSize(defaultSize.width / 2.0, defaultSize.height / 2.0);
+                NSRect contentRect = NSMakeRect(0, 0, halfSize.width, halfSize.height);
+                NSRect newWindowFrame = [gameWindow frameRectForContentRect:contentRect];
+                newWindowFrame.origin = gameWindow.frame.origin;
+                [gameWindow setFrame:newWindowFrame display:YES];
+
+                dispatch_block_t done = ^{
+                    bufferWin.pendingScrollRestore = NO;
+                    restoreTheme();
+                    [glkController.window performClose:nil];
+                    [scrollTestExpectation fulfill];
+                };
+
+                // Curses prints little at its opening prompt, so type a few
+                // commands to build up a scrollback tall enough to overflow the
+                // viewport. "verbose" makes every "look" reprint the full room
+                // description; a handful of looks/examines then fills the buffer.
+                NSArray<NSString *> *commands = @[ @"verbose", @"look", @"examine me",
+                                                   @"inventory", @"look", @"examine me", @"look" ];
+
+                // Send the commands one at a time, waiting between each so the
+                // game returns to its input prompt before the next line.
+                __block NSUInteger cmdIndex = 0;
+                __block void (^sendNextCommand)(void) = nil;
+                sendNextCommand = ^{
+                    if (cmdIndex >= commands.count) {
+                        // All commands sent; let the last output settle, then run
+                        // the scenario against the now-overflowing buffer.
+                        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                            CGFloat viewportHeight = scrollView.contentView.bounds.size.height;
+                            CGFloat docHeight = scrollView.documentView.frame.size.height;
+                            NSLog(@"Viewport height: %f, document height: %f", viewportHeight, docHeight);
+
+                            // The tests only mean anything if the content overflows
+                            // the viewport — otherwise there is no bottom distinct
+                            // from top.
+                            XCTAssertGreaterThan(docHeight, viewportHeight + 1.0,
+                                                 @"Typed commands should overflow the viewport (doc %f <= viewport %f)",
+                                                 docHeight, viewportHeight);
+                            if (docHeight <= viewportHeight + 1.0) {
+                                done();
+                                return;
+                            }
+
+                            scenario(bufferWin, scrollView, done);
+                        });
+                        return;
+                    }
+
+                    [bufferWin sendCommandLine:commands[cmdIndex]];
+                    cmdIndex++;
+                    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.6 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                        sendNextCommand();
+                    });
+                };
+
+                // Wait for the resize to take effect before typing.
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                    sendNextCommand();
+                });
+            });
+        });
+    }];
+
+    NSDictionary *options = @{
+        @"lookForImages": @(NO),
+        @"downloadInfo": @(NO),
+        @"context": self.testContext
+    };
+
+    [importer addFiles:@[gameFileURL] options:options];
+
+    [self waitForExpectationsWithTimeout:60.0 handler:^(NSError * _Nullable error) {
+        [self deleteGameAtPath:gameFileURL.path];
+        if (error) {
+            XCTFail(@"Test timed out: %@", error);
+        }
+    }];
+}
+
+// "Scrolled to bottom" — the case cde1e69d regressed. Reproduces a fresh
+// autorestore's starting state: viewport parked at the top, _lastseen == 0, a
+// restore pending, and the layoutComplete-style non-nil-sender restoreScroll:
+// firing. The fix must scroll uncapped to the saved bottom rather than capping
+// to _lastseen (0) and staying at the top.
+- (void)testAutorestoreScrollPositionRestoresBottom {
+    [self runCursesScrollRestoreScenario:^(GlkTextBufferWindow *bufferWin, NSScrollView *scrollView, dispatch_block_t done) {
+        // Scroll to the true bottom and record it. This also sets the window's
+        // internal lastAtBottom flag — what an autosave persists as
+        // "scrolledToBottom".
+        [bufferWin scrollToBottomAnimated:NO];
+
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.4 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            XCTAssertTrue(bufferWin.scrolledToBottom,
+                          @"Setup: window should be scrolled to the bottom before simulating restore");
+            CGFloat bottomPos = scrollView.contentView.bounds.origin.y;
+            NSLog(@"Recorded bottom position: %f", bottomPos);
+
+            // Park at the top and model the fresh-restore state. _lastseen is a
+            // readonly property backed by the _lastseen ivar; set it via KVC to
+            // model the fresh-restore value (0) deterministically. lastAtBottom
+            // is still set from above, so restoreScroll: takes its "scroll to
+            // bottom" branch.
+            [scrollView.contentView scrollToPoint:NSMakePoint(0, 0)];
+            [scrollView reflectScrolledClipView:scrollView.contentView];
+            [bufferWin setValue:@0 forKey:@"lastseen"];
+            bufferWin.pendingScrollRestore = YES;
+
+            XCTAssertFalse(bufferWin.scrolledToBottom,
+                           @"Setup: window should be parked at the top before restore");
+
+            // Non-nil sender = exactly what the didCompleteLayout callback passes.
+            [bufferWin restoreScroll:bufferWin];
+
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                CGFloat restoredPos = scrollView.contentView.bounds.origin.y;
+                NSLog(@"Position after restore: %f (expected bottom %f)", restoredPos, bottomPos);
+
+                XCTAssertTrue(bufferWin.scrolledToBottom,
+                              @"Autorestore should return the window to the saved bottom, not pin it to the top (pos %f, bottom %f)",
+                              restoredPos, bottomPos);
+                XCTAssertEqualWithAccuracy(restoredPos, bottomPos, 2.0,
+                                           @"Restored scroll position %f should match saved bottom %f",
+                                           restoredPos, bottomPos);
+                done();
+            });
+        });
+    }];
+}
+
+// "Scrolled to top" — restoreScroll: should take its scrollToTop branch.
+- (void)testAutorestoreScrollPositionRestoresTop {
+    [self runCursesScrollRestoreScenario:^(GlkTextBufferWindow *bufferWin, NSScrollView *scrollView, dispatch_block_t done) {
+        CGFloat inset = bufferWin.textview.textContainerInset.height;
+        CGFloat viewportHeight = scrollView.contentView.bounds.size.height;
+        CGFloat docHeight = scrollView.documentView.frame.size.height;
+
+        // Park at the top and capture that as the saved state. storeScrollOffset
+        // records lastAtTop = YES (an autosave's "scrolledToTop"). scrollToTop
+        // targets an origin.y of textContainerInset.height, so that inset value
+        // is the "at the top" position we assert against.
+        [scrollView.contentView scrollToPoint:NSMakePoint(0, inset)];
+        [scrollView reflectScrolledClipView:scrollView.contentView];
+        [bufferWin storeScrollOffset];
+        XCTAssertEqualWithAccuracy(scrollView.contentView.bounds.origin.y, inset, 2.0,
+                                   @"Setup: window should be scrolled to the top before simulating restore");
+
+        // Park at the bottom via a raw clip-view scroll, which does NOT disturb
+        // the saved lastAtTop/lastAtBottom flags, then run the restore.
+        [scrollView.contentView scrollToPoint:NSMakePoint(0, docHeight - viewportHeight)];
+        [scrollView reflectScrolledClipView:scrollView.contentView];
+        XCTAssertGreaterThan(scrollView.contentView.bounds.origin.y, inset + 10.0,
+                             @"Setup: window should be parked away from the top before restore");
+
+        bufferWin.pendingScrollRestore = YES;
+        [bufferWin restoreScroll:nil];
+
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            CGFloat restoredPos = scrollView.contentView.bounds.origin.y;
+            NSLog(@"Position after restore: %f (expected top ~%f)", restoredPos, inset);
+
+            XCTAssertEqualWithAccuracy(restoredPos, inset, 2.0,
+                                       @"Autorestore should return the window to the saved top (pos %f, expected %f)",
+                                       restoredPos, inset);
+            done();
+        });
+    }];
+}
+
+// Mid-document — restoreScroll: should take its scrollToCharacter: branch and
+// land back on the saved character/offset.
+- (void)testAutorestoreScrollPositionRestoresMiddle {
+    [self runCursesScrollRestoreScenario:^(GlkTextBufferWindow *bufferWin, NSScrollView *scrollView, dispatch_block_t done) {
+        CGFloat inset = bufferWin.textview.textContainerInset.height;
+        CGFloat viewportHeight = scrollView.contentView.bounds.size.height;
+        CGFloat docHeight = scrollView.documentView.frame.size.height;
+        CGFloat overflow = docHeight - viewportHeight;
+
+        // Need enough overflow that "the middle" is unambiguously neither the
+        // top nor the bottom; the shared scaffold types commands into Curses to
+        // build up enough scrollback for this to hold.
+        XCTAssertGreaterThan(overflow, 100.0,
+                             @"Not enough overflow (%f) for a distinct mid-document position", overflow);
+
+        // Park at a mid-document position and capture it. Since we are neither at
+        // top nor bottom, storeScrollOffset records lastVisible + lastScrollOffset
+        // (an autosave's mid-document scroll state).
+        CGFloat midTarget = floor(overflow / 2.0);
+        [scrollView.contentView scrollToPoint:NSMakePoint(0, midTarget)];
+        [scrollView reflectScrolledClipView:scrollView.contentView];
+        [bufferWin storeScrollOffset];
+        CGFloat midPos = scrollView.contentView.bounds.origin.y;
+        NSLog(@"Recorded mid position: %f", midPos);
+
+        XCTAssertGreaterThan(midPos, inset + 40.0, @"Setup: mid position should be well below the top");
+        XCTAssertLessThan(midPos, overflow - 40.0, @"Setup: mid position should be well above the bottom");
+        XCTAssertFalse(bufferWin.scrolledToBottom, @"Setup: mid position should not be the bottom");
+
+        // Move away (to the top) via a raw clip-view scroll, which leaves the
+        // saved scroll state untouched, then run the restore.
+        [scrollView.contentView scrollToPoint:NSMakePoint(0, inset)];
+        [scrollView reflectScrolledClipView:scrollView.contentView];
+        bufferWin.pendingScrollRestore = YES;
+        [bufferWin restoreScroll:nil];
+
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            CGFloat restoredPos = scrollView.contentView.bounds.origin.y;
+            NSLog(@"Position after restore: %f (expected mid %f)", restoredPos, midPos);
+
+            // storeScrollOffset/scrollToCharacter reconstruct the position from a
+            // character index + fractional offset, so allow ~one line of slop
+            // (this is the same imprecision a real autosave/restore would have).
+            // The margins above keep the middle far enough from either edge that
+            // this tolerance can't be satisfied by landing at the top or bottom.
+            XCTAssertEqualWithAccuracy(restoredPos, midPos, 20.0,
+                                       @"Restored scroll position %f should match saved mid position %f",
+                                       restoredPos, midPos);
+            done();
+        });
+    }];
+}
+
+#pragma mark - Progressive Core Data migration (real model-13 store)
+
+// Copy the file at url (plus its -wal/-shm sidecars, if present) to dstURL.
+// A purely read-only snapshot of the source - we never open or modify it.
+- (BOOL)copyStoreFilesFrom:(NSURL *)url to:(NSURL *)dstURL {
+    NSFileManager *fm = NSFileManager.defaultManager;
+    for (NSString *suffix in @[@"", @"-wal", @"-shm"]) {
+        NSURL *src = [NSURL fileURLWithPath:[url.path stringByAppendingString:suffix]];
+        NSURL *dst = [NSURL fileURLWithPath:[dstURL.path stringByAppendingString:suffix]];
+        [fm removeItemAtURL:dst error:NULL];
+        if (![fm fileExistsAtPath:src.path])
+            continue;
+        if (![fm copyItemAtURL:src toURL:dst error:NULL])
+            return NO;
+    }
+    return YES;
+}
+
+// End-to-end check that progressive migration chains a real, pre-hash store all
+// the way to the current model AND actually runs the custom
+// IfidToHashMigrationPolicy (i.e. passes through "Spatterlight 15"), rather than
+// taking a single inferred hop. Uses the on-disk model-13 group-container store
+// as a read-only fixture; skips cleanly if it is not present.
+//
+// Discriminator: the policy nils every Game.hashTag (and recomputes it from the
+// file only for "found" games). We set found=NO first, so after a policy-driven
+// migration every hashTag is empty. Plain inference would instead have copied
+// the old non-empty hashTags straight across. Zero non-empty hashTags therefore
+// proves the policy ran.
+- (void)testProgressiveMigrationFromRealV13Store {
+    NSFileManager *fm = NSFileManager.defaultManager;
+
+    // The app momd (in the test host bundle) holds every model version.
+    NSURL *momd = [[NSBundle mainBundle] URLForResource:@"Spatterlight" withExtension:@"momd"];
+    XCTAssertNotNil(momd, @"Spatterlight.momd must be in the test host bundle");
+    NSManagedObjectModel *v13 = [[NSManagedObjectModel alloc]
+                                 initWithContentsOfURL:[momd URLByAppendingPathComponent:@"Spatterlight 13.mom"]];
+    XCTAssertNotNil(v13, @"model 13 must exist in the momd");
+
+    // Locate the real model-13 fixture store.
+    NSURL *realStore = nil;
+    NSMutableArray<NSURL *> *candidates = [NSMutableArray array];
+    for (NSString *group in @[@"group.net.ccxvii.spatterlight", @"6U7YY3724Y.group.net.ccxvii.spatterlight"]) {
+        NSURL *c = [fm containerURLForSecurityApplicationGroupIdentifier:group];
+        if (c)
+            [candidates addObject:[c URLByAppendingPathComponent:@"Spatterlight.storedata"]];
+    }
+    [candidates addObject:[NSURL fileURLWithPath:[NSHomeDirectory() stringByAppendingPathComponent:
+                           @"Library/Group Containers/group.net.ccxvii.spatterlight/Spatterlight.storedata"]]];
+    // Snapshot each candidate to a temp location before reading its metadata:
+    // even a metadata read opens the SQLite file and rewrites its -shm, so the
+    // original is never opened.
+    NSURL *tmpStore = [[NSURL fileURLWithPath:NSTemporaryDirectory()]
+                       URLByAppendingPathComponent:[NSString stringWithFormat:@"v13fixture-%@.storedata",
+                                                    NSProcessInfo.processInfo.globallyUniqueString]];
+    for (NSURL *s in candidates) {
+        if (![fm fileExistsAtPath:s.path])
+            continue;
+        XCTAssertTrue([self copyStoreFilesFrom:s to:tmpStore], @"failed to snapshot candidate store");
+        NSDictionary *m = [NSPersistentStoreCoordinator metadataForPersistentStoreOfType:NSSQLiteStoreType URL:tmpStore options:nil error:NULL];
+        if (m && [v13 isConfiguration:nil compatibleWithStoreMetadata:m]) { realStore = s; break; }
+    }
+    if (!realStore) {
+        for (NSString *suffix in @[@"", @"-wal", @"-shm"])
+            [fm removeItemAtPath:[tmpStore.path stringByAppendingString:suffix] error:NULL];
+        NSLog(@"Skipping testProgressiveMigrationFromRealV13Store: no model-13 fixture store found.");
+        return;
+    }
+
+    NSManagedObjectModel *finalModel = [[CoreDataManager alloc] initWithModelName:@"Spatterlight"].managedObjectModel;
+    XCTAssertNotNil(finalModel);
+
+    // Open the snapshot at v13: set found=NO everywhere (so the policy does no
+    // file I/O) and record the discriminator baseline.
+    NSUInteger preGames = 0, preMeta = 0, preNonEmptyHash = 0;
+    @autoreleasepool {
+        NSPersistentStoreCoordinator *c13 = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel:v13];
+        NSError *e = nil;
+        XCTAssertNotNil([c13 addPersistentStoreWithType:NSSQLiteStoreType configuration:nil URL:tmpStore options:nil error:&e], @"open v13 snapshot: %@", e);
+        NSManagedObjectContext *ctx = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSMainQueueConcurrencyType];
+        ctx.persistentStoreCoordinator = c13;
+        NSArray<NSManagedObject *> *games = [ctx executeFetchRequest:[NSFetchRequest fetchRequestWithEntityName:@"Game"] error:&e];
+        for (NSManagedObject *g in games) {
+            if (((NSString *)[g valueForKey:@"hashTag"]).length)
+                preNonEmptyHash++;
+            [g setValue:@NO forKey:@"found"];
+        }
+        preGames = games.count;
+        preMeta = [ctx countForFetchRequest:[NSFetchRequest fetchRequestWithEntityName:@"Metadata"] error:&e];
+        XCTAssertTrue([ctx save:&e], @"save found=NO: %@", e);
+        for (NSPersistentStore *s in c13.persistentStores.copy)
+            [c13 removePersistentStore:s error:NULL];
+    }
+    XCTAssertGreaterThan(preGames, 0u, @"fixture should contain games");
+    // The discriminator below relies on the policy reconciling Metadata to one
+    // row per Game, so the fixture must start out NOT already 1:1.
+    XCTAssertNotEqual(preMeta, preGames, @"fixture should have a different Metadata and Game count");
+    // ...and on the policy nilling hashTags, so the fixture must have some.
+    XCTAssertGreaterThan(preNonEmptyHash, 0u, @"fixture needs some non-empty hashTags");
+
+    // The snapshot must NOT already be at the current model.
+    NSDictionary *preMetaDict = [NSPersistentStoreCoordinator metadataForPersistentStoreOfType:NSSQLiteStoreType URL:tmpStore options:nil error:NULL];
+    XCTAssertFalse([finalModel isConfiguration:nil compatibleWithStoreMetadata:preMetaDict]);
+
+    // Run the real progressive migration.
+    NSError *migErr = nil;
+    BOOL ok = [ProgressiveMigrator migrateStoreAtURL:tmpStore ofType:NSSQLiteStoreType toModel:finalModel modelName:@"Spatterlight" error:&migErr];
+    XCTAssertTrue(ok, @"progressive migration failed: %@", migErr);
+
+    // It must now be at the current model.
+    NSDictionary *postMetaDict = [NSPersistentStoreCoordinator metadataForPersistentStoreOfType:NSSQLiteStoreType URL:tmpStore options:nil error:NULL];
+    XCTAssertTrue([finalModel isConfiguration:nil compatibleWithStoreMetadata:postMetaDict], @"store is not at the current model after migration");
+
+    // Verify data survived and the policy ran.
+    NSUInteger postGames = 0, postMeta = 0, postNonEmptyHash = 0;
+    @autoreleasepool {
+        NSPersistentStoreCoordinator *cFinal = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel:finalModel];
+        NSError *e = nil;
+        XCTAssertNotNil([cFinal addPersistentStoreWithType:NSSQLiteStoreType configuration:nil URL:tmpStore options:nil error:&e], @"open migrated store: %@", e);
+        NSManagedObjectContext *ctx = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSMainQueueConcurrencyType];
+        ctx.persistentStoreCoordinator = cFinal;
+        NSArray<NSManagedObject *> *games = [ctx executeFetchRequest:[NSFetchRequest fetchRequestWithEntityName:@"Game"] error:&e];
+        for (NSManagedObject *g in games)
+            if (((NSString *)[g valueForKey:@"hashTag"]).length)
+                postNonEmptyHash++;
+        postGames = games.count;
+        postMeta = [ctx countForFetchRequest:[NSFetchRequest fetchRequestWithEntityName:@"Metadata"] error:&e];
+        for (NSPersistentStore *s in cFinal.persistentStores.copy)
+            [cFinal removePersistentStore:s error:NULL];
+    }
+
+    NSLog(@"Progressive migration: games %lu->%lu, metadata %lu->%lu, non-empty hashTags %lu->%lu",
+          (unsigned long)preGames, (unsigned long)postGames, (unsigned long)preMeta, (unsigned long)postMeta,
+          (unsigned long)preNonEmptyHash, (unsigned long)postNonEmptyHash);
+
+    XCTAssertEqual(postGames, preGames, @"Game rows must be preserved across migration");
+    XCTAssertGreaterThan(postMeta, 0u, @"Metadata must survive migration");
+    // Discriminator that the custom IfidToHashMigrationPolicy actually ran (i.e.
+    // the chain passed through model 15) rather than a single inferred hop: the
+    // policy rebuilds Game<->Metadata relationships and reconciles Metadata to
+    // one row per Game. A plain inferred migration is structurally incapable of
+    // deleting rows, so it would have preserved the original Metadata count.
+    // Reaching one-Metadata-per-Game from a non-1:1 source therefore proves the
+    // policy ran.
+    XCTAssertNotEqual(postMeta, preMeta,
+                      @"Metadata count must change - inference cannot delete rows, so an unchanged count would mean the policy did not run");
+    XCTAssertEqual(postMeta, postGames,
+                   @"policy should reconcile Metadata to exactly one row per Game (got %lu Metadata for %lu Games)",
+                   (unsigned long)postMeta, (unsigned long)postGames);
+    // With found=NO set above, the (now-fixed) policy nils every Game.hashTag
+    // and does not recompute it from a file. Plain inference would have copied
+    // the old non-empty values across, so zero proves the hashTag-deletion path
+    // (IfidToHashMigrationPolicy.m line 77) actually runs now.
+    XCTAssertEqual(postNonEmptyHash, 0u,
+                   @"the policy should have nilled every hashTag (got %lu non-empty of %lu before the migration)",
+                   (unsigned long)postNonEmptyHash, (unsigned long)preNonEmptyHash);
+
+    // Clean up the temp snapshot.
+    [[[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel:finalModel]
+     destroyPersistentStoreAtURL:tmpStore withType:NSSQLiteStoreType options:nil error:NULL];
+}
+
+// Model 17 drops the never-used Interpreter and Tag entities and the
+// Theme.interpreter and Metadata.tag relationships to them. Build a model-16
+// store where both are filled in and check that the inferred migration drops
+// them and keeps the Theme and Metadata rows they pointed at.
+- (void)testMigrationFromV16DropsInterpreterAndTag {
+    NSURL *momd = [[NSBundle mainBundle] URLForResource:@"Spatterlight" withExtension:@"momd"];
+    NSManagedObjectModel *v16 = [[NSManagedObjectModel alloc]
+                                 initWithContentsOfURL:[momd URLByAppendingPathComponent:@"Spatterlight 16.mom"]];
+    XCTAssertNotNil(v16, @"model 16 must exist in the momd");
+    XCTAssertNotNil(v16.entitiesByName[@"Interpreter"]);
+    XCTAssertNotNil(v16.entitiesByName[@"Tag"]);
+
+    NSManagedObjectModel *finalModel = [[CoreDataManager alloc] initWithModelName:@"Spatterlight"].managedObjectModel;
+    XCTAssertNil(finalModel.entitiesByName[@"Interpreter"]);
+    XCTAssertNil(finalModel.entitiesByName[@"Tag"]);
+    XCTAssertNil(finalModel.entitiesByName[@"Theme"].relationshipsByName[@"interpreter"]);
+    XCTAssertNil(finalModel.entitiesByName[@"Metadata"].relationshipsByName[@"tag"]);
+
+    NSURL *tmpStore = [[NSURL fileURLWithPath:NSTemporaryDirectory()]
+                       URLByAppendingPathComponent:[NSString stringWithFormat:@"v16fixture-%@.storedata",
+                                                    NSProcessInfo.processInfo.globallyUniqueString]];
+
+    @autoreleasepool {
+        NSPersistentStoreCoordinator *c16 = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel:v16];
+        NSError *e = nil;
+        XCTAssertNotNil([c16 addPersistentStoreWithType:NSSQLiteStoreType configuration:nil URL:tmpStore options:nil error:&e], @"create v16 store: %@", e);
+        NSManagedObjectContext *ctx = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSMainQueueConcurrencyType];
+        ctx.persistentStoreCoordinator = c16;
+        NSManagedObject *theme = [NSEntityDescription insertNewObjectForEntityForName:@"Theme" inManagedObjectContext:ctx];
+        [theme setValue:@"V16 theme" forKey:@"name"];
+        NSManagedObject *interpreter = [NSEntityDescription insertNewObjectForEntityForName:@"Interpreter" inManagedObjectContext:ctx];
+        [interpreter setValue:@"bocfel" forKey:@"name"];
+        [theme setValue:interpreter forKey:@"interpreter"];
+        NSManagedObject *metadata = [NSEntityDescription insertNewObjectForEntityForName:@"Metadata" inManagedObjectContext:ctx];
+        [metadata setValue:@"V16 title" forKey:@"title"];
+        NSManagedObject *tag = [NSEntityDescription insertNewObjectForEntityForName:@"Tag" inManagedObjectContext:ctx];
+        [tag setValue:@"tagged" forKey:@"content"];
+        [metadata setValue:tag forKey:@"tag"];
+        XCTAssertTrue([ctx save:&e], @"save v16 store: %@", e);
+        for (NSPersistentStore *s in c16.persistentStores.copy)
+            [c16 removePersistentStore:s error:NULL];
+    }
+
+    NSDictionary *preMetaDict = [NSPersistentStoreCoordinator metadataForPersistentStoreOfType:NSSQLiteStoreType URL:tmpStore options:nil error:NULL];
+    XCTAssertTrue([v16 isConfiguration:nil compatibleWithStoreMetadata:preMetaDict]);
+    XCTAssertFalse([finalModel isConfiguration:nil compatibleWithStoreMetadata:preMetaDict]);
+
+    NSError *migErr = nil;
+    XCTAssertTrue([ProgressiveMigrator migrateStoreAtURL:tmpStore ofType:NSSQLiteStoreType toModel:finalModel modelName:@"Spatterlight" error:&migErr],
+                  @"migration failed: %@", migErr);
+
+    NSDictionary *postMetaDict = [NSPersistentStoreCoordinator metadataForPersistentStoreOfType:NSSQLiteStoreType URL:tmpStore options:nil error:NULL];
+    XCTAssertTrue([finalModel isConfiguration:nil compatibleWithStoreMetadata:postMetaDict], @"store is not at the current model after migration");
+
+    @autoreleasepool {
+        NSPersistentStoreCoordinator *cFinal = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel:finalModel];
+        NSError *e = nil;
+        XCTAssertNotNil([cFinal addPersistentStoreWithType:NSSQLiteStoreType configuration:nil URL:tmpStore options:nil error:&e], @"open migrated store: %@", e);
+        NSManagedObjectContext *ctx = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSMainQueueConcurrencyType];
+        ctx.persistentStoreCoordinator = cFinal;
+        NSArray<Theme *> *themes = [ctx executeFetchRequest:[NSFetchRequest fetchRequestWithEntityName:@"Theme"] error:&e];
+        XCTAssertEqual(themes.count, 1u);
+        XCTAssertEqualObjects(themes.firstObject.name, @"V16 theme");
+        NSArray<Metadata *> *metas = [ctx executeFetchRequest:[NSFetchRequest fetchRequestWithEntityName:@"Metadata"] error:&e];
+        XCTAssertEqual(metas.count, 1u);
+        XCTAssertEqualObjects(metas.firstObject.title, @"V16 title");
+        for (NSPersistentStore *s in cFinal.persistentStores.copy)
+            [cFinal removePersistentStore:s error:NULL];
+    }
+
+    [[[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel:finalModel]
+     destroyPersistentStoreAtURL:tmpStore withType:NSSQLiteStoreType options:nil error:NULL];
+}
+
+#pragma mark - Blorb parser hardening (corrupt / truncated files)
+
+// Build a minimal but structurally valid Blorb: FORM/IFRS wrapper + an RIdx
+// index containing a single Picture resource whose `start` offset points exactly
+// at the end of the data. Reading the 4-byte chunk type at that offset used to
+// walk off the end of the buffer and raise NSRangeException in
+// -[Blorb stringFromChunkWithPtr:] (Blorb.m:81 -> subdataWithRange:).
+- (NSData *)truncatedBlorbWithResourceStartAtEOF {
+    NSMutableData *data = [NSMutableData data];
+
+    // FORM header (12 bytes): 'FORM' + length + 'IFRS'.
+    blorbAppendFourCC(data, "FORM");
+    blorbAppendBE32(data, 0);            // form length is not consulted by the parser
+    blorbAppendFourCC(data, "IFRS");
+
+    // RIdx chunk header (8 bytes) + count (4) + one 12-byte entry.
+    blorbAppendFourCC(data, "RIdx");
+    blorbAppendBE32(data, 4 + 12);       // chunk length: count field + one entry
+    blorbAppendBE32(data, 1);            // resource count
+
+    // Single index entry: usage 'Pict', number 1, start == total length (EOF).
+    blorbAppendFourCC(data, "Pict");
+    blorbAppendBE32(data, 1);
+    blorbAppendBE32(data, 36);           // start offset == final data length
+
+    XCTAssertEqual(data.length, 36u, @"fixture layout changed; update the start offset");
+    return data;
+}
+
+// The reported crash: an RIdx entry whose start offset sits at the end of the
+// file. Parsing must succeed (degrading gracefully) instead of throwing.
+- (void)testTruncatedBlorbResourceStartAtEOFDoesNotCrash {
+    NSData *data = [self truncatedBlorbWithResourceStartAtEOF];
+
+    Blorb *blorb = [[Blorb alloc] initWithData:data];
+    XCTAssertNotNil(blorb, @"parsing a truncated Blorb should not return nil for a valid-length buffer");
+    XCTAssertEqual(blorb.resources.count, 1u, @"the single index entry should still be recorded");
+
+    BlorbResource *res = blorb.resources.firstObject;
+    XCTAssertNil(res.chunkType, @"an out-of-range chunk type must be nil, not a crash");
+
+    // The readers that dereference `start` must also degrade to nil, not crash.
+    XCTAssertNil([blorb dataForResource:res], @"reading past EOF should return nil");
+    XCTAssertNil(blorb.coverImageData, @"cover extraction must tolerate a missing chunk");
+}
+
+// An RIdx that claims far more entries than the file actually contains must not
+// over-read past the buffer while walking the index.
+- (void)testBlorbWithOverlongResourceCountDoesNotOverread {
+    NSMutableData *data = [NSMutableData data];
+    blorbAppendFourCC(data, "FORM");
+    blorbAppendBE32(data, 0);
+    blorbAppendFourCC(data, "IFRS");
+    blorbAppendFourCC(data, "RIdx");
+    blorbAppendBE32(data, 4 + 12);
+    blorbAppendBE32(data, 1000);         // lies: claims 1000 entries...
+    blorbAppendFourCC(data, "Pict");     // ...but only one 12-byte entry follows
+    blorbAppendBE32(data, 1);
+    blorbAppendBE32(data, 36);
+
+    Blorb *blorb = [[Blorb alloc] initWithData:data];
+    XCTAssertNotNil(blorb);
+    XCTAssertEqual(blorb.resources.count, 1u,
+                   @"only the entries that actually fit in the buffer should be read");
+}
+
+// A metadata (IFmd) chunk whose declared length runs past the end of the file
+// must be skipped rather than read out of bounds.
+- (void)testBlorbWithOverlongMetadataLengthDoesNotCrash {
+    NSMutableData *data = [NSMutableData data];
+    blorbAppendFourCC(data, "FORM");
+    blorbAppendBE32(data, 0);
+    blorbAppendFourCC(data, "IFRS");
+    // Empty RIdx (zero resources) so the parser moves on to the trailing chunks.
+    blorbAppendFourCC(data, "RIdx");
+    blorbAppendBE32(data, 4);
+    blorbAppendBE32(data, 0);
+    // IFmd chunk header claiming 10000 bytes of payload that isn't there.
+    blorbAppendFourCC(data, "IFmd");
+    blorbAppendBE32(data, 10000);
+
+    Blorb *blorb = [[Blorb alloc] initWithData:data];
+    XCTAssertNotNil(blorb);
+    XCTAssertNil(blorb.metaData, @"an out-of-range IFmd chunk must not be extracted");
+}
+
+// isBlorbData: reads the first 12 bytes of the FORM header, so it must reject
+// buffers shorter than that instead of reading past the end.
+- (void)testIsBlorbDataRejectsShortBuffers {
+    XCTAssertFalse([Blorb isBlorbData:[NSData data]]);
+    XCTAssertFalse([Blorb isBlorbData:[@"FO" dataUsingEncoding:NSASCIIStringEncoding]]);
+    XCTAssertFalse([Blorb isBlorbData:[@"FORM????????" dataUsingEncoding:NSASCIIStringEncoding]],
+                   @"a 12-byte non-IFRS FORM is not a Blorb");
+}
+
+// Assemble a Blorb from Pict resources (number -> payload) and trailing
+// chunks (fourCC -> payload). Resources come first, in the order given, and
+// the chunks follow, padded to even lengths.
+- (NSData *)blorbWithPictures:(NSArray<NSArray *> *)pictures chunks:(NSArray<NSArray *> *)chunks {
+    NSMutableData *data = [NSMutableData data];
+    blorbAppendFourCC(data, "FORM");
+    blorbAppendBE32(data, 0);
+    blorbAppendFourCC(data, "IFRS");
+    blorbAppendFourCC(data, "RIdx");
+    blorbAppendBE32(data, (uint32_t)(4 + 12 * pictures.count));
+    blorbAppendBE32(data, (uint32_t)pictures.count);
+
+    NSMutableData *body = [NSMutableData data];
+    for (NSArray *chunk in chunks) {
+        NSData *payload = chunk[1];
+        blorbAppendFourCC(body, [chunk[0] UTF8String]);
+        blorbAppendBE32(body, (uint32_t)payload.length);
+        [body appendData:payload];
+        if (payload.length & 1)
+            [body appendBytes:"\0" length:1];
+    }
+
+    NSUInteger offset = data.length + 12 * pictures.count + body.length;
+    NSMutableData *pictData = [NSMutableData data];
+    for (NSArray *picture in pictures) {
+        blorbAppendFourCC(data, "Pict");
+        blorbAppendBE32(data, [picture[0] unsignedIntValue]);
+        blorbAppendBE32(data, (uint32_t)(offset + pictData.length));
+        NSData *payload = picture[1];
+        blorbAppendFourCC(pictData, "PNG ");
+        blorbAppendBE32(pictData, (uint32_t)payload.length);
+        [pictData appendData:payload];
+        if (payload.length & 1)
+            [pictData appendBytes:"\0" length:1];
+    }
+    [data appendData:body];
+    [data appendData:pictData];
+    return data;
+}
+
+// 40 bytes, so FileSignature gives it a real hash.
+static NSData *blorbFakeImage(char fill) {
+    NSMutableData *image = [NSMutableData dataWithLength:40];
+    memset(image.mutableBytes, fill, 40);
+    return image;
+}
+
+// Without an Fspc chunk the first picture is used as a fake frontispiece.
+// Asking twice used to clear the flag and could pick a different picture.
+- (void)testBlorbCoverImageWithoutFspcIsStable {
+    NSData *data = [self blorbWithPictures:@[@[@3, blorbFakeImage('a')], @[@1, blorbFakeImage('b')]] chunks:@[]];
+    Blorb *blorb = [[Blorb alloc] initWithData:data];
+    NSData *first = blorb.coverImageData;
+    XCTAssertEqualObjects(first, blorbFakeImage('a'), @"the first picture in index order is the fallback cover");
+    XCTAssertTrue(blorb.fakeFrontispiece);
+    XCTAssertEqualObjects(blorb.coverImageData, first);
+    XCTAssertTrue(blorb.fakeFrontispiece, @"a second call must not reset the flag");
+}
+
+- (void)testBlorbCoverImageUsesFspc {
+    uint8_t fspc[4] = {0, 0, 0, 1};
+    NSData *data = [self blorbWithPictures:@[@[@3, blorbFakeImage('a')], @[@1, blorbFakeImage('b')]]
+                                    chunks:@[@[@"Fspc", [NSData dataWithBytes:fspc length:4]]]];
+    Blorb *blorb = [[Blorb alloc] initWithData:data];
+    XCTAssertEqualObjects(blorb.coverImageData, blorbFakeImage('b'));
+    XCTAssertFalse(blorb.fakeFrontispiece);
+    XCTAssertFalse(blorb.fakeFrontispiece, @"reading the flag first or twice gives the same answer");
+}
+
+// SNam is UTF-16BE; the other text chunks are ASCII. An odd-length chunk is
+// padded, and the chunk after it must still be found.
+- (void)testBlorbOptionalTextChunks {
+    NSData *snam = [@"Zork Zero" dataUsingEncoding:NSUTF16BigEndianStringEncoding];
+    NSData *data = [self blorbWithPictures:@[]
+                                    chunks:@[@[@"SNam", snam],
+                                             @[@"AUTH", [@"Odd" dataUsingEncoding:NSASCIIStringEncoding]],
+                                             @[@"(c) ", [@"1988" dataUsingEncoding:NSASCIIStringEncoding]]]];
+    Blorb *blorb = [[Blorb alloc] initWithData:data];
+    XCTAssertEqualObjects(blorb.optionalChunks[@"SNam"], @"Zork Zero");
+    XCTAssertEqualObjects(blorb.optionalChunks[@"AUTH"], @"Odd");
+    XCTAssertEqualObjects(blorb.optionalChunks[@"(c) "], @"1988");
+}
+
+- (void)testBlorbIFhd {
+    const uint8_t ifhd[13] = {0x00, 0x58, '8', '4', '0', '7', '2', '6', 0xAB, 0xCD, 0, 0, 0};
+    NSData *data = [self blorbWithPictures:@[] chunks:@[@[@"IFhd", [NSData dataWithBytes:ifhd length:13]]]];
+    Blorb *blorb = [[Blorb alloc] initWithData:data];
+    XCTAssertEqual(blorb.releaseNumber, 88u);
+    XCTAssertEqualObjects(blorb.serialNumber, @"840726");
+    XCTAssertEqual(blorb.checkSum, 0xABCDu);
+    XCTAssertEqualObjects(blorb.ifidFromIFhd, @"ZCODE-88-840726", @"serials that look like 1970s-1990s dates omit the checksum");
+
+    // Too short to hold the fields: ignored rather than over-read.
+    data = [self blorbWithPictures:@[] chunks:@[@[@"IFhd", [NSData dataWithBytes:ifhd length:9]]]];
+    blorb = [[Blorb alloc] initWithData:data];
+    XCTAssertNil(blorb.serialNumber);
+    XCTAssertNil(blorb.ifidFromIFhd);
+
+    XCTAssertEqualObjects([Blorb zcodeIFIDWithRelease:1 serial:@"000000" checksum:0x1234], @"ZCODE-1-000000");
+    XCTAssertEqualObjects([Blorb zcodeIFIDWithRelease:1 serial:@"123456" checksum:0x1234], @"ZCODE-1-123456-1234");
+    XCTAssertEqualObjects([Blorb zcodeIFIDWithRelease:1 serial:@"12" checksum:0x1234], @"ZCODE-1-12-1234",
+                          @"a short serial must not throw");
+}
+
+// A chunk length with the top bit set used to be clamped to UINT32_MAX by
+// unpackLong. Either way it runs past the file and must be skipped.
+- (void)testBlorbHugeChunkLength {
+    NSMutableData *data = [[self blorbWithPictures:@[] chunks:@[]] mutableCopy];
+    blorbAppendFourCC(data, "AUTH");
+    blorbAppendBE32(data, UINT32_MAX);
+    blorbAppendFourCC(data, "Zork");
+    Blorb *blorb = [[Blorb alloc] initWithData:data];
+    XCTAssertNotNil(blorb);
+    XCTAssertNil(blorb.optionalChunks[@"AUTH"]);
+}
+
+- (void)testIFFHelpers {
+    const uint8_t bytes[] = {'F', 'O', 'R', 'M', 0x80, 0, 0, 1, 'I', 'F', 'Z', 'S', 'I', 'F', 'h', 'd', 0, 0, 0, 13};
+    XCTAssertEqual(unpackLong(bytes + 4), 0x80000001u, @"no hidden clamp for values with the top bit set");
+    XCTAssertEqual(unpackShort(bytes + 4), 0x8000u);
+    XCTAssertEqual(IFFID((char)0xA9, 'a', 'b', 'c'), 0xA9616263u, @"high-bit characters are not sign-extended");
+
+    XCTAssertTrue(isForm(bytes, sizeof bytes, 'I', 'F', 'Z', 'S'));
+    XCTAssertFalse(isForm(bytes, 11, 'I', 'F', 'Z', 'S'), @"too short for a FORM header");
+    XCTAssertFalse(isForm(NULL, 12, 'I', 'F', 'Z', 'S'));
+
+    uint32_t chunkID = 0, length = 0;
+    XCTAssertTrue(chunkHeaderAt(bytes, sizeof bytes, 12, &chunkID, &length));
+    XCTAssertEqual(chunkID, IFFID('I', 'F', 'h', 'd'));
+    XCTAssertEqual(length, 13u);
+    XCTAssertFalse(chunkHeaderAt(bytes, sizeof bytes, 13, &chunkID, &length), @"header runs past the end");
+    XCTAssertFalse(chunkHeaderAt(bytes, sizeof bytes, 1000, &chunkID, &length), @"offset past the end");
+    XCTAssertFalse(chunkHeaderAt(bytes, sizeof bytes, SIZE_MAX, &chunkID, &length));
+
+    XCTAssertEqual(paddedLength(0), 0u);
+    XCTAssertEqual(paddedLength(13), 14u);
+    XCTAssertEqual(paddedLength(UINT32_MAX), (size_t)UINT32_MAX + 1);
+    XCTAssertEqual(paddedLength(SIZE_MAX), SIZE_MAX, @"saturates instead of wrapping to 0");
+
+    IFhdInfo info;
+    const uint8_t ifhd[10] = {0, 2, '8', '6', '0', '9', '1', '0', 0x12, 0x34};
+    XCTAssertTrue(parseIFhd(ifhd, 10, &info));
+    XCTAssertEqual(info.release, 2u);
+    XCTAssertEqual(memcmp(info.serial, "860910", 6), 0);
+    XCTAssertEqual(info.checksum, 0x1234u);
+    XCTAssertFalse(parseIFhd(ifhd, 9, &info));
+    XCTAssertFalse(parseIFhd(NULL, 10, &info));
+}
+
+#pragma mark - Crossed filename-title repair
+
+// Build a standalone in-memory context on the Spatterlight model, independent
+// of the shared test store, so this repair test can't disturb (or be disturbed
+// by) other tests.
+- (NSManagedObjectContext *)freshInMemoryContext {
+    CoreDataManager *manager = [[CoreDataManager alloc] initInMemoryWithModelName:@"Spatterlight"];
+    NSManagedObjectContext *context = manager.mainManagedObjectContext;
+    XCTAssertNotNil(context, @"in-memory store should be created");
+    // The context holds on to its coordinator but not to the container.
+    [self addTeardownBlock:^{
+        (void)manager;
+    }];
+    return context;
+}
+
+- (Game *)insertGameWithPath:(NSString *)path
+                        ifid:(NSString *)ifid
+                       title:(NSString *)title
+                   inContext:(NSManagedObjectContext *)context {
+    Game *game = [NSEntityDescription insertNewObjectForEntityForName:@"Game" inManagedObjectContext:context];
+    game.path = path;
+    game.ifid = ifid;
+    Metadata *metadata = [NSEntityDescription insertNewObjectForEntityForName:@"Metadata" inManagedObjectContext:context];
+    metadata.title = title;
+    game.metadata = metadata;
+    return game;
+}
+
+// Regression test for the bug where an early IfidToHashMigrationPolicy could
+// leave a game wearing a same-ifid sibling's filename as its title (an Apple II
+// .woz disk image of The Sorcerer of Claymorge Castle titled "claymorge.z80").
+- (void)testRepairCrossedFilenameTitles {
+    NSManagedObjectContext *context = [self freshInMemoryContext];
+    NSString *ifid = @"TEST-CLAYMORGE";
+
+    // The bug: the .woz game is titled with the .z80 sibling's filename.
+    Game *woz = [self insertGameWithPath:@"/Games/claymorge.woz" ifid:ifid title:@"claymorge.z80" inContext:context];
+    // The sibling, correctly titled with its own filename.
+    Game *z80 = [self insertGameWithPath:@"/Games/claymorge.z80" ifid:ifid title:@"claymorge.z80" inContext:context];
+    // An unrelated game with a real title that must not be touched.
+    Game *other = [self insertGameWithPath:@"/Games/curses.z5" ifid:@"ZCODE-16-950520" title:@"Curses" inContext:context];
+
+    NSUInteger repaired = [CoreDataManager repairCrossedFilenameTitlesInContext:context];
+
+    XCTAssertEqual(repaired, 1UL, @"exactly the crossed .woz title should be repaired");
+    XCTAssertEqualObjects(woz.metadata.title, @"claymorge.woz",
+                          @"the .woz game should be retitled to its own filename");
+    XCTAssertEqualObjects(z80.metadata.title, @"claymorge.z80",
+                          @"a game titled with its own filename must be left alone");
+    XCTAssertEqualObjects(other.metadata.title, @"Curses",
+                          @"a real title must not be mistaken for a filename");
+}
+
+// A game with no file path (missing file) whose title is a sibling's filename
+// should fall back to "Untitled" rather than keep the wrong name.
+- (void)testRepairCrossedFilenameTitlesFallsBackToUntitledWhenPathMissing {
+    NSManagedObjectContext *context = [self freshInMemoryContext];
+    NSString *ifid = @"TEST-NOPATH";
+
+    [self insertGameWithPath:@"/Games/real.z80" ifid:ifid title:@"real.z80" inContext:context];
+    Game *missing = [self insertGameWithPath:nil ifid:ifid title:@"real.z80" inContext:context];
+
+    NSUInteger repaired = [CoreDataManager repairCrossedFilenameTitlesInContext:context];
+
+    XCTAssertEqual(repaired, 1UL);
+    XCTAssertEqualObjects(missing.metadata.title, @"Untitled",
+                          @"a crossed game with no path should become Untitled");
+}
+
+@end

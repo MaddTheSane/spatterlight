@@ -10,10 +10,7 @@
 
 #import "ImageView.h"
 
-#import "Constants.h"
-
 #import "AppDelegate.h"
-#import "LibController.h"
 #import "TableViewController.h"
 #import "Game.h"
 #import "Metadata.h"
@@ -21,16 +18,23 @@
 
 #import "NSImage+Categories.h"
 #import "NSData+Categories.h"
+#import "NSView+Categories.h"
 #import "ImageCompareViewController.h"
 #import "IFDBDownloader.h"
-#import "MyFilePromiseProvider.h"
+#import "CoverImageStore.h"
+#import "IFictionMetadata.h"
+#import "IFStory.h"
+#import "IFCoverDescription.h"
+#import "ImageDragSource.h"
 
 #import "NotificationBezel.h"
 #import "FolderAccess.h"
 
-#import "OSImageHashing.h"
+#import "ImageSimilarity.h"
 
 #import "Preferences.h"
+#import "NSAlert+Spatterlight.h"
+#import "Constants.h"
 
 #define FILTERTAG ((NSInteger) 100)
 #define DESCRIPTIONTAG ((NSInteger) 200)
@@ -39,11 +43,17 @@
 
 @interface ImageView ()
 {
-    NSSet<NSPasteboardType> *nonURLTypes;
     NSArray<NSString *> *imageTypes;
     CALayer *imageLayer;
     CAShapeLayer *shapeLayer;
+    ImageDragSource *dragSource; // made on first drag
 }
+
+@property BOOL isSelected;
+@property BOOL isReceivingDrag;
+@property NSInteger numberForSelfSourcedDrag;
+@property (readwrite) CGFloat ratio;
+@property (readonly, copy, nullable) NSData *pngData;
 
 @property NSOperationQueue *workQueue;
 @property NSURL *destinationURL;
@@ -60,10 +70,7 @@
         self.wantsLayer = YES;
         self.enabled = YES;
 
-        nonURLTypes = [NSSet setWithObjects:NSPasteboardTypeTIFF, NSPasteboardTypePNG, nil];
-        _acceptableTypes = [NSSet setWithObject:NSPasteboardTypeURL];
-        _acceptableTypes = [_acceptableTypes setByAddingObjectsFromSet:nonURLTypes];
-        [self registerForDraggedTypes:_acceptableTypes.allObjects];
+        [self registerForDraggedTypes:ImageView.acceptableDragTypes.allObjects];
         _numberForSelfSourcedDrag = NSNotFound;
 
         imageTypes = NSImage.imageTypes;
@@ -81,12 +88,21 @@
         self = [self initWithFrame:NSZeroRect];
     if (self) {
         _image = anImage;
-        _game = game;
+        _gameObjID = game.objectID;
 
         if (_image)
             [self processImage:_image];
     }
     return self;
+}
+
++ (NSSet<NSPasteboardType> *)acceptableDragTypes {
+    static NSSet<NSPasteboardType> *types;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        types = [NSSet setWithObjects:NSPasteboardTypeURL, NSPasteboardTypeTIFF, NSPasteboardTypePNG, nil];
+    });
+    return types;
 }
 
 + (NSMenu *)defaultMenu {
@@ -117,7 +133,7 @@
     [menu addItem:paste];
     [menu addItem:delete];
     [menu addItem:[NSMenuItem separatorItem]];
-    filter.state = NSOffState;
+    filter.state = NSControlStateValueOff;
     filter.tag = FILTERTAG;
     [menu addItem:filter];
 
@@ -183,6 +199,11 @@
     return YES;
 }
 
+- (Game *)gameFromObjectID {
+    TableViewController *tableViewController = ((AppDelegate*)NSApp.delegate).tableViewController;
+    return [tableViewController.managedObjectContext objectWithID:_gameObjID];
+}
+
 - (void)processImage:(NSImage *)image {
     _image = image;
     if (imageLayer)
@@ -191,16 +212,18 @@
     imageLayer = [CALayer layer];
 
     NSImageRep *rep = image.representations.lastObject;
-    NSSize sizeInPixels = NSMakeSize(rep.pixelsWide, rep.pixelsHigh);
+    NSSize sizeInPixels = NSMakeSize((CGFloat)rep.pixelsWide, (CGFloat)rep.pixelsHigh);
     image.size = sizeInPixels;
 
     _ratio = sizeInPixels.width / sizeInPixels.height;
 
-    if (_game.metadata.cover.interpolation == kUnset) {
-        _game.metadata.cover.interpolation = sizeInPixels.width < 350 ? kNearestNeighbor : kTrilinear;
+    Game *game = [self gameFromObjectID];
+
+    if (game.metadata.cover.interpolation == kUnset) {
+        game.metadata.cover.interpolation = sizeInPixels.width < 350 ? kNearestNeighbor : kTrilinear;
     }
 
-    imageLayer.magnificationFilter = (_game.metadata.cover.interpolation == kNearestNeighbor) ? kCAFilterNearest : kCAFilterTrilinear;
+    imageLayer.magnificationFilter = (game.metadata.cover.interpolation == kNearestNeighbor) ? kCAFilterNearest : kCAFilterTrilinear;
 
     imageLayer.drawsAsynchronously = YES;
     imageLayer.contentsGravity = kCAGravityResize;
@@ -227,10 +250,10 @@
 
     [CATransaction commit];
 
-    self.accessibilityLabel = _game.metadata.coverArtDescription;
+    self.accessibilityLabel = game.metadata.coverArtDescription;
     if (!self.accessibilityLabel.length)
         self.accessibilityLabel =
-        [NSString stringWithFormat:@"cover image for %@", _game.metadata.title];
+        [NSString stringWithFormat:@"cover image for %@", game.metadata.title];
 }
 
 - (BOOL)acceptsFirstResponder {
@@ -287,13 +310,14 @@
 #pragma mark Actions
 
 - (BOOL)validateMenuItem:(NSMenuItem *)menuItem {
+    Game *game = [self gameFromObjectID];
     if (menuItem.action == @selector(paste:)) {
         NSPasteboard *pasteBoard = [NSPasteboard generalPasteboard];
         if ([pasteBoard canReadObjectForClasses:@[[NSURL class]] options:@{NSPasteboardURLReadingContentsConformToTypesKey:[NSImage imageTypes]}]) {
             return YES;
         } else {
             NSMutableSet *types = [NSMutableSet setWithArray:pasteBoard.types];
-            [types intersectSet:_acceptableTypes];
+            [types intersectSet:ImageView.acceptableDragTypes];
             if (types.count)
                 return YES;
         }
@@ -305,7 +329,7 @@
     }
 
     else if (menuItem.action == @selector(reloadFromBlorb:)) {
-        return [Blorb isBlorbURL:[NSURL fileURLWithPath:_game.path isDirectory:NO]];
+        return [Blorb isBlorbURL:[NSURL fileURLWithPath:game.path isDirectory:NO]];
     }
 
     else if (menuItem.action == @selector(saveImage:)) {
@@ -315,10 +339,10 @@
     else if (menuItem.action == @selector(toggleFilter:)) {
         NSMenuItem *filter = [self.menu itemWithTag:FILTERTAG];
         if (!_isPlaceholder) {
-            filter.state = (_game.metadata.cover.interpolation == kNearestNeighbor) ? NSOffState : NSOnState;
+            filter.state = (game.metadata.cover.interpolation == kNearestNeighbor) ? NSControlStateValueOff : NSControlStateValueOn;
             return YES;
         } else {
-            filter.state = NSOffState;
+            filter.state = NSControlStateValueOff;
             return NO;
         }
     }
@@ -326,7 +350,7 @@
     else if (menuItem.action == @selector(addDescription:)) {
         NSMenuItem *description = [self.menu itemWithTag:DESCRIPTIONTAG];
         if (!_isPlaceholder) {
-            description.title = (_game.metadata.coverArtDescription.length || _game.metadata.cover.imageDescription.length) ? NSLocalizedString(@"Edit description", nil) : NSLocalizedString(@"Add description", nil);
+            description.title = (game.metadata.coverArtDescription.length || game.metadata.cover.imageDescription.length) ? NSLocalizedString(@"Edit description", nil) : NSLocalizedString(@"Add description", nil);
             return YES;
         } else {
             description.title = NSLocalizedString(@"Add description", nil);
@@ -337,20 +361,28 @@
     return YES;
 }
 
+// Delete the cover relation of the Metadata object, and the Image object
+// too if that leaves it an orphan
+- (void)removeCover {
+    Metadata *metadata = [self gameFromObjectID].metadata;
+    Image *image = metadata.cover;
+    if (!image)
+        return;
+    metadata.cover = nil;
+    metadata.coverArtDescription = nil;
+    [Image deleteIfOrphan:image];
+}
+
 - (void)cut:(id)sender {
     [self copy:nil];
-
-    //Delete the cover relation of the Metadata object
-    Image *image = _game.metadata.cover;
-    _game.metadata.cover = nil;
-    _game.metadata.coverArtDescription = nil;
-
-    //If the Image object becomes an orphan, delete it from the Core Data store
-    if (image && image.metadata.count == 0)
-        [_game.managedObjectContext deleteObject:image];
+    [self removeCover];
 }
 
 - (void)copy:(id)sender {
+    if (!_image) {
+        NSBeep();
+        return;
+    }
     NSPasteboard *pb = [NSPasteboard generalPasteboard];
     [pb clearContents];
     [pb writeObjects:@[_image]];
@@ -361,39 +393,32 @@
         NSBeep();
         return;
     }
-    NSAlert *alert = [[NSAlert alloc] init];
-    alert.messageText = NSLocalizedString(@"Are you sure?", nil);
-    alert.informativeText = NSLocalizedString(@"Do you want to delete this cover image?", nil);
+    NSAlert *alert = [NSAlert alertWithMessage:NSLocalizedString(@"Are you sure?", nil)
+                                          info:NSLocalizedString(@"Do you want to delete this cover image?", nil)
+                                       buttons:@[NSLocalizedString(@"Delete", nil), NSLocalizedString(@"Cancel", nil)]];
     alert.icon = _image;
-    [alert addButtonWithTitle:NSLocalizedString(@"Delete", nil)];
-    [alert addButtonWithTitle:NSLocalizedString(@"Cancel", nil)];
 
-    NSInteger choice = [alert runModal];
-
-    if (choice == NSAlertFirstButtonReturn) {
-        //Delete the cover relation of the Metadata object
-        Image *image = _game.metadata.cover;
-        if (!image)
-            return;
-        _game.metadata.cover = nil;
-        _game.metadata.coverArtDescription = nil;
-
-        //If the Image object becomes an orphan, delete it from the Core Data store
-        if (image.metadata.count == 0)
-            [_game.managedObjectContext deleteObject:image];
-    }
+    if ([alert runModal] == NSAlertFirstButtonReturn)
+        [self removeCover];
 }
 
 - (void)paste:(id)sender {
     NSPasteboard *pb = [NSPasteboard  generalPasteboard];
     NSArray *objects = [pb readObjectsForClasses:@[[NSURL class], [NSImage class]] options:nil];
 
-    NSData *imgData1 = (NSData *)_game.metadata.cover.data;
+    Game *game = [self gameFromObjectID];
+    // The cover is stored as PNG or JPEG data, so it can't be compared with
+    // a pasted NSImage byte for byte: compare both decoded to TIFF instead.
+    NSData *coverData = (NSData *)game.metadata.cover.data;
+    NSData *imgData1 = coverData ? [[NSImage alloc] initWithData:coverData].TIFFRepresentation : nil;
+
+    BOOL (^isCurrentCover)(NSImage *) = ^BOOL(NSImage *image) {
+        return imgData1 && [imgData1 isEqualToData:image.TIFFRepresentation];
+    };
 
     for (id item in objects) {
         if ([item isKindOfClass:[NSImage class]]) {
-            NSData *imgData2 = ((NSImage *)item).TIFFRepresentation;
-            if ([imgData1 isEqual:imgData2]) {
+            if (isCurrentCover((NSImage *)item)) {
                 NSBeep();
                 return;
             }
@@ -401,7 +426,7 @@
             break;
         } else if ([item isKindOfClass:[NSURL class]]) {
             NSURL *url = (NSURL *)item;
-            if ([_game.metadata.coverArtURL isEqualToString:url.path]) {
+            if ([game.metadata.coverArtURL isEqualToString:url.path]) {
                 NSBeep();
                 return;
             }
@@ -409,8 +434,7 @@
                 NSArray *objects2 = [pb readObjectsForClasses:@[[NSImage class]] options:nil];
                 if ([objects2.firstObject isKindOfClass:[NSImage class]]) {
                     NSImage *image = (NSImage *)objects2.firstObject;
-                    NSData *imgData2 = image.TIFFRepresentation;
-                    if ([imgData1 isEqual:imgData2]) {
+                    if (isCurrentCover(image)) {
                         NSBeep();
                         return;
                     }
@@ -456,7 +480,8 @@
 }
 
 - (IBAction)reloadFromBlorb:(id)sender {
-    NSURL *url = _game.urlForBookmark;
+    Game *game = [self gameFromObjectID];
+    NSURL *url = game.urlForBookmark;
     if (!url)
         return;
     ImageView __weak *weakSelf = self;
@@ -464,7 +489,7 @@
         ImageView *strongSelf = weakSelf;
         if (!strongSelf)
             return;
-        Blorb *blorb = [[Blorb alloc] initWithData:[NSData dataWithContentsOfURL:url]];
+        Blorb *blorb = [Blorb blorbAtURL:url];
         NSData *data = blorb.coverImageData;
         BOOL success = NO;
         if (data) {
@@ -474,7 +499,7 @@
             if (metadata) {
                 NSString *imageDescription = [ImageView coverArtDescriptionFromXMLData:metadata];
                 if (imageDescription.length)
-                    strongSelf.game.metadata.coverArtDescription = imageDescription;
+                    game.metadata.coverArtDescription = imageDescription;
             }
         }
         if (!success) {
@@ -485,47 +510,62 @@
 }
 
 + (NSString *)coverArtDescriptionFromXMLData:(NSData *)data {
-    NSString *result = @"";
-    NSError *error = nil;
-    NSXMLDocument *xml =
-    [[NSXMLDocument alloc] initWithData:data
-                                options:NSXMLDocumentTidyXML
-                                  error:&error];
-    NSArray *descriptions = [xml.rootElement nodesForXPath:@"story/cover/description" error:&error];
-    if (descriptions.count) {
-        NSXMLElement *description = descriptions.firstObject;
-        result = description.stringValue;
-    } else {
+    NSString *result = [[IFictionMetadata alloc] initWithData:data].firstStory.coverDescription.coverArtDescription;
+    if (!result) {
         NSLog(@"No cover image description found in metadata!");
+        return @"";
     }
     return result;
 }
 
 - (IBAction)downloadImage:(id)sender {
-    Game *game = _game;
+    TableViewController *libController = ((AppDelegate *)NSApp.delegate).tableViewController;
+    libController.lastImageComparisonData = nil;
+    NSManagedObjectContext *context = libController.managedObjectContext;
+    Game *game = [context objectWithID:_gameObjID];
     NSOperationQueue *queue = self.workQueue;
 
-    TableViewController *libController = ((AppDelegate*)NSApp.delegate).tableViewController;
-    libController.lastImageComparisonData = nil;
-
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    NSInteger setting = [defaults integerForKey:@"ImageReplacement"];
+    NSInteger setting = [defaults integerForKey:kImageReplacementKey];
 
-    [game.managedObjectContext performBlock:^{
+    BOOL reportFailure = (game.metadata.ifids.count <= 1 || game.metadata.tuid.length);
 
-        IFDBDownloader *downloader = [[IFDBDownloader alloc] initWithContext:game.managedObjectContext];
-        
-        [downloader downloadMetadataForGames:@[game] onQueue:queue imageOnly:YES reportFailure:YES completionHandler:^{
-            [game.managedObjectContext performBlock:^{
-                [downloader downloadImageFor:game.metadata onQueue:queue forceDialog:(setting == kNeverReplace)];
+    NSArray<NSManagedObjectID *> *gameArray = @[game.objectID];
+    NSManagedObjectID *metaID = game.metadata.objectID;
+    NSString *oldURL = game.metadata.coverArtURL;
+    [context performBlock:^{
+
+        IFDBDownloader *downloader = [[IFDBDownloader alloc] initWithTableViewController:libController];
+
+        // If the metadata has more than one IFID, it may try to download metadata several times,
+        // which may result in a failure bezel on one attempt while another one succeeds. Thus, if
+        // the metadata has more than one IFID and no TUID, we dowload the image again
+        // in order to get a failure report.
+        // Also, if the image replacement setting is set to never replace, we override it by
+        // downloading the image again with forceDialog set to YES.
+        [downloader downloadMetadataForGames:gameArray inContext:context onQueue:queue imageOnly:YES reportFailure:reportFailure completionHandler:^{
+            if (reportFailure && setting != kNeverReplace)
+                return;
+            BOOL __block reload = NO;
+            [context performBlockAndWait:^{
+                Metadata *meta = [context objectWithID:metaID];
+                if ([meta.coverArtURL isEqualToString:oldURL]) {
+                    reload = YES;
+                } else if (setting == kNeverReplace) {
+                    reload = YES;
+                }
             }];
+
+            if (reload)
+                [downloader downloadImageFor:metaID inContext:context onQueue:queue forceDialog:(setting == kNeverReplace) reportFailure:YES];
         }];
     }];
 }
 
 - (IBAction)toggleFilter:(id)sender {
-    _game.metadata.cover.interpolation = (_game.metadata.cover.interpolation == kTrilinear) ? kNearestNeighbor : kTrilinear;
-    self.layer.magnificationFilter = (_game.metadata.cover.interpolation == kNearestNeighbor) ? kCAFilterNearest : kCAFilterTrilinear;
+    Game *game = [self gameFromObjectID];
+    game.metadata.cover.interpolation = (game.metadata.cover.interpolation == kTrilinear) ? kNearestNeighbor : kTrilinear;
+    imageLayer.magnificationFilter = (game.metadata.cover.interpolation == kNearestNeighbor) ? kCAFilterNearest : kCAFilterTrilinear;
 }
 
 - (IBAction)saveImage:(id)sender {
@@ -534,7 +574,8 @@
     panel.allowedFileTypes = @[ @"png" ];
     panel.extensionHidden = NO;
     [panel setCanCreateDirectories:YES];
-    NSString *fileName = [_game.path.lastPathComponent.stringByDeletingPathExtension stringByAppendingPathExtension:@"png"];
+    Game *game = [self gameFromObjectID];
+    NSString *fileName = [game.path.lastPathComponent.stringByDeletingPathExtension stringByAppendingPathExtension:@"png"];
     if (!fileName.length)
         fileName = @"image.png";
     panel.nameFieldStringValue = NSLocalizedString(fileName, nil);
@@ -555,10 +596,17 @@
     }];
 }
 
++ (void)setUserEditedForMetadata:(Metadata *)metadata {
+    metadata.userEdited = @YES;
+    metadata.source = @(kUser);
+    metadata.lastModified = [NSDate date];
+}
+
 - (IBAction)addDescription:(id)sender {
 
     NSAlert *alert = [[NSAlert alloc] init];
-    Metadata *metadata = _game.metadata;
+    Game *game = [self gameFromObjectID];
+    Metadata *metadata = game.metadata;
     NSTextField *entryField = [[NSTextField alloc] initWithFrame:NSMakeRect(0,0, 300, 150)];
     entryField.editable = YES;
     if (metadata.coverArtDescription.length)
@@ -578,8 +626,7 @@
     if (choice == NSAlertFirstButtonReturn && ![entryField.stringValue isEqualToString:metadata.coverArtDescription]) {
         metadata.coverArtDescription = entryField.stringValue;
         metadata.cover.imageDescription = entryField.stringValue;
-        metadata.userEdited = @YES;
-        metadata.source = @(kUser);
+        [ImageView setUserEditedForMetadata:metadata];
     }
 
 }
@@ -599,14 +646,19 @@
         canAccept = YES;
     } else {
         NSMutableSet *types = [NSMutableSet setWithArray:pasteBoard.types];
-        [types intersectSet:_acceptableTypes];
+        [types intersectSet:ImageView.acceptableDragTypes];
         if (types.count)
             canAccept = YES;
     }
 
-    if ([draggingInfo.draggingSource isKindOfClass:[ImageView class]]) {
-        ImageView *source = (ImageView *)draggingInfo.draggingSource;
-        if ([source.game.ifid isEqualToString:self.game.ifid])
+    id dragSourceObject = draggingInfo.draggingSource;
+    if ([dragSourceObject isKindOfClass:[ImageDragSource class]])
+        dragSourceObject = ((ImageDragSource *)dragSourceObject).sourceView;
+    if ([dragSourceObject isKindOfClass:[ImageView class]]) {
+        ImageView *source = (ImageView *)dragSourceObject;
+        Game *sourcegame = [source gameFromObjectID];
+        Game *targetgame = [self gameFromObjectID];
+        if ([sourcegame.hashTag isEqualToString:targetgame.hashTag])
             canAccept = NO;
     }
 
@@ -642,10 +694,17 @@
         supportedClasses = [supportedClasses arrayByAddingObject:[NSFilePromiseReceiver class]];
     }
 
+    // Images dragged from inside the app also carry a temporary file URL
+    // (for Terminal). Take the image itself, so the temporary path is not
+    // stored as the cover's source and the cover is replaced without asking.
+    if ([draggingInfo.draggingSource isKindOfClass:[ImageDragSource class]])
+        supportedClasses = @[[NSImage class]];
+
     NSDictionary<NSPasteboardReadingOptionKey, id> *searchOptions = @{ NSPasteboardURLReadingFileURLsOnlyKey: @YES,
                                                                        NSPasteboardURLReadingContentsConformToTypesKey:imageTypes };
 
-    NSDraggingItemEnumerationOptions options = NSDraggingItemEnumerationClearNonenumeratedImages | NSDraggingItemEnumerationConcurrent;
+    // Not concurrent: the block reaches Core Data through replaceCoverImage:
+    NSDraggingItemEnumerationOptions options = NSDraggingItemEnumerationClearNonenumeratedImages;
     [draggingInfo enumerateDraggingItemsWithOptions:options forView:nil classes:supportedClasses searchOptions:searchOptions usingBlock:^(NSDraggingItem * _Nonnull draggingItem, NSInteger idx, BOOL * _Nonnull stop) {
         if ([draggingItem.item isKindOfClass:[NSFilePromiseReceiver class]] ) {
             NSFilePromiseReceiver *filePromiseReceiver = (NSFilePromiseReceiver *)draggingItem.item;
@@ -653,7 +712,13 @@
                 if (errorOrNil) {
                     NSLog(@"Error: %@", errorOrNil);
                 } else {
-                    [self imageFromURL:fileURL dontAsk:NO];
+                    // The reader runs on workQueue, but imageFromURL: reaches
+                    // the main context through processImageData:
+                    // The received file is only needed until it has been read.
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        [self imageFromURL:fileURL dontAsk:NO];
+                        [[NSFileManager defaultManager] removeItemAtURL:fileURL error:nil];
+                    });
                 }
             }];
         } else if ([draggingItem.item isKindOfClass:[NSURL class]] ) {
@@ -673,7 +738,7 @@
     if ([Blorb isBlorbURL:url]) {
         // Only accept blorbs with image data but no executable chunk
         // (because it would be confusing to treat game files as image files)
-        Blorb *blorb = [[Blorb alloc] initWithData:[NSData dataWithContentsOfURL:url]];
+        Blorb *blorb = [Blorb blorbAtURL:url];
         if ([blorb findResourceOfUsage:ExecutableResource] == nil) {
             data = blorb.coverImageData;
             if (data) {
@@ -708,40 +773,35 @@
 -(void)processImageData:(NSData *)imageData sourceUrl:(NSString *)URLPath dontAsk:(BOOL)dontAsk {
     if (!imageData || !URLPath.length)
         return;
+    Game *game = [self gameFromObjectID];
+    Metadata *metadata = game.metadata;
 
-    Metadata *metadata = _game.metadata;
-
-    Image *oldImageObj = [ImageView findImageObjectWithURL:URLPath inContext:_game.managedObjectContext];
-    if (oldImageObj && [oldImageObj.data isEqualTo:imageData]) {
+    Image *oldImageObj = [CoverImageStore fetchImageForURL:URLPath inContext:game.managedObjectContext];
+    if (oldImageObj && [(NSData *)oldImageObj.data isEqualToData:imageData]) {
+        Image *oldCover = metadata.cover;
         metadata.cover = oldImageObj;
+        //If the Image object becomes an orphan, delete it from the Core Data store
+        [Image deleteIfOrphan:oldCover];
         metadata.coverArtURL = URLPath;
         return;
     }
 
-    if ([URLPath isEqualToString:@"pasteboard"] ||
-        [self compareByFileNames:URLPath data:imageData]) {
-        dontAsk = YES;
-    }
+    NSData *gameData = (NSData *)game.metadata.cover.data;
+    NSString *gamePath = game.path;
+    NSManagedObjectContext *context = game.managedObjectContext;
 
     NSData __block *data = imageData;
-    BOOL __block askFlag = dontAsk;
     [self.workQueue addOperationWithBlock:^{
         if (data.length > MAX_SPATTERLIGHT_IMAGE_FILE_SIZE)
             data = [data reduceImageDimensionsTo:NSMakeSize(2048, 2048)];
 
-        if ([URLPath isEqualToString:@"pasteboard"] ||
-            [self compareByFileNames:URLPath data:imageData]) {
-            askFlag = YES;
-        }
+        // Comparing the images for compareByFileNames: is slow, so it is done here rather
+        // than on the main thread.
+        BOOL replaceWithoutAsking = dontAsk || [URLPath isEqualToString:@"pasteboard"] ||
+        [self compareByFileNames:URLPath data:imageData gamePath:gamePath gameData:gameData];
 
-        if (askFlag) {
-            [metadata.managedObjectContext performBlockAndWait:^{
-                metadata.coverArtURL = URLPath;
-                metadata.coverArtDescription = nil;
-                [IFDBDownloader insertImageData:data inMetadata:metadata];
-                metadata.userEdited = @YES;
-                metadata.source = @(kUser);
-            }];
+        if (replaceWithoutAsking) {
+            [ImageView commitCoverData:data sourceUrl:URLPath toMetadata:metadata context:context];
             return;
         }
 
@@ -750,52 +810,23 @@
         dispatch_after(popTime, dispatch_get_main_queue(), ^(void) {
             ImageCompareViewController *compare = [ImageCompareViewController new];
             // We always replace when pasting
-            if ([compare userWantsImage:data ratherThanImage:(NSData *)metadata.cover.data source:kImageComparisonLocalFile force:NO]) {
-                [metadata.managedObjectContext performBlockAndWait:^{
-                    metadata.coverArtURL = URLPath;
-                    metadata.coverArtDescription = nil;
-                    [IFDBDownloader insertImageData:data inMetadata:metadata];
-                    metadata.userEdited = @YES;
-                    metadata.source = @(kUser);
-                }];
-            }
+            if ([compare userWantsImage:data ratherThanImage:(NSData *)metadata.cover.data source:kImageComparisonLocalFile force:NO])
+                [ImageView commitCoverData:data sourceUrl:URLPath toMetadata:metadata context:context];
         });
     }];
 }
 
-+ (nullable Image *)findImageObjectWithURL:(NSString *)path inContext:(NSManagedObjectContext *)context {
-
-    NSFetchRequest *fetchRequest = [[NSFetchRequest alloc] init];
-    fetchRequest.entity = [NSEntityDescription entityForName:@"Image" inManagedObjectContext:context];
-    fetchRequest.predicate = [NSPredicate predicateWithFormat:@"originalURL = %@", path];
-
-    NSError *error = nil;
-    NSArray *fetchedObjects = [context executeFetchRequest:fetchRequest error:&error];
-    if (fetchedObjects == nil || error) {
-        NSLog(@"findImageObjectWithURL error: %@",error);
-        return nil;
-    }
-
-    if (!fetchedObjects.count) {
-        return nil;
-    }
-
-    return fetchedObjects.firstObject;
+// Make data the cover of metadata, as a user edit
++ (void)commitCoverData:(NSData *)data sourceUrl:(NSString *)URLPath toMetadata:(Metadata *)metadata context:(NSManagedObjectContext *)context {
+    [context performBlockAndWait:^{
+        metadata.coverArtURL = URLPath;
+        metadata.coverArtDescription = nil;
+        [CoverImageStore insertImageData:data inMetadataID:metadata.objectID context:context];
+        [ImageView setUserEditedForMetadata:metadata];
+    }];
 }
 
-- (BOOL)compareByFileNames:(NSString *)path data:(NSData *)data {
-
-    if (!_game.managedObjectContext)
-        return NO;
-
-    NSData __block *gameData;
-    NSString __block *gamePath;
-
-    [_game.managedObjectContext performBlockAndWait:^{
-        gameData = (NSData *)_game.metadata.cover.data;
-        gamePath = _game.path;
-    }];
-
+- (BOOL)compareByFileNames:(NSString *)path data:(NSData *)data gamePath:(NSString *)gamePath gameData:(NSData *)gameData {
     if (!gameData) {
         return NO;
     }
@@ -810,15 +841,7 @@
         fileBaseName = [fileBaseName substringToIndex:gameBaseName.length];
     }
 
-    if ([gameBaseName isEqualToString:fileBaseName]) {
-        SInt64 distance = [[OSImageHashing sharedInstance] hashDistance:gameData to:data];
-        NSLog(@"distance: %lld", distance);
-        if (distance < 11) {
-            return YES;
-        }
-    }
-
-    return NO;
+    return [gameBaseName isEqualToString:fileBaseName] && [ImageSimilarity imageData:gameData looksLike:data];
 }
 
 @synthesize workQueue = _workQueue;
@@ -829,10 +852,6 @@
         _workQueue.qualityOfService = NSQualityOfServiceUserInitiated;
     }
     return _workQueue;
-}
-
-- (void)setWorkQueue:(NSOperationQueue *)workQueue {
-    _workQueue = workQueue;
 }
 
 @synthesize destinationURL = _destinationURL;
@@ -849,16 +868,7 @@
     return _destinationURL;
 }
 
-- (void)setDestinationURL:(NSURL *)destinationURL {
-    _destinationURL = destinationURL;
-}
-
 #pragma mark Dragging source stuff
-
-- (NSDragOperation)draggingSession:(NSDraggingSession *)session sourceOperationMaskForDraggingContext:(NSDraggingContext)context
-{
-    return NSDragOperationCopy;
-}
 
 - (void)myMouseDown:(NSEvent *)event {
     _isSelected = YES;
@@ -869,158 +879,27 @@
 
 - (void)mouseDown:(NSEvent *)theEvent {
 
-    NSDate *mouseTime = [NSDate date];
-
-    NSPoint __block location = [self convertPoint:theEvent.locationInWindow fromView: nil];
-
-    NSEventMask eventMask = NSEventMaskLeftMouseDown | NSEventMaskLeftMouseDragged | NSEventMaskLeftMouseUp;
-    NSTimeInterval timeout = NSEventDurationForever;
-
-    CGFloat dragThreshold = 0.3;
-
-    [self.window trackEventsMatchingMask:eventMask timeout:timeout mode:NSEventTrackingRunLoopMode handler:^(NSEvent * _Nullable event, BOOL * _Nonnull stop) {
-
-        if (!event) { return; }
-
-        if (event.type == NSEventTypeLeftMouseUp) {
-            *stop = YES;
-            if (mouseTime.timeIntervalSinceNow > -0.5) {
-                [self myMouseDown:event];
-            }
-        } else if (event.type == NSEventTypeLeftMouseDragged) {
-            NSPoint movedLocation = [self convertPoint:event.locationInWindow fromView: nil];
-            if (ABS(movedLocation.x - location.x) > dragThreshold || ABS(movedLocation.y - location.y) > dragThreshold) {
-                *stop = YES;
-
-                if (_isPlaceholder)
-                    return;
-
-                NSDraggingItem *dragItem;
-
-                if (@available(macOS 10.14, *)) {
-
-                    MyFilePromiseProvider *provider = [[MyFilePromiseProvider alloc] initWithFileType: NSPasteboardTypePNG delegate:self];
-
-                    dragItem = [[NSDraggingItem alloc] initWithPasteboardWriter:provider];
-
-                } else {
-                    NSPasteboardItem *pasteboardItem = [NSPasteboardItem new];
-
-                    [pasteboardItem setDataProvider:self forTypes:@[NSPasteboardTypePNG, PasteboardFileURLPromise, PasteboardFilePromiseContent]];
-
-                    // Create the dragging item for the drag operation
-                    dragItem = [[NSDraggingItem alloc] initWithPasteboardWriter:pasteboardItem];
-                }
-
-                [dragItem setDraggingFrame:self.bounds contents:_image];
-                NSDraggingSession *session = [self beginDraggingSessionWithItems:@[dragItem] event:event source:self];
-                _numberForSelfSourcedDrag = session.draggingSequenceNumber;
-            }
+    [self trackClickOrDragFromEvent:theEvent click:^(NSEvent *upEvent) {
+        [self myMouseDown:upEvent];
+    } drag:^(NSEvent *dragEvent) {
+        if (self->_isPlaceholder || !self->_image)
+            return;
+        if (!self->dragSource) {
+            self->dragSource = [ImageDragSource new];
+            self->dragSource.operationQueue = self.workQueue;
         }
+        NSDraggingSession *session =
+            [self->dragSource dragImage:self->_image
+                                   from:self
+                                  event:dragEvent
+                               filename:[self gameFromObjectID].fileBaseName
+                                  frame:self.bounds];
+        self->_numberForSelfSourcedDrag = session.draggingSequenceNumber;
     }];
 }
 
-- (void)superMouseDown:(NSEvent*)event {
-    [super mouseDown:event];
-}
-
-// For pre-10.14
-- (void)pasteboard:(NSPasteboard *)sender item:(NSPasteboardItem *)item provideDataForType:(NSString *)type
-{
-    //sender has accepted the drag and now we need to send the data for the type we promised
-    if ( [type isEqual:NSPasteboardTypePNG]) {
-        //set data for PNG type on the pasteboard as requested
-        [sender setData:self.pngData forType:NSPasteboardTypePNG];
-    } else if ([type isEqualTo:PasteboardFilePromiseContent]) {
-        // The receiver will send this asking for the content type for the drop, to figure out
-        // whether it wants to/is able to accept the file type.
-
-        [sender setString:@"public.png" forType: PasteboardFilePromiseContent];
-    }
-    else if ([type isEqualTo: PasteboardFileURLPromise]) {
-        // The receiver is interested in our data, and is happy with the format that we told it
-        // about during the PasteboardFilePromiseContent request.
-        // The receiver has passed us a URL where we are to write our data to.
-
-        NSString *str = [sender stringForType:PasteboardFilePasteLocation];
-        NSURL *destinationFolderURL = [NSURL fileURLWithPath:str isDirectory:YES];
-        if (!destinationFolderURL) {
-            NSLog(@"ERROR:- Receiver didn't tell us where to put the file?");
-            return;
-        }
-
-        // Here, we build the file destination using the receivers destination URL
-        NSString *baseFileName = _game.path.lastPathComponent.stringByDeletingPathExtension;
-
-        if (!baseFileName.length)
-            baseFileName = @"image";
-
-        NSString *fileName = [baseFileName stringByAppendingPathExtension:@"png"];
-
-        NSURL *destinationFileURL = [destinationFolderURL URLByAppendingPathComponent:fileName isDirectory:NO];
-
-        NSUInteger index = 2;
-
-        // Handle duplicate file names
-        // by slapping on a number at the end.
-        while ([[NSFileManager defaultManager] fileExistsAtPath:destinationFileURL.path]) {
-            NSString *newFileName = [NSString stringWithFormat:@"%@ %ld", baseFileName, index];
-            newFileName = [newFileName stringByAppendingPathExtension:@"png"];
-            destinationFileURL = [destinationFolderURL URLByAppendingPathComponent:newFileName isDirectory:NO];
-            index++;
-        }
-
-        NSData *bitmapData = self.pngData;
-
-        NSError *error = nil;
-
-        if (![bitmapData writeToURL:destinationFileURL options:NSDataWritingAtomic error:&error]) {
-            NSLog(@"Error: Could not write PNG data to url %@: %@", destinationFileURL.path, error);
-        }
-
-        // And finally, tell the receiver where we wrote our file
-        [sender setString:destinationFileURL.path forType:PasteboardFileURLPromise];
-    }
-}
-
-- (NSString *)filePromiseProvider:(NSFilePromiseProvider *)filePromiseProvider
-                  fileNameForType:(NSString *)fileType {
-    NSString *fileName = [_game.path.lastPathComponent.stringByDeletingPathExtension stringByAppendingPathExtension:@"png"];
-    if (!fileName.length)
-        fileName = @"image.png";
-
-    return fileName;
-}
-
-- (void)filePromiseProvider:(NSFilePromiseProvider *)filePromiseProvider
-          writePromiseToURL:(NSURL *)url
-          completionHandler:(void (^)(NSError *errorOrNil))completionHandler {
-
-    NSData *bitmapData = self.pngData;
-
-    NSError *error = nil;
-
-    if (![bitmapData writeToURL:url options:NSDataWritingAtomic error:&error]) {
-        NSLog(@"Error: Could not write PNG data to url %@: %@", url.path, error);
-        completionHandler(error);
-        return;
-    }
-
-    completionHandler(nil);
-    NSLog(@"Your image has been saved to %@", url.path);
-}
-
-- (NSOperationQueue *)operationQueueForFilePromiseProvider:(NSFilePromiseProvider *)filePromiseProvider {
-    return self.workQueue;
-}
-
-- (NSData *)pngData {
-    if (!self.image)
-        NSLog(@"No image?");
-    NSBitmapImageRep *bitmaprep = self.image.bitmapImageRepresentation;
-
-    NSDictionary *props = @{ NSImageInterlaced: @(NO) };
-    return [NSBitmapImageRep representationOfImageRepsInArray:@[bitmaprep] usingType:NSBitmapImageFileTypePNG properties:props];
+- (nullable NSData *)pngData {
+    return [ImageDragSource pngDataForImage:self.image];
 }
 
 #pragma mark Accessibility

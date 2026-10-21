@@ -19,7 +19,14 @@ typedef NS_ENUM(int32_t, kImageInterpolationType) {
 
 NS_ASSUME_NONNULL_BEGIN
 
+//! originalURL of the single shared Image for the Inform 7 placeholder cover,
+//! which is never deleted as an orphan
+extern NSString * const kImagePlaceholderOriginalURL;
+extern NSString * const kImagePlaceholderDescription;
+
 @interface Image : NSManagedObject
+
++ (NSFetchRequest<Image *> *)fetchRequest NS_SWIFT_NAME(fetchRequest());
 
 @property (nullable, nonatomic, retain) NSObject *data;
 @property (nullable, nonatomic, copy) NSString *imageDescription;
@@ -35,6 +42,15 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)removeMetadataObject:(Metadata *)value;
 - (void)addMetadata:(NSSet<Metadata *> *)values;
 - (void)removeMetadata:(NSSet<Metadata *> *)values;
++ (void)deleteIfOrphan:(Image *)image;
+
+@end
+
+// Image and Metadata are the entities MyCoreDataCoreSpotlightDelegate indexes,
+// keyed by the object ID's URI. Both call this from -willSave when deleted.
+@interface NSManagedObject (SpotlightRemoval)
+
+- (void)removeFromSpotlightIndex;
 
 @end
 

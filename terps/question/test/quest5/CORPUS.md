@@ -1,0 +1,75 @@
+# Quest 5 corpus — decisions and facts
+
+The per-game data lives elsewhere and is not repeated here:
+
+- `games.manifest.tsv` — every file in the gitignored `games/`, with its sha256
+  pin and download source (`../GAMES.md` explains fetching and verifying).
+- `harness/oracle/corpus.tsv` — the wired rows the oracle drives.
+- `harness/oracle/overrides/README.md` — how each game's route was derived and
+  where it ends.
+
+This file keeps what those don't: why some files are in `games/` but not wired,
+why two games are wired twice, and what has already been learned about sourcing
+games and walkthroughs.
+
+See `~/Downloads/Quest 5 walkthroughs/README.md` for walkthrough sources, the
+Wayback workaround, folder layout and known data bugs. That folder's top level
+holds only Quest 5 walkthroughs; `_pre-quest5/` (Quest 1–4) and `_not-quest5/`
+(QuestJS) are set aside.
+
+## Corrections to the original Quest 5 plan
+
+1. **§7's "free regression scripts" assumption is false.** It says "many `.quest` games ship `<walkthrough>` elements". **None of the games here do.** It is an editor-side testing feature authors essentially never populate. Regression scripts must come from the external walkthroughs harvested here.
+2. **§7 names textadventures.co.uk as the corpus source.** Direct access is Cloudflare-blocked (403 to any scripted client), **but the Wayback Machine is not** — see the README for the working recipe. 11 games here exist nowhere else. The corpus is therefore **not size-capped**: IFDB's `system:Quest` filter returns **631 Quest games**, any of which can be pulled the same way.
+3. **`The_House_on_Highfield_Lane` is QuestJS ("Quest 6", pure JavaScript), not Quest 5.** No `game.aslx`. The plan explicitly rejected QuestJS, so the engine can never run it. Moved to `_not-quest5/`.
+
+## Corpus facts
+
+- **Walkthrough coverage is believed complete.** Of the 631 Quest games on IFDB, exactly 35 have a walkthrough link. Cross-referencing Welbourn's full index (1340 entries) and `if-archive/solutions/` (499 files) against all 631 titles found **zero** additional. Don't re-hunt.
+- **plover.net's `idx_quest.html` cannot prune by version string alone**: a bare `Quest` (no number) means "version unrecorded", not "pre-5" — 15 of the first 49 verified Quest 5 games were labelled bare `Quest` there. The pre-5 walkthrough split was done by triangulating bare-`Quest` + index-year (2001–2009) + `.asl`/`.cas` format, with ASL headers as ground truth.
+- **100 unwired Wayback games (2026-10-04).** The 100 largest text adventures (most objects, all over 100; gamebooks, `Adult`-category games and titles already here left out) from the Wayback index of `media.textadventures.co.uk/games/` are in `games/` and the manifest with their capture URL as source, but have no route, golden or `corpus.tsv` row yet. Each loads and answers `look` in `aslx_replay`; nothing more has been checked.
+- **Six more unwired Wayback games (2026-10-05).** Added while looking for Quest games with an ADRIFT counterpart: `Cloak of Darkness (The Pixie).quest`, `Cloak of Darkness (DavyB).quest` and `Cloak of Darkness (2013).quest` (three Quest takes on the specimen game; the suffixes are ours, to tell them apart), `Ghost Town.quest` (Craig Dutton) and `Worship the Pig.quest` (Heal Butcher, QuestComp 2013), all five fetched from Wayback. Same status as the 100 above: in `games/` and the manifest, each loads and answers `look` in `aslx_replay`, no route, golden or `corpus.tsv` row. The sixth, `Easter Egg Hunt.quest` (PeaceGamer), came from a browser download instead: its only capture (2021-01-04) returned 404 on playback that day, but the file's SHA-1 is the digest the CDX index records for that capture, so the capture URL is its source. The Pixie's Cloak has a single capture from the same day and 404'd alongside it for some hours before it came back, so a 404 from that crawl is worth retrying.
+- **91 more unwired Wayback games (2026-10-05).** Taken from the Quest 5 titles in Welbourn's Quest index (`plover.net/~davidw/sol/idx_quest.html`) that were not already here: 294 `.quest` files were fetched from Wayback, and these are the parser text adventures among them that look finished. "Look finished" is a reading of the game file, not a playthrough: gamebooks (160) were left out, as were games that call themselves a demo, alpha or work in progress, near-empty stubs, episodes that stop on "to be continued", and games whose script never calls `finish`. Same status as the groups above: in `games/` and the manifest with the capture URL as source and Welbourn's title in the title column, no route, golden or `corpus.tsv` row. Each loads in `aslx_replay` and answers a single `look`; under the replay's timer draining `Blood room.quest` and `to the toilet.quest` run their countdown to the losing ending straight away, and `Mystery Musical.quest` takes `look` as the answer to its opening question and ends. Two files were renamed from their upload name to Welbourn's title: `The Obelisk Part 1.quest` (uploaded as `Adventure.quest`, which is already another game here; it calls itself the first instalment of a series but ends) and `The Lost Valve.quest` (uploaded as `Test.quest`). Two titles in the index hint at less than a finished game and have not been looked at further: `Heavy Rain.quest` ("Heavy Rain 0.1") and `Und wieder ein typischer Fall von Amnesie.quest` ("Locked in a dungeon (test game)").
+- **Three unwired games from `~/Downloads` (2026-10-17).** `Beyond The Gloom.quest` (Father Thyme, ASL 600, saved by Quest Viva 6.0.1; an earlier 6.0.0 save of the same release, `Beyond The Gloom.quest` of 2026-10-05 in `~/Downloads`, was left out: the later one only moves the sound-effects question into `firstenter` and adds a `PrintPageOptions` call), `Thyme (ASL 600 build).quest` (see the version duplicates below) and `ZORK1_beta.quest` (KV's Quest Viva port of Zork I, v0.8, 2026-10-10; its source is the author's GitHub commit, pinned by hash). No Wayback capture of any of the three exists. Same status as the groups above: each loads and answers `look` in `aslx_replay` exactly as in the oracle. `ZORK1_beta` has since been wired (2026-10-17, all 350 points; see `overrides/README.md`).
+- **`_not-quest5/`** (games folder) holds Quest 3/4 `.asl`/`.cas` games (which belong to the *existing* Question engine) and the QuestJS outlier.
+- Every `.quest` here is verified: a real zip containing `game.aslx`. Six deliberate
+  version duplicates:
+  - `Quest for the Serpent's Eye v1.1.3.quest` (newer release, kept alongside the frozen
+    v1.1.1 corpus copy; the frozen override replays on it to THE END with errors=0 —
+    16 prose-polish diff lines, same path). NOT separately wired.
+  - `Guttersnipe- The Baleful Backwash (2018 re-release).quest` (the author's later build,
+    Quest 5.8.6794.18055 / 2018-08-12, shipped as `speakeasy5.quest`, cover
+    `backwash512.png`; the frozen corpus copy is Quest 5.7.6404.15496 / 2018-03-24, cover
+    `backwashs.png`). Unlike Serpent's Eye the frozen script does NOT replay on it —
+    renamed objects and a rebuilt trapdoor lock break the poker key — so it IS separately
+    wired, with its own override + golden.
+  `speakeasy5.quest` is still present as well and is **byte-identical** to the re-release
+  copy (same md5) — a leftover of the rename, not a third build. It is deliberately not
+  a corpus row.
+  - `The Acreage (pub 6.29 revision).quest` (the author's later build, Quest
+    5.10.9635.26171 against the frozen copy's 5.9.9166.36226, 177 objects against 173,
+    new opening and much reworded prose). Like Baleful Backwash the frozen script does
+    NOT replay on it — Desmond's conversation menu lost a topic and renumbered, and an
+    out-of-range menu answer silently swallows the rest of the run — so it IS separately
+    wired, with its own override + golden.
+  - `Sir Loin - Coming of Age (ASL 600 build).quest` (DavyB's 26 Sept 2026 re-save of
+    v1.7 for Quest Viva, `<asl version="600">`, shipped as `Sir Loin One Too 1.7.quest`;
+    same gameid and version as the pinned 580 build). The 580 build's script replays
+    unchanged, but the transcript differs (yes/no ShowMenu prompts became `ask`, a
+    sound-effects line at the start), and it exercises the ASL 600 loader, so it IS
+    separately wired.
+  - `Sleuth - Public Beta 1.7.quest` (the author's later build, v1.7, ASL 520, Quest
+    5.2, shipped as `Sleuth-1.7.quest`; the corpus's `Sleuth - SpringThing 2012
+    Edition.aslx` is v1.0, ASL 510, with a different gameid). The SpringThing script
+    replays except the accusation: the same seed picks a different murderer (Maude
+    Moore, not Harriet Moore), so it IS separately wired.
+
+  - `Thyme (ASL 600 build).quest` (Father Thyme's Quest Viva re-save, `<asl version="600">`,
+    shipped as `Thyme.quest`; the pinned `Thyme.quest` is the ASL 580 build, Quest
+    5.8.6836.13983). NOT wired. Its intro's `WaitForKeyPress` is what showed that
+    QuestViva allows `request (Wait)` and `request (Pause)` again at 600+.
+
+  Three games were renamed to their in-game titles when they were wired, since the corpus
+  row and the golden are keyed on the file's basename: `behind_the_door_final.quest` →
+  `Behind the Door.quest`, `Park.quest` → `All Visitors Welcome.quest`, and
+  `The eye of Mandival..quest` → `The Eye of Mandival.quest`.

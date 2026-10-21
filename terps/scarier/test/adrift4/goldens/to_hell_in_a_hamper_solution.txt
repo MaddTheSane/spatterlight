@@ -1,0 +1,69 @@
+x hubert
+x overcoat
+x side pocket
+get box
+get mallet
+open box
+get scissors
+cut off buttons
+get painting
+throw painting
+get donkey
+throw donkey
+empty box
+throw box
+x overcoat
+x bulge
+cut lining with scissors
+get vase
+shake vase
+hit vase with mallet
+get key
+x bag
+unlock bag
+get underpants
+throw underpants
+get trombone
+x trombone
+hit trombone with mallet
+get ball
+get ear-trumpet
+# SEEN-MODEL RE-DERIVE (2026-08-24): a dynamic object lying loose in a room
+# is not referenceable until something LISTS it -- the Runner stamps the seen
+# byte in its room lister, not once a turn.  Measured live in run400
+# (Adrift_22_xfiles.txt, The X-Files): `take knife` in a room entered through a
+# ShowRoomDesc=0 task answers "Take what?" although the knife is on the floor.
+# The dog's ear is a part-of-character static the basket description lists; with
+# no description printed on the way in, the parser cannot resolve it at all
+# ("I don't understand what you want me to do with the ear-trumpet").
+look
+put ear-trumpet in dog's ear
+play trombone
+x hat
+throw ball at hat
+get clock
+throw clock
+get ball
+throw ball
+get bundle
+x overcoat
+x inside pocket
+get lighter
+throw trombone
+throw mallet
+throw scissors
+throw smudge stick
+get hatchet
+cut anchor rope with hatchet
+throw hatchet
+x breast pocket
+get handkerchief
+make parachute
+get mummy
+throw mummy
+get smudge stick
+light smudge stick
+throw smudge stick
+tie parachute to apron
+push gertie
+pull gas valve rope

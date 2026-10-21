@@ -7,15 +7,15 @@
 
 #import "MarginImage.h"
 #import "MarginContainer.h"
-#import "MyFilePromiseProvider.h"
-#import "NSImage+Categories.h"
-#import "Constants.h"
+#import "ImageDragSource.h"
+
+#import "DebugLog.h"
 
 #include "glk.h"
 
 @interface MarginImage () <NSSecureCoding> {
     BOOL recalc;
-    NSString *baseFilename;
+    ImageDragSource *dragSource;
 }
 @end
 
@@ -23,15 +23,6 @@
 
 + (BOOL) supportsSecureCoding {
     return YES;
-}
-
-- (instancetype)init {
-    return [self
-        initWithImage:[[NSImage alloc] initWithContentsOfFile:@"../Resources/Question.png"]
-            alignment:kAlignLeft
-               linkId:0
-                   at:0
-               sender:self];
 }
 
 - (instancetype)initWithImage:(NSImage *)animage
@@ -86,8 +77,6 @@
 }
 
 - (NSRect)boundsWithLayout:(NSLayoutManager *)layout {
-    NSRange ourglyph;
-    NSRange ourline;
     NSRect theline;
     NSSize size = _image.size;
 
@@ -98,14 +87,17 @@
         NSTextView *textview = _container.textView;
 
         if (_pos >= textview.textStorage.length) {
-            NSLog(@"Error! _pos: %ld textStorage.length: %ld", _pos, textview.textStorage.length);
+            NSLog(@"MarginImage boundsWithLayout: _pos: %lu textStorage.length: %lu", (unsigned long)_pos, (unsigned long)textview.textStorage.length);
             return NSZeroRect;
         }
 
-        /* force layout and get position of anchor glyph */
-        ourglyph = [layout glyphRangeForCharacterRange:NSMakeRange((NSUInteger)_pos, 1)
-                                  actualCharacterRange:&ourline];
-        theline = [layout lineFragmentRectForGlyphAtIndex:ourglyph.location
+        /* get position of anchor glyph. _pos is a character index, so it must
+         * be converted to a glyph index first (mirroring FlowBreak): the two
+         * diverge as characters that produce no glyph accumulate above the
+         * anchor, which otherwise makes the image slip downward into the text. */
+        NSRange glyphRange = [layout glyphRangeForCharacterRange:NSMakeRange(_pos, 1)
+                                           actualCharacterRange:NULL];
+        theline = [layout lineFragmentRectForGlyphAtIndex:glyphRange.location
                                            effectiveRange:nil];
 
         NSParagraphStyle *para = [textview.textStorage attribute:NSParagraphStyleAttributeName atIndex:_pos effectiveRange:nil];
@@ -120,25 +112,22 @@
             _bounds = NSMakeRect(rightMargin - size.width, theline.origin.y,
                                  size.width, size.height);
 
-            // NSLog(@"rightMargin = %f, _bounds = %@", rightMargin,
-            // NSStringFromRect(_bounds));
-
             // If the above places the image outside margin, move it within
             if (NSMaxX(_bounds) > rightMargin) {
                 _bounds.origin.x = rightMargin - size.width;
-                // NSLog(@"_bounds outside right margin. Moving it to %@",
-                // NSStringFromRect(_bounds));
             }
         } else {
+            // Anchor to the stable left content edge (mirroring the way the
+            // MarginRight branch anchors to the textview's right edge).  We
+            // must NOT use theline.origin.x here: lineFragmentRectForProposedRect:
+            // shrinks the anchor line's left edge by this image's own width, so
+            // reading it back when the fragment is already laid out shifts the
+            // image right by roughly its own width.  Only the vertical position
+            // is taken from the line fragment.
             _bounds =
-                NSMakeRect(theline.origin.x + _container.lineFragmentPadding,
+                NSMakeRect(_container.lineFragmentPadding,
                            theline.origin.y, size.width, size.height);
         }
-
-        /* invalidate our fake layout *after* we set the bounds ... to avoid
-         * infiniloop */
-        [layout invalidateLayoutForCharacterRange:ourline
-                             actualCharacterRange:nil];
     }
 
     [_container unoverlap:self];
@@ -147,7 +136,6 @@
 
 - (void)uncacheBounds {
     recalc = YES;
-    _bounds = NSZeroRect;
 }
 
 -(void)cursorUpdate {
@@ -161,129 +149,27 @@
 #pragma mark Dragging
 
 - (void)dragMarginImageFrom:(NSTextView *)source event:(NSEvent *)event filename:(NSString *)filename rect:(NSRect)rect {
-    NSDraggingItem *dragItem;
-
-    if (@available(macOS 10.14, *)) {
-        MyFilePromiseProvider *provider = [[MyFilePromiseProvider alloc] initWithFileType: NSPasteboardTypePNG delegate:self];
-
-        dragItem = [[NSDraggingItem alloc] initWithPasteboardWriter:provider];
-    } else {
-        NSPasteboardItem *pasteboardItem = [NSPasteboardItem new];
-
-        [pasteboardItem setDataProvider:self forTypes:@[NSPasteboardTypePNG, PasteboardFileURLPromise, PasteboardFilePromiseContent]];
-
-        // Create the dragging item for the drag operation
-        dragItem = [[NSDraggingItem alloc] initWithPasteboardWriter:pasteboardItem];
-    }
-
-    baseFilename = filename;
-
-    [dragItem setDraggingFrame:rect contents:_image];
-    [source beginDraggingSessionWithItems:@[dragItem] event:event source:self];
-}
-
-
-- (nonnull NSString *)filePromiseProvider:(nonnull NSFilePromiseProvider *)filePromiseProvider fileNameForType:(nonnull NSString *)fileType {
-    NSString *fileName = [baseFilename stringByAppendingPathExtension:@"png"];
-    if (!fileName.length)
-        fileName = @"image.png";
-
-    return fileName;
-}
-
-- (void)filePromiseProvider:(nonnull NSFilePromiseProvider *)filePromiseProvider writePromiseToURL:(nonnull NSURL *)url completionHandler:(nonnull void (^)(NSError * _Nullable))completionHandler {
-
-    NSData *bitmapData = [self pngData];
-
-    NSError *error = nil;
-
-    if (![bitmapData writeToURL:url options:NSDataWritingAtomic error:&error]) {
-        NSLog(@"Error: Could not write PNG data to url %@: %@", url.path, error);
-        completionHandler(error);
-        return;
-    }
-
-    completionHandler(nil);
-    NSLog(@"Your image has been saved to %@", url.path);
-}
-
-- (NSDragOperation)draggingSession:(nonnull NSDraggingSession *)session sourceOperationMaskForDraggingContext:(NSDraggingContext)context {
-    return NSDragOperationCopy;
-}
-
-- (void)pasteboard:(nullable NSPasteboard *)pasteboard item:(nonnull NSPasteboardItem *)item provideDataForType:(nonnull NSPasteboardType)type {
-    // sender has accepted the drag and now we need to send the data for the type we promised
-    if ( [type isEqual:NSPasteboardTypePNG]) {
-        // set data for PNG type on the pasteboard as requested
-        [pasteboard setData:[self pngData] forType:NSPasteboardTypePNG];
-    } else if ([type isEqualTo:PasteboardFilePromiseContent]) {
-        // The receiver will send this asking for the content type for the drop, to figure out
-        // whether it wants to/is able to accept the file type.
-
-        [pasteboard setString:@"public.png" forType: PasteboardFilePromiseContent];
-    }
-    else if ([type isEqualTo: PasteboardFileURLPromise]) {
-        // The receiver is interested in our data, and is happy with the format that we told it
-        // about during the PasteboardFilePromiseContent request.
-        // The receiver has passed us a URL where we are to write our data to.
-
-        NSString *str = [pasteboard stringForType:PasteboardFilePasteLocation];
-        NSURL *destinationFolderURL = [NSURL fileURLWithPath:str isDirectory:YES];
-        if (!destinationFolderURL) {
-            NSLog(@"ERROR:- Receiver didn't tell us where to put the file?");
-            return;
-        }
-
-        // Here, we build the file destination using the receivers destination URL
-        if (!baseFilename.length)
-            baseFilename = @"image";
-
-        NSString *fileName = [baseFilename stringByAppendingPathExtension:@"png"];
-
-        NSURL *destinationFileURL = [destinationFolderURL URLByAppendingPathComponent:fileName isDirectory:NO];
-
-        NSUInteger index = 2;
-
-        // Handle duplicate file names
-        // by slapping on a number at the end.
-        while ([[NSFileManager defaultManager] fileExistsAtPath:destinationFileURL.path]) {
-            NSString *newFileName = [NSString stringWithFormat:@"%@ %ld", baseFilename, index];
-            newFileName = [newFileName stringByAppendingPathExtension:@"png"];
-            destinationFileURL = [destinationFolderURL URLByAppendingPathComponent:newFileName isDirectory:NO];
-            index++;
-        }
-
-        NSData *bitmapData = [self pngData];
-
-        NSError *error = nil;
-
-        if (![bitmapData writeToURL:destinationFileURL options:NSDataWritingAtomic error:&error]) {
-            NSLog(@"Error: Could not write PNG data to url %@: %@", destinationFileURL.path, error);
-        }
-
-        // And finally, tell the receiver where we wrote our file
-        [pasteboard setString:destinationFileURL.path forType:PasteboardFileURLPromise];
-    }
-}
-
-- (NSData *)pngData {
-    if (!_image)
-        NSLog(@"No image?");
-    NSBitmapImageRep *bitmaprep = _image.bitmapImageRepresentation;
-
-    NSDictionary *props = @{ NSImageInterlaced: @(NO) };
-    return [NSBitmapImageRep representationOfImageRepsInArray:@[bitmaprep] usingType:NSBitmapImageFileTypePNG properties:props];
+    if (!dragSource)
+        dragSource = [ImageDragSource new];
+    [dragSource dragImage:_image from:source event:event filename:filename frame:rect];
 }
 
 #pragma mark Accessibility
 
+// Computed on demand, as the image moves whenever the text is laid out again.
+- (NSRect)accessibilityFrame {
+    NSTextView *textView = _container.textView;
+    if (!textView)
+        return super.accessibilityFrame;
+    NSRect bounds = [self boundsWithLayout:_container.layoutManager];
+    bounds = NSAccessibilityFrameInView(textView, bounds);
+    bounds.origin.x += textView.textContainerInset.width;
+    bounds.origin.y -= textView.textContainerInset.height;
+    return bounds;
+}
+
 - (void)setAccessibilityFocused:(BOOL)accessibilityFocused {
     if (accessibilityFocused) {
-        NSRect bounds = [self boundsWithLayout:_container.layoutManager];
-        bounds = NSAccessibilityFrameInView(_container.textView, bounds);
-        bounds.origin.x += _container.textView.textContainerInset.width;
-        bounds.origin.y -= _container.textView.textContainerInset.height;
-        self.accessibilityFrame = bounds;
         NSTextView *parent = (NSTextView *)self.accessibilityParent;
         if (parent) {
             [parent becomeFirstResponder];
@@ -294,10 +180,11 @@
 - (NSString *)customA11yLabel {
     NSString *label = _image.accessibilityDescription;
     if (!label.length) {
+        BOOL left = (_glkImgAlign == imagealign_MarginLeft);
         if (_linkid) {
-            label = [NSString stringWithFormat: @"Clickable %@ margin image", _glkImgAlign == imagealign_MarginLeft ? @"left" : @"right"];
+            label = left ? NSLocalizedString(@"Clickable left margin image", nil) : NSLocalizedString(@"Clickable right margin image", nil);
         } else {
-            label = [NSString stringWithFormat: @"%@ margin image", _glkImgAlign == imagealign_MarginLeft ? @"Left" : @"Right"];
+            label = left ? NSLocalizedString(@"Left margin image", nil) : NSLocalizedString(@"Right margin image", nil);
         }
     }
     return label;

@@ -1,0 +1,2327 @@
+#!/usr/bin/env python3
+"""Parameterized ADRIFT 4.0 arena-probe generator (plain body only).
+Derived from terps/scarier/test/adrift4/harness/make_battle_taf.py; pack with taftool.py."""
+import sys
+
+SEP = "\xbd\xd0"
+
+def build(cfg):
+    L = []
+    def s(x): L.append(str(x))
+    def ml(x): L.append(x); L.append(SEP)
+
+    ml(cfg.get('intro', "A synthetic arena probe."))
+    s(0)                                    # StartRoom
+    ml("You have won.")
+    s(cfg['name']); s("SCARE probe"); s("I don't understand.")
+    s(cfg.get('persp', 2)); s(1); s(0); s(1); s(1)  # Persp ShowExits WaitTurns DispFirstRoom BattleSystem
+    s(cfg.get('maxscore', 0))               # MaxScore (run400's end-of-game summary divides by it)
+    s(cfg.get('playername', "Player")); s(0); s("A test fighter.")  # PlayerName PromptName PlayerDesc
+    s(0); s(0); s(0); s(0)                  # Task Position ParentObject Gender
+    # MaxSize / MaxWt are packed the way every dimension in the file is:
+    # 'tens' times the scale factor raised to the 'units'.  100 = 10 x m^0.
+    s(cfg.get('maxsize', 100)); s(cfg.get('maxwt', 100))
+    p = cfg['player']                       # (stam, strLo,strHi, accLo,accHi, defLo,defHi, agiLo,agiHi, recovery)
+    s(p[0]); s(p[0])
+    s(p[1]); s(p[2]); s(p[3]); s(p[4]); s(p[5]); s(p[6]); s(p[7]); s(p[8])
+    s(p[9])                                 # Recovery
+    s(0); s(0); s(0); s(0); s(0); s(0); s(0); s(0); s(0)  # compass..graphics
+    # The two "iUnk" globals are the per-game SIZE and WEIGHT scale factors
+    # (SizeMultiple / WeightMultiple).  The ADRIFT editor always writes 3;
+    # 0 is the historical default here and makes every scaled dimension
+    # collapse to 1 (index 0) or 0, which no probe before PUT4 cared about.
+    s(0); s("")                             # StatusBox txt
+    s(cfg.get('sizemult', 0)); s(cfg.get('weightmult', 0)); s(0)  # Embedded
+
+    rooms = cfg['rooms']                    # list of (short, long, exits{dir_index: dest_room_0based})
+    s(len(rooms))
+    for (short, long_, exits) in rooms:
+        s(short); s(long_)
+        for d in range(8):
+            if d in exits:
+                s(exits[d] + 1); s(0); s(0); s(0)
+            else:
+                s(0)
+        s(0); s(0)                          # Alts, bHideOnMap
+
+    objs = cfg.get('objects', [])           # (prefix, short, initpos, weapon, prot, hitval, method, acc, wearable
+                                            #  [, container])  initpos: 1 held, 4 room 1
+    statics = cfg.get('statics', [])        # (prefix, short, wheretype, roomOrParent)
+                                            #   wheretype: 1 one-room (arg = room 0-based),
+                                            #   3 all-rooms (arg unused), 4 NPC part
+                                            #   (arg: 0 = player, N = NPC N 1-based)
+    s(len(objs) + len(statics))
+    for o in objs:
+        (pre, short, pos, wpn, prot, hv, meth, acc, wear) = o[:9]
+        cont = o[9] if len(o) > 9 else 0
+        parent = o[10] if len(o) > 10 else 0    # pos 2 = inside container `parent`
+        # SizeWeight packs the SIZE index in its tens and the WEIGHT index in
+        # its units; each is an exponent on the game's scale factor.  2 (size
+        # 3^0 = 1, weight 3^2 = 9) is what every probe before PUT4 used.
+        sw = o[11] if len(o) > 11 else 2
+        # Capacity is 'tens' objects' worth of size index 'units', multiplied
+        # out into one volume: 100 = 10 x m^0.
+        cap = o[12] if len(o) > 12 else (100 if cont else 0)
+        s(pre); s(short); s(0); s(0)
+        s("A probe object."); s(pos); s(0); s(0); s("")
+        # Openable is index 13: 0 not openable, 5 open, 6 closed, 7 locked
+        # (4.0 values, no exchange).  An openable object carries a Key field
+        # right after it; -1 = no key.
+        openable = o[13] if len(o) > 13 else 0
+        s(cont); s(0); s(cap); s(wear); s(sw); s(parent)
+        s(openable)
+        if openable in (5, 6, 7):
+            s(-1)                               # Key: none
+        s(0); s(0); s(0)                        # SitLie Edible Readable
+        s(wpn); s(0); s(0)
+        s(prot); s(hv); s(meth); s(acc)
+        s(""); s(0)
+    for (pre, short, wtype, arg) in statics:
+        s(pre); s(short); s(0); s(1)        # Prefix Short Aliases Static=1
+        s("A probe static."); s(0); s(0); s(0); s("")  # Desc InitPos Task TaskNotDone AltDesc
+        s(wtype)                            # Where.Type
+        if wtype == 1:
+            s(arg + 1)                      # single room, 1-based
+        s(0); s(0); s(0)                    # Container Surface Capacity
+        if wtype == 4:
+            s(arg)                          # Parent: 0 = player, N = NPC N
+        s(0); s(0); s(0)                    # Openable SitLie Readable
+        s(0); s(0)                          # CurrentState ListFlag
+        s(0); s(0); s(0); s(0)              # OBJ_BATTLE prot/hit/method/acc
+        s(""); s(0)                         # InRoomDesc OnlyWhenNotMoved
+
+    tasks = cfg.get('tasks', [])            # dicts: commands=[...], complete="",
+                                            #   restrs=[(var1,var2,var3,failmsg)] (type-0
+                                            #   object-location), repeatable=1
+    s(len(tasks))
+    for t in tasks:
+        cmds = t['commands']
+        s(len(cmds))
+        for c in cmds: s(c)
+        s(t['complete']); s("")                 # CompleteText Reverse
+        s(t.get('repeat', "")); s(t.get('additional', ""))  # RepeatText Additional
+        # ShowRoomDesc is 0 for "don't", else the 1-based room whose name and
+        # description the task shows.  It is emitted BEFORE the task's own
+        # actions run -- see probe SRD below.
+        s(t.get('showroomdesc', 0)); s(t.get('repeatable', 1)); s(0)
+        s(0)                                    # ReverseCommands
+        twhere = t.get('where', (3, 0))         # Where: default all rooms
+        s(twhere[0])
+        if twhere[0] == 1:
+            s(twhere[1])                        # one room, 0-based on disk
+        q = t.get('question', "")
+        s(q)                                    # Question (+2 hints if set)
+        if q:
+            s(t.get('hint1', "")); s(t.get('hint2', ""))
+        restrs = t.get('restrs', [])
+        s(len(restrs))
+        for (v1, v2, v3, fail) in restrs:
+            s(0); s(v1); s(v2); s(v3); s(fail)  # Type-0 object-location restriction
+        actions = t.get('actions', [])          # raw field tuples, e.g. type-3
+        s(len(actions))                         # set-var: (3, varidx0, 5, 0, expr, 0)
+        for a in actions:
+            for f in a: s(f)
+        # RestrMask: "#", "#A#", ... -- or an explicit mixed-connector mask
+        # like "#A#A#O#" via the optional 'mask' key.
+        s(t.get('mask', "A".join(["#"] * len(restrs))))
+    events = cfg.get('events', [])          # (short, taskAffected_1based
+                                            #  [, time1, time2, restart])
+                                            # ...or a dict, which additionally
+                                            # takes starter=1|2|3, start/end
+                                            # (starter 2 delay range) and
+                                            # tasknum (starter 3 trigger).
+    s(len(events))
+    for e in events:
+        if isinstance(e, dict):
+            short, aff = e['short'], e['affected']
+            t1, t2 = e.get('time1', 0), e.get('time2', 0)
+            restart = e.get('restart', 1)
+            starter = e.get('starter', 1)
+        else:
+            (short, aff) = e[:2]
+            t1 = e[2] if len(e) > 2 else 0
+            t2 = e[3] if len(e) > 3 else 0
+            restart = e[4] if len(e) > 4 else 1
+            starter = 1
+        s(short); s(starter)                # Short StarterType
+        if starter == 2:                    # random delay before starting
+            s(e.get('start', 0)); s(e.get('end', 0))
+        elif starter == 3:                  # after a task completes
+            s(e.get('tasknum', 0))
+        s(restart); s(0)                    # RestartType TaskFinished
+        s(t1); s(t2)                        # Time1 Time2
+        if isinstance(e, dict):
+            s(e.get('starttext', "")); s(e.get('looktext', ""))
+            s(e.get('finishtext', ""))
+        else:
+            s(""); s(""); s("")             # Start/Look/FinishText
+        where = e.get('where', (3, 0)) if isinstance(e, dict) else (3, 0)
+        s(where[0])                         # Where.Type (3 = all rooms)
+        if where[0] == 1:                   # one room: arg is 0-based, the
+            s(where[1])                     # file stores it 0-based (ROOM_LIST0)
+        s(0); s(0)                          # PauseTask PauserCompleted
+        s(0); s("")                         # PrefTime1 PrefText1
+        s(0); s(0)                          # ResumeTask ResumerCompleted
+        s(0); s("")                         # PrefTime2 PrefText2
+        # Obj2/Dest Obj3/Dest Obj1/Dest.  Object numbers are 1-based, 0 = none.
+        # Destinations are 0 hidden, 1 held by player, 2 the player's room,
+        # 3 + N room N, and beyond that room groups.  Obj1 moves when the
+        # event starts, Obj2 and Obj3 when it finishes.
+        if isinstance(e, dict):
+            s(e.get('obj2', 0)); s(e.get('obj2dest', 0))
+            s(e.get('obj3', 0)); s(e.get('obj3dest', 0))
+            s(e.get('obj1', 0)); s(e.get('obj1dest', 0))
+        else:
+            s(0); s(0); s(0); s(0); s(0); s(0)
+        s(aff)                              # TaskAffected
+
+    npcs = cfg['npcs']                      # (name, room0based, att, stam, strLo,strHi, accLo,accHi, defLo,defHi, agiLo,agiHi, speed, recovery [, killedtask, staminatask, inroomtext])
+    s(len(npcs))
+    for n in npcs:
+        (name, room, att, stam, sl, sh, al, ah, dl, dh, gl, gh, speed, rec) = n[:14]
+        ktask = n[14] if len(n) > 14 else 0     # 1-based task refs, 0 = none
+        stask = n[15] if len(n) > 15 else 0
+        # InRoomText: "#" asks for the engine's default "<name> is here." line,
+        # and "" drops the NPC from the room description altogether.
+        inroom = n[16] if len(n) > 16 else name + " is here, looking dangerous."
+        s(name); s("a"); s(0)
+        descr = n[19] if len(n) > 19 else "A probe NPC."   # "" = Runner default
+        s(descr); s(room + 1); s(""); s(0)
+        s(0)                                # topics
+        # n[17]: walks, each dict(stops=[(room0based, time)], loop=1,
+        # starttask=0, chartask=0, meetobject=0, objecttask=0,
+        # stoppingtask=0, meetchar=0, changeddesc="").  Stop rooms are stored
+        # +2 (0 = hidden, 1 = follow player), as the Runner reads them.
+        walks = n[17] if len(n) > 17 else []
+        s(len(walks))
+        for w in walks:
+            stops = w['stops']
+            s(len(stops)); s(w.get('loop', 1)); s(w.get('starttask', 0))
+            s(w.get('chartask', 0)); s(w.get('meetobject', 0))
+            s(w.get('objecttask', 0)); s(w.get('stoppingtask', 0))
+            s(w.get('meetchar', 0)); s(w.get('changeddesc', ""))
+            for (r, t) in stops:
+                s(r + 2); s(t)
+        # n[18]: (EnterText, ExitText) turns ShowEnterExit on.
+        ee = n[18] if len(n) > 18 else None
+        if ee:
+            s(1); s(ee[0]); s(ee[1])
+        else:
+            s(0)
+        s(inroom); s(0)
+        s(att)
+        s(stam); s(stam)
+        s(sl); s(sh); s(al); s(ah); s(dl); s(dh); s(gl); s(gh)
+        s(speed); s(ktask); s(rec); s(stask)  # Speed KilledTask Recovery StaminaTask
+
+    s(0); s(0)                              # groups syns
+    vars_ = cfg.get('vars', [])             # (name, type 0=int/1=str, value-string)
+    s(len(vars_))
+    for (name, vtype, val) in vars_:
+        s(name); s(vtype); s(val)
+    s(0); s(0)                              # alrs font
+    s("2026")
+    return ("\r\n".join(L) + "\r\n").encode("latin-1")
+
+CONFIGS = {
+ 'M3': dict(name="Probe M3",
+    player=(200,10,10,60,60,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    objects=[("a","blaster",1,1,0,30,3,20,0)],
+    npcs=[("Robot",0,2,35,0,1,0,0,0,0,0,0,0,0)]),
+ 'SP2': dict(name="Probe SP2",
+    player=(200,10,10,60,60,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    objects=[],
+    npcs=[("Robot",0,2,250,5,5,50,50,0,0,0,0,2,0)]),
+ 'SP3': dict(name="Probe SP3",
+    player=(200,10,10,60,60,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    objects=[],
+    npcs=[("Robot",0,2,250,5,5,50,50,0,0,0,0,3,0)]),
+ 'TS': dict(name="Probe TS",
+    player=(300,10,10,60,60,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    objects=[],
+    npcs=[("Aly",0,1,250,3,3,50,50,0,0,0,0,0,0),
+          ("Foe",0,2,250,5,5,50,50,0,0,0,0,0,0),
+          ("Bystander",0,0,250,7,7,50,50,0,0,0,0,0,0)]),
+ # Wield/status surface probe: two held weapons with split best-ness (axe =
+ # higher HitValue, sword = higher Accuracy) + an unseen NPC in a second room.
+ # Player Acc 20-20 so a weapon's accuracy bonus is visible in status rolls.
+ 'WS': dict(name="Probe WS",
+    player=(200,10,10,20,20,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{}),("Back Room","A back room.",{})],
+    objects=[("a","sword",1,1,0,10,1,15,0),
+             ("an","axe",1,1,0,20,0,5,0)],
+    npcs=[("Robot",0,2,250,0,1,0,0,0,0,0,0,0,0),
+          ("Ghost",1,0,50,0,1,0,0,0,0,0,0,0,0)]),
+ # Status-layout probe (the pWS cosmetics follow-up): the Robot always hits
+ # (Acc 50 vs player Agi 0) for exactly 5 (Str 5-5 vs Def 0), so the player's
+ # live stamina drops below max and the status table's Stamina cells become
+ # distinguishable; its own 30 stamina takes visible damage for the NPC table.
+ # The rock is an in-room weapon for the wield-not-carried wording.
+ 'WS2': dict(name="Probe WS2",
+    player=(200,10,10,20,20,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    objects=[("a","sword",1,1,0,10,1,15,0),
+             ("a","rock",4,1,0,3,0,0,0)],
+    npcs=[("Robot",0,2,30,5,5,50,50,0,0,0,0,0,0)]),
+ # Throw-drop probe (settled live 2026-08-01): a method-5 throw moves the
+ # weapon to the room and deals base-Strength-only damage (HitValue ignored).
+ 'TD': dict(name="Probe TD",
+    player=(200,10,10,60,60,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    objects=[("a","spear",1,1,0,5,5,0,0)],
+    npcs=[("Robot",0,2,250,0,1,0,0,0,0,0,0,0,0)]),
+ # Missed-throw variant of TD: does a throw that never lands still move the
+ # weapon to the room?  The decompile puts the move inside the hit branch, so
+ # the port keeps the weapon -- this is the live check.  The hit test is
+ # `effAccuracy(attacker) > effAgility(target)` strictly, so player Accuracy
+ # 0-0 with a zero-accuracy spear against Agility 5-5 can never land; the
+ # player's own Agility 50 keeps the Robot's replies from cluttering the
+ # transcript (its Accuracy is 0 too, so nobody ever connects).
+ 'TDM': dict(name="Probe TDM",
+    player=(200,10,10,0,0,0,0,50,50,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    objects=[("a","spear",1,1,0,5,5,0,0)],
+    npcs=[("Robot",0,2,250,0,1,0,0,0,0,5,5,0,0)]),
+ # The third throw case: the throw lands (Accuracy 60 > Agility 0) but the
+ # Robot's Defence 50 swallows it, so no damage is dealt.  The drop sits in
+ # the hit branch, ahead of the damage roll, so the spear should still land on
+ # the floor.
+ 'TDZ': dict(name="Probe TDZ",
+    player=(200,10,10,60,60,0,0,50,50,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    objects=[("a","spear",1,1,0,5,5,0,0)],
+    npcs=[("Robot",0,2,250,0,1,0,0,50,50,0,0,0,0)]),
+ # Body-part-static probe (§4 RUNNER_TESTS_TODO): `head` is a static Where-
+ # type-4 part of Robot (NPC 1), `arm` a part of the player.  probe1/2/3 put
+ # the referenced object through a Var1=2 object-location restriction --
+ # is-hidden (0,0), visible-to-player (3,0), NOT-hidden (6,0).  Scarier
+ # positions parts at OBJ_PART_NPC; the Runner's statics have no location
+ # field, so its Var1=2 reads them as hidden.
+ 'BP': dict(name="Probe BP",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    npcs=[("Robot",0,0,250,0,0,0,0,0,0,0,0,0,0)],
+    statics=[("a","head",4,1),
+             ("an","arm",4,0)],
+    tasks=[dict(commands=["probe1 %object%"], complete="P1 HIDDEN PASS.",
+                restrs=[(2,0,0,"P1 HIDDEN FAIL.")]),
+           dict(commands=["probe2 %object%"], complete="P2 VISIBLE PASS.",
+                restrs=[(2,3,0,"P2 VISIBLE FAIL.")]),
+           dict(commands=["probe3 %object%"], complete="P3 NOTHIDDEN PASS.",
+                restrs=[(2,6,0,"P3 NOTHIDDEN FAIL.")])]),
+ # Two-room variant: Robot (and so his head) is in the Back Room, the player
+ # is not.  Asks whether visible-to tracks the parent NPC's location, and
+ # whether the Runner's %object% scope filter will match an absent NPC's part
+ # at all.
+ 'BP2': dict(name="Probe BP2",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{1:1}),
+           ("Back Room","A back room.",{3:0})],
+    npcs=[("Robot",1,0,250,0,0,0,0,0,0,0,0,0,0)],
+    statics=[("a","head",4,1)],
+    tasks=[dict(commands=["probe1 %object%"], complete="P1 HIDDEN PASS.",
+                restrs=[(2,0,0,"P1 HIDDEN FAIL.")]),
+           dict(commands=["probe2 %object%"], complete="P2 VISIBLE PASS.",
+                restrs=[(2,3,0,"P2 VISIBLE FAIL.")]),
+           dict(commands=["probe3 %object%"], complete="P3 NOTHIDDEN PASS.",
+                restrs=[(2,6,0,"P3 NOTHIDDEN FAIL.")])]),
+ # KilledTask/StaminaTask probe (§1 remainder): Robot dies to one 4-damage
+ # blow and carries KilledTask -> task 1; Droid (stamina 100, threshold 10)
+ # carries StaminaTask -> task 2, which under Scarier's rule fires on every
+ # hit leaving 0 < stamina < max/10 (hits 23 and 24 of Str 4-4 leave 8 and 4;
+ # hit 25 kills).
+ 'KT': dict(name="Probe KT",
+    player=(200,4,4,60,60,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    npcs=[("Robot",0,2,4,0,0,0,0,0,0,0,0,0,0,1,0),
+          ("Droid",0,2,100,0,0,0,0,0,0,0,0,0,0,0,2)],
+    tasks=[dict(commands=["zzkilled"], complete="KILLEDTASK FIRED."),
+           dict(commands=["zzstamina"], complete="STAMINATASK FIRED.")]),
+ # Battle-task done-state probe (2026-08-02, KilledTask room-gate follow-up):
+ # the KilledTask is NON-repeatable and typeable; type `zzkilled` first (runs
+ # it, marks it done), then `attack robot` -- does run400's Sub_20_22 refuse
+ # the re-dispatch of a done non-repeatable task (no text, and no corpse line
+ # either since the KilledTask is set), or run it again?
+ 'KT2': dict(name="Probe KT2",
+    player=(200,4,4,60,60,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    npcs=[("Robot",0,2,4,0,0,0,0,0,0,0,0,0,0,1,0)],
+    tasks=[dict(commands=["zzkilled"], complete="KILLEDTASK FIRED.",
+                repeatable=0)]),
+ # Expression-division rounding probe (§4): each `/` reduction rounds
+ # immediately -- run400 computes Round((a/b) + 0.000001), VB6 banker's
+ # rounding with an epsilon that biases halves toward +infinity.
+ # Expected (P-code-derived): 5/2=3, -5/2=-2, 7/2=4, -7/2=-3, 1/2=1,
+ # -1/2=0, 4/2=2, 22/7=3.
+ 'DIV': dict(name="Probe DIV",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    npcs=[],
+    vars=[("v1",0,"0"),("v2",0,"0"),("v3",0,"0"),("v4",0,"0"),
+          ("v5",0,"0"),("v6",0,"0"),("v7",0,"0"),("v8",0,"0")],
+    tasks=[dict(commands=["divtest"],
+                complete="R= %v1% %v2% %v3% %v4% %v5% %v6% %v7% %v8% =R",
+                actions=[(3,0,5,0,"5/2",0),
+                         (3,1,5,0,"-5/2",0),
+                         (3,2,5,0,"7/2",0),
+                         (3,3,5,0,"-7/2",0),
+                         (3,4,5,0,"1/2",0),
+                         (3,5,5,0,"-1/2",0),
+                         (3,6,5,0,"4/2",0),
+                         (3,7,5,0,"22/7",0)])]),
+ # Second-round division probe: v1/v3/v5 hold true negative values, so
+ # %v1%/2 is a genuine negative dividend with no unary minus in the
+ # expression -- this separates "round half away from zero" from "unary
+ # minus reduces after the division" (both print -3 for the literal -5/2).
+ 'DIV2': dict(name="Probe DIV2",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    npcs=[],
+    vars=[("v1",0,"0"),("v2",0,"0"),("v3",0,"0"),("v4",0,"0"),
+          ("v5",0,"0"),("v6",0,"0"),("v7",0,"0"),("v8",0,"0")],
+    tasks=[dict(commands=["divtest"],
+                complete="R= %v1% %v2% %v3% %v4% %v5% %v6% %v7% %v8% =R",
+                actions=[(3,0,5,0,"0-5",0),
+                         (3,1,5,0,"%v1%/2",0),
+                         (3,2,5,0,"0-7",0),
+                         (3,3,5,0,"%v3%/2",0),
+                         (3,4,5,0,"0-1",0),
+                         (3,5,5,0,"%v5%/2",0),
+                         (3,6,5,0,"-5/2",0),
+                         (3,7,5,0,"3/2",0)])]),
+ # Zero-word wildcard probe (§4 last row of RUNNER_TESTS_TODO): can the
+ # Runner's mid-command `*` match ZERO words (TheADRIFTProject's TASK 41
+ # `put * pill in cup` vs the input `put pill in cup`)?  foo/qux/yop test the
+ # mid/trailing/leading positions unrestricted; `zap * pill` carries an
+ # always-failing restriction WITH a FailMessage (any-object-hidden in a game
+ # with no dynamic objects) to separate "no match" from "matched, restriction
+ # failed" on the zero-word input.
+ 'ST': dict(name="Probe ST",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    npcs=[],
+    tasks=[dict(commands=["foo * bar"], complete="MIDSTAR FIRED."),
+           dict(commands=["qux *"], complete="TRAILSTAR FIRED."),
+           dict(commands=["* yop"], complete="LEADSTAR FIRED."),
+           dict(commands=["zap * pill"], complete="ZAPPASS.",
+                restrs=[(1,0,0,"ZAPFAIL.")])]),
+ # Fail-message selection probe (the sequel to ST): when a matched task's
+ # restriction expression fails, WHICH failing restriction's FailMessage does
+ # the Runner print?  Scarier (SCARE) keeps the lowest-indexed failing one;
+ # TheADRIFTProject's TASK 41 transcript suggests run400 keeps the LAST
+ # failing one (and falls through to the library when its message is empty).
+ # (1,0,0) = "any object is hidden" -> always FAILS here (no dynamic objects);
+ # (0,0,0) = "no object is hidden" -> always PASSES.  Masks are all-AND.
+ 'FM': dict(name="Probe FM",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    npcs=[],
+    tasks=[dict(commands=["alpha"], complete="APASS.",
+                restrs=[(1,0,0,"AFIRST."),(1,0,0,"ASECOND.")]),
+           dict(commands=["beta"], complete="BPASS.",
+                restrs=[(1,0,0,""),(1,0,0,"BSECOND.")]),
+           dict(commands=["gamma"], complete="CPASS.",
+                restrs=[(1,0,0,"CFIRST."),(1,0,0,"")]),
+           dict(commands=["delta"], complete="DPASS.",
+                restrs=[(1,0,0,"DFIRST."),(0,0,0,"DSECOND.")])]),
+ # Mixed-connector fail-message probe: replicate TheADRIFTProject TASK 41's
+ # exact mask `#A#A#O#` (R1 A R2 A (R3 O R4)).  epsilon = the game's live
+ # shape: R1 pass, R2 FAIL (with message), R3 pass, R4 FAIL (empty message);
+ # the whole expression fails on R2, yet the author's comp transcript shows
+ # run400 falling through to the library.  zeta = same but R4's message
+ # non-empty, to see WHICH message a mixed mask surfaces.  eta = OR-group
+ # both failing, AND-half passing (expression fails inside the OR group).
+ 'FM2': dict(name="Probe FM2",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    npcs=[],
+    tasks=[dict(commands=["epsilon"], complete="EPASS.", mask="#A#A#O#",
+                restrs=[(0,0,0,"EONE."),(1,0,0,"ETWO."),
+                        (0,0,0,"ETHREE."),(1,0,0,"")]),
+           dict(commands=["zeta"], complete="ZPASS.", mask="#A#A#O#",
+                restrs=[(0,0,0,"ZONE."),(1,0,0,"ZTWO."),
+                        (0,0,0,"ZTHREE."),(1,0,0,"ZFOUR.")]),
+           dict(commands=["eta"], complete="HPASS.", mask="#A#A#O#",
+                restrs=[(0,0,0,"HONE."),(0,0,0,"HTWO."),
+                        (1,0,0,"HTHREE."),(1,0,0,"HFOUR.")])]),
+ # Third-round probe for the TheADRIFTProject fallthrough (reproduced live on
+ # our run400 via a .tas transplant): which ingredient makes run400 NOT match
+ # `put * pill in cup` on `put pill in cup`?  rho/omega = zero-word `*` with a
+ # MULTI-WORD literal tail (unrestricted / restricted); tau/sig = same but
+ # preceded by the game's other alternatives (an untypeable #command and a
+ # choice-form that fails at its last word), unrestricted / restricted.
+ 'FM3': dict(name="Probe FM3",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    npcs=[],
+    tasks=[dict(commands=["rho * pill in cup"], complete="RHOPASS."),
+           dict(commands=["omega * pill in cup"], complete="OPASS.",
+                restrs=[(1,0,0,"OFAIL.")]),
+           dict(commands=["#zzztau",
+                          "[tau]{the}[pill]{in/to/with}{the/a/an}[slime/goo]",
+                          "tau * pill in cup"], complete="TAUPASS."),
+           dict(commands=["#zzzsig",
+                          "[sig]{the}[pill]{in/to/with}{the/a/an}[slime/goo]",
+                          "sig * pill in cup"], complete="SPASS.",
+                restrs=[(1,0,0,"SFAIL.")])]),
+ # Fourth-round probe -- the hypothesis that reconciles everything: when a
+ # matched task's restrictions FAIL, run400 gives the LIBRARY the input and
+ # prints the fail message only if the library can't handle it (all earlier
+ # probe verbs were library-gibberish, so the orders were indistinguishable).
+ # take/wear collide with the library (success and refusal respectively);
+ # `get * rock` passes its (absent) restrictions, testing that a PASSING task
+ # still claims the input ahead of the library.
+ 'FM4': dict(name="Probe FM4",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    objects=[("a","rock",4,0,0,0,0,0,0)],
+    npcs=[],
+    tasks=[dict(commands=["take * rock"], complete="TAKEPASS.",
+                restrs=[(1,0,0,"TFAIL.")]),
+           dict(commands=["wear * rock"], complete="WEARPASS.",
+                restrs=[(1,0,0,"WFAIL.")]),
+           dict(commands=["get * rock"], complete="GETPASS.")]),
+ # Fifth-round bisect: run400 does NOT fall through for simple replicas
+ # (take/wear fail messages beat the library), yet the real TASK 41 does.
+ # Suspect: its command LIST.  A = the verbatim eight commands; B = just the
+ # nested-brace choice alternative + a plain starred one; C = the
+ # `mix slime * pill *` shape; D = eight commands with no nested braces.
+ # All carry one always-failing restriction with a distinct message; if an
+ # input falls through to the library instead of printing the message, that
+ # task never matched in run400.
+ 'FM5': dict(name="Probe FM5",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    npcs=[],
+    tasks=[dict(commands=["#Put Pill IN Slime",
+                          "[put/drop/mix]{the}[pill/drift{-}{o}{-}jump]{in/to/with}{the/a/an}[slime/goo/gooze/ooze]",
+                          "mix slime * pill *",
+                          "put * pill in cup",
+                          "drop * pill * slime *",
+                          "drop * pill * cup *",
+                          "mix * pill * slime *",
+                          "mix * slime * pill *"],
+                complete="APASS.", restrs=[(1,0,0,"AFAIL.")]),
+           dict(commands=["#zb",
+                          "[put/drop/mix]{the}[wand/drift{-}{o}{-}jump]{in/to/with}{the/a/an}[slime/goo]",
+                          "put * wand in hat"],
+                complete="BPASS.", restrs=[(1,0,0,"BFAIL.")]),
+           dict(commands=["#zc",
+                          "mix slime * coin *",
+                          "put * coin in jar"],
+                complete="CPASS.", restrs=[(1,0,0,"CFAIL.")]),
+           dict(commands=["#zd",
+                          "[put/drop/mix]{the}[fork/spoon]{in/to/with}{the/a/an}[slime/goo]",
+                          "mix slime * fork *",
+                          "put * fork in mug",
+                          "drop * fork * slime *",
+                          "drop * fork * mug *",
+                          "mix * fork * slime *",
+                          "mix * slime * fork *"],
+                complete="DPASS.", restrs=[(1,0,0,"DFAIL.")])]),
+ # Sixth round: full verbatim replica of TheADRIFTProject's TASK 40/41 --
+ # sixteen dynamic objects so the restriction indices line up (v1=5 -> dyn2
+ # cup, v1=9 -> dyn6 pill, v1=18 -> dyn15 slime), tin before cup so the cup
+ # is the SECOND container (restriction v3=2), verbatim commands,
+ # restrictions, mask, hints, and non-repeatable flag.
+ 'FM6': dict(name="Probe FM6",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    objects=[("a","tin",1,0,0,0,0,0,0,1),
+             ("a","brick",4,0,0,0,0,0,0),
+             ("a","cup",1,0,0,0,0,0,0,1),
+             ("a","dime",4,0,0,0,0,0,0),
+             ("an","egg",4,0,0,0,0,0,0),
+             ("a","fig",4,0,0,0,0,0,0),
+             ("a","pill",1,0,0,0,0,0,0),
+             ("a","hook",4,0,0,0,0,0,0),
+             ("an","iron",4,0,0,0,0,0,0),
+             ("a","jug",4,0,0,0,0,0,0),
+             ("a","kite",4,0,0,0,0,0,0),
+             ("a","lamp",4,0,0,0,0,0,0),
+             ("a","mat",4,0,0,0,0,0,0),
+             ("a","nut",4,0,0,0,0,0,0),
+             ("an","oar",4,0,0,0,0,0,0),
+             ("a","slime",4,0,0,0,0,0,0)],
+    npcs=[],
+    tasks=[dict(commands=["#Take Slime",
+                          "[get/take/pick up]{the/a/an}[slime/ooze/gooze]",
+                          "put * slime * cup *",
+                          "scoop * slime *",
+                          "scoop * slime * cup *"],
+                complete="SCOOPPASS.",
+                restrs=[(18,3,0,"No slime around here."),
+                        (5,1,0,"You need something to put the slime in.")]),
+           dict(commands=["#Put Pill IN Slime",
+                          "[put/drop/mix]{the}[pill/drift{-}{o}{-}jump]{in/to/with}{the/a/an}[slime/goo/gooze/ooze]",
+                          "mix slime * pill *",
+                          "put * pill in cup",
+                          "drop * pill * slime *",
+                          "drop * pill * cup *",
+                          "mix * pill * slime *",
+                          "mix * slime * pill *"],
+                complete="PILLPASS.", repeatable=0,
+                question="How to I make a radioactive substance for a bomb?",
+                hint1="You need the right ingredients.",
+                hint2="Put the slime in the coffee cup and mix the pill in.",
+                restrs=[(5,1,0,"Not yet.  You don't have everything you need."),
+                        (18,4,2," Not yet."),
+                        (9,1,0,"You don't have the small pill."),
+                        (9,4,2,"")],
+                mask="#A#A#O#")]),
+ # Minimal pair vs FM5-A: identical task (verbatim commands, one quantifier
+ # always-fail restriction, repeatable) but the pill and cup EXIST (held,
+ # cup a container), so the library put-in is fully resolvable.  If run400
+ # falls through here, the discriminator is library resolvability, not the
+ # restriction types/mask/rep/hints.  The jug (non-container) and the
+ # in-room slime give the library-refusal variants.
+ 'FM7': dict(name="Probe FM7",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    objects=[("a","pill",1,0,0,0,0,0,0),
+             ("a","cup",1,0,0,0,0,0,0,1),
+             ("a","jug",1,0,0,0,0,0,0),
+             ("a","slime",4,0,0,0,0,0,0)],
+    npcs=[],
+    tasks=[dict(commands=["#Put Pill IN Slime",
+                          "[put/drop/mix]{the}[pill/drift{-}{o}{-}jump]{in/to/with}{the/a/an}[slime/goo/gooze/ooze]",
+                          "mix slime * pill *",
+                          "put * pill in cup",
+                          "drop * pill * slime *",
+                          "drop * pill * cup *",
+                          "mix * pill * slime *",
+                          "mix * slime * pill *"],
+                complete="XPASS.", restrs=[(1,0,0,"XFAIL.")])]),
+ # Zero-length always-restarting checker event, 4.0 half (the 3.9 half is
+ # make_39_fwprobe.py variant b): pill starts inside the cup, the checker
+ # task's restriction is true from turn one.  Does the event fire at start
+ # only (run390's answer), every turn, or per-turn relative to the command?
+ # `take pill` gives the falling edge.
+ 'EV': dict(name="Probe EV",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    objects=[("a","pill",2,0,0,0,0,0,0,0,0),
+             ("a","cup",1,0,0,0,0,0,0,1),
+             ("a","slime",4,0,0,0,0,0,0)],
+    npcs=[],
+    tasks=[dict(commands=["zzpillcheck"], complete="PILLCHECK FIRED.",
+                restrs=[(3,4,1,"")])],
+    events=[("Pill Check", 1)]),
+ # Beanstalk (Beanstalk.taf) event 0 "greeting the stranger": StarterType 3
+ # after task 22, Time1=Time2=1, RestartType 0, FinishText only, one-room
+ # Where.  run400 (Adrift_1_beanstalk.txt, 2026-08-29) never printed the
+ # FinishText although the player stood in that room on the finishing turn;
+ # scarier printed it on the turn after the starter task.  EV10 isolates the
+ # shape without the room gate (Where: all rooms):
+ #   G1  starter=3 after task 1, len 1..1, FinishText only  -> the Beanstalk cell
+ #   G2  starter=3 after task 1, len 2..2, FinishText only  -> control (vardock
+ #                                        ev 2, len 3, is measured to print)
+ #   G3  starter=3 after task 1, len 1..1, StartText+FinishText
+ # Session: zztrigger, z, z, z, z.
+ 'EV10': dict(name="Probe EV10",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    npcs=[],
+    tasks=[dict(commands=["zztrigger"], complete="TRIGGER DONE.")],
+    events=[dict(short="G1", affected=0, starter=3, restart=0, tasknum=1,
+                 time1=1, time2=1, finishtext="G1 FINISH."),
+            dict(short="G2", affected=0, starter=3, restart=0, tasknum=1,
+                 time1=2, time2=2, finishtext="G2 FINISH."),
+            dict(short="G3", affected=0, starter=3, restart=0, tasknum=1,
+                 time1=1, time2=1, starttext="G3 START.",
+                 finishtext="G3 FINISH.")]),
+ # EV10 measured 2026-08-29 (Adrift_1_ev10.txt): G1 FINISH and G3 FINISH on
+ # the turn after zztrigger, G2 FINISH one later, G3 START with the trigger --
+ # scarier identical.  So the Beanstalk shape prints; what is left is the
+ # one-room Where.  EV11 isolates that: two rooms, the same event twice with
+ # Where = room 0 and Where = room 1, triggered from each room.
+ #   P1/P2 after task 1 (zzone), len 1, FinishText, Where room 0 / room 1
+ #   P3/P4 after task 2 (zztwo), same, Where room 0 / room 1
+ # Session: zzone, z, e, zztwo, z.  0-based Where => P1 then P4.
+ 'EV11': dict(name="Probe EV11",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Room A","Room A, exit east.",{1:1}),
+           ("Room B","Room B, exit west.",{3:0})],
+    npcs=[],
+    tasks=[dict(commands=["zzone"], complete="ONE DONE."),
+           dict(commands=["zztwo"], complete="TWO DONE.")],
+    events=[dict(short="P1", affected=0, starter=3, restart=0, tasknum=1,
+                 time1=1, time2=1, finishtext="P1 FINISH (Where room 0).",
+                 where=(1,0)),
+            dict(short="P2", affected=0, starter=3, restart=0, tasknum=1,
+                 time1=1, time2=1, finishtext="P2 FINISH (Where room 1).",
+                 where=(1,1)),
+            dict(short="P3", affected=0, starter=3, restart=0, tasknum=2,
+                 time1=1, time2=1, finishtext="P3 FINISH (Where room 0).",
+                 where=(1,0)),
+            dict(short="P4", affected=0, starter=3, restart=0, tasknum=2,
+                 time1=1, time2=1, finishtext="P4 FINISH (Where room 1).",
+                 where=(1,1))]),
+ # EV11 measured 2026-08-29 (Adrift_1_ev11.txt): P1 then P4, i.e. the one-room
+ # Where is 0-based and the finish prints in that room -- scarier identical.
+ # So neither the event shape nor its Where explains Beanstalk; what is left
+ # is the starter TASK.  Beanstalk task 21 `sell cow` is Repeatable 0, has a
+ # one-room Where and moves objects.  EV12 splits those three:
+ #   zzone   Repeatable 0                         -> P1
+ #   zztwo   moves object 1 to the player (0,1,4,0) -> P2
+ #   zzthree one-room Where                       -> P3
+ # Session: zzone, z, zztwo, z, zzthree, z (all in room A).
+ 'EV12': dict(name="Probe EV12",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Room A","Room A, exit east.",{1:1}),
+           ("Room B","Room B, exit west.",{3:0})],
+    objects=[("a","pebble",4,0,0,0,0,0,0)],
+    npcs=[],
+    tasks=[dict(commands=["zzone"], complete="ONE DONE.", repeatable=0),
+           dict(commands=["zztwo"], complete="TWO DONE.",
+                actions=[(0,1,4,0)]),
+           dict(commands=["zzthree"], complete="THREE DONE.", where=(1,0))],
+    events=[dict(short="P1", affected=0, starter=3, restart=0, tasknum=1,
+                 time1=1, time2=1, finishtext="P1 FINISH (after zzone).",
+                 where=(1,0)),
+            dict(short="P2", affected=0, starter=3, restart=0, tasknum=2,
+                 time1=1, time2=1, finishtext="P2 FINISH (after zztwo).",
+                 where=(1,0)),
+            dict(short="P3", affected=0, starter=3, restart=0, tasknum=3,
+                 time1=1, time2=1, finishtext="P3 FINISH (after zzthree).",
+                 where=(1,0))]),
+ # EV12 measured 2026-08-29 (Adrift_1_ev12.txt): P1, P2, P3 all print --
+ # scarier identical.  The starter task's shape is not it either.  What is:
+ # run390 checkevent's awaiting-task block (P32Dasm 00048258..0004834A, VB
+ # Decompiler loc_448258) fires on task[TaskNum - 2].done == 1 - TaskFinished,
+ # and TaskNum 1 means ANY task.  Scarier reads TaskNum - 1 with 0 = any, so
+ # every probe above (tasknum=1) fired for both reasons at once and never
+ # told them apart.  Beanstalk's TaskNum 22 is task 20 `give beans to mother`
+ # in the Runner and task 21 `sell cow` in Scarier.  EV13 separates them:
+ #   Q1 tasknum=2, all rooms  -> Runner: after zzone (task 0);
+ #                               Scarier: after zztwo (task 1)
+ #   Q2 tasknum=3, Where room B -> Runner: after zztwo, finishing on the `e`
+ #                               that moves the player into room B (does a
+ #                               finish on a move turn see the new room?);
+ #                               Scarier: after zzthree, never typed
+ # Session: zzone, z, zztwo, e, z.
+ 'EV13': dict(name="Probe EV13",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Room A","Room A, exit east.",{1:1}),
+           ("Room B","Room B, exit west.",{3:0})],
+    npcs=[],
+    tasks=[dict(commands=["zzone"], complete="ONE DONE."),
+           dict(commands=["zztwo"], complete="TWO DONE."),
+           dict(commands=["zzthree"], complete="THREE DONE.")],
+    events=[dict(short="Q1", affected=0, starter=3, restart=0, tasknum=2,
+                 time1=1, time2=1, finishtext="Q1 FINISH (tasknum 2)."),
+            dict(short="Q2", affected=0, starter=3, restart=0, tasknum=3,
+                 time1=1, time2=1, finishtext="Q2 FINISH (tasknum 3, room B).",
+                 where=(1,1))]),
+ # EV13 measured 2026-08-29 (Adrift_1_ev13.txt): Q1 fired after zztwo, Q2
+ # never -- run400 reads TaskNum - 1 exactly as scarier does (the - 2 above is
+ # the run390 listing; unconfirmed live for 3.9).  So Beanstalk's event does
+ # start on `sell cow` in both, and the finishing turn is `x stranger`.  EV14
+ # asks whether an examine / look / inventory turn ticks events at all:
+ #   R1 after zzone   -> the next turn is `x pebble`
+ #   R2 after zztwo   -> the next turn is `look`
+ #   R3 after zzthree -> the next turn is `i`
+ #   R4 after zzfour  -> the next turn is `x bob` (an NPC)
+ # each followed by a `z`.  A finish on the examine turn = it ticks; on the z
+ # = it does not.
+ # Session: zzone, x pebble, z, zztwo, look, z, zzthree, i, z, zzfour, x bob, z.
+ 'EV14': dict(name="Probe EV14",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Room A","Room A, exit east.",{1:1}),
+           ("Room B","Room B, exit west.",{3:0})],
+    objects=[("a","pebble",4,0,0,0,0,0,0)],
+    npcs=[("Bob",0,0,100,1,1,1,1,1,1,1,1,1,1)],
+    tasks=[dict(commands=["zzone"], complete="ONE DONE."),
+           dict(commands=["zztwo"], complete="TWO DONE."),
+           dict(commands=["zzthree"], complete="THREE DONE."),
+           dict(commands=["zzfour"], complete="FOUR DONE.")],
+    events=[dict(short="R1", affected=0, starter=3, restart=0, tasknum=1,
+                 time1=1, time2=1, finishtext="R1 FINISH (after zzone)."),
+            dict(short="R2", affected=0, starter=3, restart=0, tasknum=2,
+                 time1=1, time2=1, finishtext="R2 FINISH (after zztwo)."),
+            dict(short="R3", affected=0, starter=3, restart=0, tasknum=3,
+                 time1=1, time2=1, finishtext="R3 FINISH (after zzthree)."),
+            dict(short="R4", affected=0, starter=3, restart=0, tasknum=4,
+                 time1=1, time2=1, finishtext="R4 FINISH (after zzfour).")]),
+ # EV14 measured 2026-08-29 (Adrift_1_ev14.txt): R1/R2/R3 fired on the
+ # `x pebble` / `look` / `i` turns, R4 only on the `z` AFTER `x bob` -- an
+ # NPC examine does not tick events in run400 (scarier ticks on all four).
+ # That is Beanstalk turn 45 (`x stranger`).  EV15 separates "no tick" from
+ # "deferred finish" with 2-turn events, and asks whether NPC walks are
+ # skipped on that turn too (Walker loops A->B->A every turn with
+ # enter/exit lines).
+ # Session: zzone, x bob, z, z, zztwo, x pebble, z, z.
+ 'EV15': dict(name="Probe EV15",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Room A","Room A, exit east.",{1:1}),
+           ("Room B","Room B, exit west.",{3:0})],
+    objects=[("a","pebble",4,0,0,0,0,0,0)],
+    npcs=[("Bob",0,0,100,1,1,1,1,1,1,1,1,1,1),
+          ("Walker",0,0,100,1,1,1,1,1,1,1,1,1,1,0,0,"#",
+           [dict(stops=[(1,1),(0,1)], loop=1)], ("arrives","leaves"))],
+    tasks=[dict(commands=["zzone"], complete="ONE DONE."),
+           dict(commands=["zztwo"], complete="TWO DONE.")],
+    events=[dict(short="T1", affected=0, starter=3, restart=0, tasknum=1,
+                 time1=2, time2=2, finishtext="T1 FINISH (2 ticks after zzone)."),
+            dict(short="T2", affected=0, starter=3, restart=0, tasknum=2,
+                 time1=2, time2=2, finishtext="T2 FINISH (2 ticks after zztwo).")]),
+ # EV15 measured 2026-08-29 (Adrift_1_ev15.txt): on the `x bob` turn the
+ # Runner ran NEITHER the walk nor the event tick (Walker's line is missing
+ # and T1 fired on the second z), so an NPC examine is an administrative
+ # turn in run400, like `turns` or `score`.  EV16 pins the edges with the
+ # Runner's own turn counter ("You have taken N turns so far."):
+ #   x bob (has a description), x carl (empty description -> "nothing
+ #   special"), look at bob, examine bob, x me, x dave (Dave is in Room B,
+ #   so a refusal).
+ # Session: turns, x bob, turns, x carl, turns, look at bob, turns,
+ #          examine bob, turns, x me, turns, x dave, turns, z, turns.
+ 'EV16': dict(name="Probe EV16",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Room A","Room A, exit east.",{1:1}),
+           ("Room B","Room B, exit west.",{3:0})],
+    objects=[("a","pebble",4,0,0,0,0,0,0)],
+    npcs=[("Bob",0,0,100,1,1,1,1,1,1,1,1,1,1),
+          ("Carl",0,0,100,1,1,1,1,1,1,1,1,1,1,0,0,"#",[],None,""),
+          ("Dave",1,0,100,1,1,1,1,1,1,1,1,1,1)],
+    tasks=[dict(commands=["zzone"], complete="ONE DONE.")],
+    events=[]),
+ # EV follow-up: the zero-length shapes the 2026-08-02 one-shot gate does NOT
+ # cover.  EV settled RestartType=1 (restart immediately) -- fires once at
+ # game start, never again.  Here every event has Time1=Time2=0 and
+ # RestartType=2 ("restart after delay"), which re-arms via a DIFFERENT path
+ # per StarterType:
+ #   E1  starter=1 (immediate)      -> the gated path, unprobed until now
+ #   E2  starter=2, delay 2..2      -> ungated: re-arms with a fresh 2-turn
+ #                                    wait, so a re-arming Runner prints on
+ #                                    turns 2, 4, 6, 8
+ #   E3  starter=3, after task 4    -> ungated: goes back to AWAITING, so a
+ #                                    re-arming Runner prints again every
+ #                                    time `zztrigger` is repeated
+ # Session: z z z z z z z z, then zztrigger, zztrigger.  Count the prints.
+ 'EV2': dict(name="Probe EV2",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    npcs=[],
+    tasks=[dict(commands=["zze1"], complete="E1 FIRED."),
+           dict(commands=["zze2"], complete="E2 FIRED."),
+           dict(commands=["zze3"], complete="E3 FIRED."),
+           dict(commands=["zztrigger"], complete="TRIGGER DONE.")],
+    events=[dict(short="Imm Restart", affected=1, starter=1, restart=2),
+            dict(short="Delay Restart", affected=2, starter=2, restart=2,
+                 start=2, end=2),
+            dict(short="Task Restart", affected=3, starter=3, restart=2,
+                 tasknum=4)]),
+ # EV2 follow-up.  In run400 the EV2 delayed-start zero-length event (starter=2,
+ # StartTime=EndTime=2) never fired AT ALL in eight turns, which could equally
+ # mean "delayed zero-length never finishes" or "this generator writes
+ # StartTime/EndTime wrong".  EV3 separates the two: F2 is the same delayed
+ # start with a NON-zero length, so if it fires the field layout is right and
+ # F1/F3's silence is real semantics.
+ #   F1  starter=2 delay 2..2, len 0, restart=2  -> the EV2 cell, repeated
+ #   F2  starter=2 delay 2..2, len 1..1, restart=0 -> the authoring control
+ #   F3  starter=2 delay 3..3, len 0, restart=0  -> zero-length, no restart
+ 'EV3': dict(name="Probe EV3",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    npcs=[],
+    tasks=[dict(commands=["zzf1"], complete="F1 FIRED."),
+           dict(commands=["zzf2"], complete="F2 FIRED."),
+           dict(commands=["zzf3"], complete="F3 FIRED.")],
+    events=[dict(short="Zero Delay Restart", affected=1, starter=2, restart=2,
+                 start=2, end=2),
+            dict(short="Len1 Delay", affected=2, starter=2, restart=0,
+                 start=2, end=2, time1=1, time2=1),
+            dict(short="Zero Delay Once", affected=3, starter=2, restart=0,
+                 start=3, end=3)]),
+ # EV3 follow-up, and the one that decides the corpus question.  EV3's
+ # zero-length delayed-start events never ran their TaskAffected in run400 --
+ # but a real corpus event of that shape (Del Sol's "physics distraction 3":
+ # starter=2, StartTime=EndTime=25, RestartType=0, Time1=Time2=0) carries no
+ # task at all, only a StartText and a FinishText.  So: does the Runner START
+ # such an event (printing StartText) and merely never finish it, or does it
+ # never start either?  G1 is Del Sol's shape with a short delay and all three
+ # texts; G2 is the same with a non-zero length, as the ordering control.
+ 'EV4': dict(name="Probe EV4",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    npcs=[],
+    tasks=[dict(commands=["zzg1"], complete="G1 TASK.")],
+    events=[dict(short="Zero Delay Texts", affected=1, starter=2, restart=0,
+                 start=2, end=2, starttext="G1 START.", looktext="G1 LOOK.",
+                 finishtext="G1 FINISH."),
+            dict(short="Len2 Delay Texts", affected=0, starter=2, restart=0,
+                 start=2, end=2, time1=2, time2=2, starttext="G2 START.",
+                 looktext="G2 LOOK.", finishtext="G2 FINISH.")]),
+ # EV4 follow-up, and the one that decides how to MODEL the run400 results
+ # rather than just tabulate them.  EV4 showed a zero-length event started off
+ # a countdown parking in RUNNING for ever (StartText printed, LookText still
+ # in the room description, FinishText never).  If that is the general rule,
+ # then a zero-length event that RESTARTS should restart into the same parked
+ # state -- printing its StartText a second time and then showing its LookText
+ # for ever -- rather than going quietly dormant the way Scarier's one-shot
+ # gate assumes.  All three events here are zero-length and carry all three
+ # texts plus an affected task, so both halves are directly visible:
+ #   H1  starter=1, restart=1 (immediately)   -> TheADRIFTProject's "#Pill
+ #                                               Check" shape, with texts
+ #   H2  starter=1, restart=2 (after delay)   -> EV2's E1, with texts
+ #   H3  starter=3 on task 4, restart=2       -> EV2's E3, with texts
+ # Park model predicts "H1 START. H1 FINISH. H1 TASK. H1 START." at turn 0 and
+ # "H1 LOOK." in every later room description; the dormant model predicts the
+ # first three and silence after.
+ 'EV5': dict(name="Probe EV5",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    npcs=[],
+    tasks=[dict(commands=["zzh1"], complete="H1 TASK."),
+           dict(commands=["zzh2"], complete="H2 TASK."),
+           dict(commands=["zzh3"], complete="H3 TASK."),
+           dict(commands=["zztrigger"], complete="TRIGGER DONE.")],
+    events=[dict(short="Zero Imm Restart", affected=1, starter=1, restart=1,
+                 starttext="H1 START.", looktext="H1 LOOK.",
+                 finishtext="H1 FINISH."),
+            dict(short="Zero Imm Delayed", affected=2, starter=1, restart=2,
+                 starttext="H2 START.", looktext="H2 LOOK.",
+                 finishtext="H2 FINISH."),
+            dict(short="Zero Task Restart", affected=3, starter=3, restart=2,
+                 tasknum=4, starttext="H3 START.", looktext="H3 LOOK.",
+                 finishtext="H3 FINISH.")]),
+ # The turn-0 ORDERING probe (RUNNER_TESTS_TODO section 4's last open row).
+ # EV5 showed run400's turn 0 as "A bare arena.  H1 LOOK.  H2 LOOK.  H1
+ # FINISH. ..." -- the LookTexts INSIDE the opening room description and the
+ # StartTexts nowhere -- which reads as "immediate events are started during
+ # load, before the description is printed".  But every EV5 event is
+ # zero-length, so that reading is entangled with the parking model.  EV6
+ # takes the zero-length question out: K1 is a plain LENGTH-3 immediate event
+ # with all three texts, so
+ #   load-start model  -> opening description carries "K1 LOOK.", "K1 START."
+ #                        never appears, "K1 FINISH." + "K1 TASK." land on the
+ #                        third turn after load
+ #   tick-start model  -> "K1 START." prints under the opening description and
+ #                        "K1 LOOK." only shows up from the next `look` on
+ # K2 is the mid-game control (starts off a 2-turn delay) that shows where a
+ # StartText lands when nobody disputes the ordering.
+ # Session: look, z, z, look, z, z, z, look.
+ 'EV6': dict(name="Probe EV6",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    npcs=[],
+    tasks=[dict(commands=["zzk1"], complete="K1 TASK."),
+           dict(commands=["zzk2"], complete="K2 TASK.")],
+    events=[dict(short="Len3 Immediate", affected=1, starter=1, restart=0,
+                 time1=3, time2=3, starttext="K1 START.",
+                 looktext="K1 LOOK.", finishtext="K1 FINISH."),
+            dict(short="Len2 Delay2", affected=2, starter=2, restart=0,
+                 start=2, end=2, time1=2, time2=2, starttext="K2 START.",
+                 looktext="K2 LOOK.", finishtext="K2 FINISH.")]),
+ # EV6 with something on the floor.  run390's opening description of the EV6
+ # 3.9 twin reads "LONG.  Also here is a rock and a slime.  K1 LOOK." -- the
+ # event's LookText AFTER the room contents, where SCARIER puts it before
+ # them.  EV6 itself has an empty room, so it cannot tell whether run400
+ # agrees; this adds a floor object and nothing else.
+ 'EV7': dict(name="Probe EV7",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    objects=[("a","rock",4,0,0,0,0,0,0)],
+    npcs=[],
+    tasks=[dict(commands=["zzk1"], complete="K1 TASK.")],
+    events=[dict(short="Len3 Immediate", affected=1, starter=1, restart=0,
+                 time1=3, time2=3, starttext="K1 START.",
+                 looktext="K1 LOOK.", finishtext="K1 FINISH.")]),
+ # EV7 plus an NPC.  run400 on EV7 answered "yes, LookText goes after the
+ # object list" -- but SCARIER's room block is description, then objects, then
+ # the character lines, so a probe with only an object cannot say whether the
+ # Runner's LookText is merely after the objects or genuinely LAST.  Robot has
+ # no InRoomText, so it takes the default "Robot is here" line: if the opening
+ # description ends "...  Also here is a rock.  Robot is here, looking
+ # dangerous.  K1 LOOK.", the LookText closes the whole block.
+ 'EV8': dict(name="Probe EV8",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    objects=[("a","rock",4,0,0,0,0,0,0)],
+    npcs=[("Robot",0,0,250,0,0,0,0,0,0,0,0,0,0)],
+    tasks=[dict(commands=["zzk1"], complete="K1 TASK.")],
+    events=[dict(short="Len3 Immediate", affected=1, starter=1, restart=0,
+                 time1=3, time2=3, starttext="K1 START.",
+                 looktext="K1 LOOK.", finishtext="K1 FINISH.")]),
+ # The 4.0 twin of make_39_evtimeprobe.py (RUNNER_TESTS_TODO section 8, second
+ # open row): a length-5 immediately-restarting event, which makes the "3.9/3.8
+ # move one step into the restarted event" claim four turns wide.  4.0 is the
+ # version the fixup does NOT apply to, so this is the control that says what
+ # an unshortened period looks like: with immediate events started at load, the
+ # first FINISH lands on turn 5 and the rest should follow every 5 turns
+ # (5, 10, 15) where the 3.9 probe is expected to show 5, 9, 13.
+ # Session: 15 x z.
+ 'EV9': dict(name="Probe EV9",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    npcs=[],
+    tasks=[dict(commands=["ping"], complete="PING FIRED.")],
+    events=[dict(short="Period Five", affected=0, starter=1, restart=1,
+                 time1=5, time2=5, starttext="E START.",
+                 finishtext="E FINISH.")]),
+ # Group-trailing reference probe (the open tangent on RUNNER_TESTS_TODO
+ # section 4's last-element-in-group row): uip_match_text() and
+ # uip_match_wildcard() share the remainder-list shape that killed
+ # %object%/%character% before the 2026-08-02 fix, so a %text% that closes a
+ # [...] group -- and a `*` that closes one with input left over -- can never
+ # match in Scarier.  T0 is the working top-level control; the CompleteTexts
+ # echo %text% so the Runner reveals its capture extent directly; T3 pins
+ # whether a group-trailing %text% is minimal-munch against material AFTER
+ # the group.
+ 'TX': dict(name="Probe TX",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    npcs=[],
+    tasks=[dict(commands=["mimic %text%"], complete="T0=[%text%]."),
+           dict(commands=["[echo %text%]"], complete="T1=[%text%]."),
+           dict(commands=["[eat *]"], complete="EATSTAR FIRED."),
+           dict(commands=["[mark %text%] now"], complete="T3=[%text%]."),
+           dict(commands=["[nib/nab *]"], complete="NIBSTAR FIRED.")]),
+ # TX follow-up controls.  TX showed run400 matching NONE of `[echo %text%]`,
+ # `[eat *]`, `[nib/nab *]`, `[mark %text%] now` -- but ADRIFTMAS proved it
+ # DOES match `[kiss {the} %character%]`, so the failure cannot be "groups
+ # don't work".  These separate the candidate causes in one file: literal-only
+ # groups (C1/C2) vs a group-trailing %character% (C3, the known-good shape)
+ # vs %text% (C4) vs `*` (C5) vs a reference followed by a literal INSIDE the
+ # group (C6/C7, testing whether it is trailing-ness or the reference itself).
+ 'TX2': dict(name="Probe TX2",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    npcs=[("Robot",0,0,250,0,0,0,0,0,0,0,0,0,0)],
+    tasks=[dict(commands=["[wham]"], complete="C1 LITGROUP FIRED."),
+           dict(commands=["[zap/zop] thing"], complete="C2 ALTGROUP FIRED."),
+           dict(commands=["[poke {the} %character%]"], complete="C3 CHARGROUP FIRED."),
+           dict(commands=["[jot %text%]"], complete="C4=[%text%]."),
+           dict(commands=["[snag *]"], complete="C5 STARGROUP FIRED."),
+           dict(commands=["[prod %character% hard]"], complete="C6 CHARMID FIRED."),
+           dict(commands=["[quip %text% hard]"], complete="C7=[%text%].")]),
+ 'RC': dict(name="Probe RC",
+    player=(200,10,10,60,60,0,0,0,0,3),
+    rooms=[("Test Arena","A bare arena.",{1:1}),
+           ("Safe Room","A quiet room.",{3:0})],
+    objects=[],
+    npcs=[("Robot",0,2,250,5,5,50,50,0,0,0,0,0,0)]),
+ # End-game action ordering (RUNNER_TESTS_TODO section 4, last row).  Does a
+ # task's REMAINING actions run after an action that ends the game?  Scarier
+ # runs them with the print filter muted (sctasks_action.cpp task_run_task_actions),
+ # so the state change lands but nothing is shown -- which is invisible in
+ # "Three Monkeys One Cage", the game that raised the question, because its
+ # score is an author variable rather than the engine score.
+ #
+ # SETTLED against run400 2026-08-09, and it is not one answer but two:
+ # in-line actions behind the ending DO run, an Execute Task action does NOT.
+ # Scarier ran both, and task_run_set_task_action() was gated to match.
+ #
+ # Engine score IS observable in run400: it prints its own end-of-game summary
+ # ("You scored N out of the maximum M", "Well done - you scored maximum
+ # points!" at 100%).  MaxScore=7 so a trailing +7 reads as 100% and a dropped
+ # one as 0%.  Tasks 0-3 and 6 are the probes; tasks 4 and 5 are exec targets,
+ # never typed directly.
+ #
+ # One end per session, so each command is its own Runner launch.  run400's
+ # reading is in [brackets]; Scarier now matches all five.
+ #   scorefirst -- control: +7 BEFORE the end action.  Proves the summary
+ #                 reports the engine score at all.  [7/7]
+ #   scorelast  -- the direct question: +7 AFTER a type-6 end action.  [7/7 --
+ #                 so the trailing action DOES run.]
+ #   execlast   -- Three Monkeys' actual shape: +7 after an Execute-Task
+ #                 action whose callee ends the game.  [7/7]
+ #   printfirst -- control for the one below: exec a task that prints and
+ #                 scores, THEN end.  [7/7, callee's text shown.]
+ #   printlast  -- the same exec, now queued behind the ending.  [0/7 and no
+ #                 text -- the Runner drops the dispatch outright.  The callee
+ #                 scores +7, which is what separates "ran but muted" (7/7)
+ #                 from "skipped" (0/7); printfirst rules out the callee.]
+ 'EG': dict(name="Probe EG", maxscore=7,
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    npcs=[],
+    tasks=[dict(commands=["scorefirst"], complete="EG scorefirst.",
+                actions=[(4,7), (6,0,0,0)]),
+           dict(commands=["scorelast"], complete="EG scorelast.",
+                actions=[(6,0,0,0), (4,7)]),
+           dict(commands=["execlast"], complete="EG execlast.",
+                actions=[(5,0,4), (4,7)]),
+           dict(commands=["printlast"], complete="EG printlast.",
+                actions=[(6,0,0,0), (5,0,5)]),
+           # task 4: exec target that ends the game (never typed directly).
+           dict(commands=["egender"], complete="EG ender.",
+                actions=[(6,0,0,0)]),
+           # task 5: exec target that prints and scores (never typed directly).
+           dict(commands=["egtrailer"], complete="EG TRAILER RAN.",
+                actions=[(4,7)]),
+           # task 6: printlast's control -- same Execute-Task action, but
+           # BEFORE the ending rather than after it.
+           dict(commands=["printfirst"], complete="EG printfirst.",
+                actions=[(5,0,5), (6,0,0,0)])]),
+ # Take-wording probe (RUNNER_TESTS_TODO §4, the "You pick up" vs "You take"
+ # row): which of run400's two take templates does a *bare* `take`/`get` of an
+ # object lying loose in the room reach?  Scarier says "You pick up the rock.",
+ # a run400 transcript of "It's Easter, Peeps!" says "You take the creme egg.",
+ # and the P-code carries both builders in separate handlers.  Authored
+ # Perspective 1 so the answer reads in the same second person as that
+ # transcript.  No NPCs, no tasks, no battle -- nothing to intercept the
+ # library.  The box is an in-room container so the same session can re-check
+ # the agreed "You take the X from the Y." path, and the lamp/gem give `take
+ # all` and a multiple-object list something to work with.
+ 'TK': dict(name="Probe TK", persp=1,
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    objects=[("a","rock",4,0,0,0,0,0,0),
+             ("a","box",4,0,0,0,0,0,0,1),
+             ("a","lamp",4,0,0,0,0,0,0),
+             ("a","gem",1,0,0,0,0,0,0)],
+    npcs=[]),
+ # End-of-game score summary (RUNNER_TESTS_TODO section 4, the "End-of-game
+ # score summary" row).  run400 prints two or three lines of its own AFTER the
+ # game's ending text; Scarier prints none of them.  The row had the five
+ # literals censused in all four binaries but the *assembly* had never been
+ # captured live -- specifically the rounding of the percentage, whether the
+ # block is printed unconditionally, and what selects "Well done - you scored
+ # maximum points!" over "You finished N points short."
+ #
+ # Read off Form1.endmessage in run400 (@0005DDAC; the gameover flag is the
+ # same import slot 0x4F that section 4's end-game-action row pinned, and the
+ # two I4 globals it reads are slot 0x50 = MaxScore, 0x51 = score):
+ #
+ #   If gameOver > 0 Then
+ #     If MaxScore = 0 Then pct = 100 Else pct = Int(score * (100 / MaxScore))
+ #     If gameOver = 1 Then                          ' EndGame Var1=0, the win
+ #        <win banner>
+ #        If MaxScore > 0 Then                       ' @0005DE16 loads slot 0x50
+ #           t &= "You scored" & Str(score) & " out of the maximum" & Str(MaxScore) & "!" & CRLF
+ #           t &= "That is" & Str(pct) & "% of the game!" & CRLF
+ #           If score = MaxScore Then t &= "Well done - you scored maximum points!" & CRLF & CRLF
+ #                              Else t &= "You finished " & CStr(MaxScore - score) & " points short." & CRLF & CRLF
+ #        End If
+ #        t &= "[Press any key to end]"
+ #     ElseIf gameOver = 3 Then                      ' EndGame Var1=1, the loss
+ #        t &= CRLF & CRLF & "Better luck next time." & CRLF
+ #        <the same MaxScore > 0 block>              ' @0005E01A loads slot 0x50
+ #        t &= "[Press any key to end]"
+ #     ElseIf gameOver = 2 Then General.Sub_22_70    ' EndGame Var1=2, the death
+ #     ElseIf gameOver = 4 Then <menus only>         ' EndGame Var1=3, no message
+ #
+ # VB's Str() prepends a space to a non-negative number, which is why the
+ # literals are "You scored" and " out of the maximum" with no space of their
+ # own; CStr() in the "points short" arm does not, hence its trailing space.
+ #
+ # MaxScore=8 with a +3 score is the discriminating cell: 3/8 = 37.5%, so
+ # Int() reads 37 where any rounding reads 38, and the same ending exercises
+ # the "points short" arm (8 - 3 = 5).  The 100% / "Well done" and 0% cells
+ # are already live from the `EG` probe above (7/7 and 0/7), so they are not
+ # repeated here.  One ending per session, so each command is its own launch.
+ #   scwin   -- +3 then EndGame Var1=0.  [win banner + the three lines]
+ #   sclose  -- +3 then EndGame Var1=1.  [Better luck next time. + the same]
+ #   scdead  -- +3 then EndGame Var1=2.  [does Sub_22_70 print a summary?]
+ #   scend   -- +3 then EndGame Var1=3.  [expected: no message at all]
+ # `SC0` is the same probe with MaxScore=0, to confirm the guard: `scwin`
+ # there should print the win banner and NOTHING else.
+ 'SC': dict(name="Probe SC", persp=1, maxscore=8,
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    objects=[], npcs=[],
+    tasks=[dict(commands=["scwin"],  complete="SC scwin.",
+                actions=[(4,3), (6,0,0,0)]),
+           dict(commands=["sclose"], complete="SC sclose.",
+                actions=[(4,3), (6,1,0,0)]),
+           dict(commands=["scdead"], complete="SC scdead.",
+                actions=[(4,3), (6,2,0,0)]),
+           dict(commands=["scend"],  complete="SC scend.",
+                actions=[(4,3), (6,3,0,0)]),
+           # Not an ending: a bare +3 on an ordinary turn.  run400 is the only
+           # Runner whose binary carries "(Your score has increased by " (it is
+           # absent from run370/380/390), and it printed no such line on the
+           # scoring turns above -- but those turns also ended the game, so this
+           # separates "never notifies" from "does not notify on the last turn".
+           dict(commands=["scpoint"], complete="SC scpoint.",
+                actions=[(4,3)])]),
+ 'SC0': dict(name="Probe SC0", persp=1, maxscore=0,
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    objects=[], npcs=[],
+    tasks=[dict(commands=["scwin"],  complete="SC0 scwin.",
+                actions=[(4,3), (6,0,0,0)]),
+           dict(commands=["sclose"], complete="SC0 sclose.",
+                actions=[(4,3), (6,1,0,0)])]),
+ # getdynfromroom (RUNNER_TESTS_TODO section 9, "getdynfromroom selection
+ # criteria").  run400 evaluates the function inside Sub_20_22 -- the routine
+ # that *runs a task by its index* -- as a preamble, so it is not a matcher at
+ # all: nothing here fires on a typed command, and every probe below has to be
+ # reached through a wrapper task whose action is "execute task N".  Read off
+ # @0005F750 and then measured live, variant by variant:
+ #
+ #   For each ALTERNATE command of the task     ' the primary Command is not
+ #     If Left(Replace(cmd, " ", ""), 25)       ' in the array it walks
+ #          = "#%object%=getdynfromroom("
+ #       And Right(cmd, 1) = ")"                ' the RAW command, not squeezed
+ #     Then
+ #       arg = the squeezed text between "(" and the final ")"
+ #       For r = 0 To roomCount - 1             ' 1-based array: LAST room lost
+ #         If arg = Rooms(r).Short Then         ' case-INsensitive
+ #           For o = 0 To objCount - 1          ' 0-based: no fencepost here
+ #             If Objects(o).[1A] = r And Objects(o).[18] = 0 Then ref = o : Exit For
+ #
+ # Measured results, all live in run400 with the wrappers below:
+ #
+ #   GD1/GD3..GD0   function written as the task's FIRST command: never
+ #                  evaluated (the TAF's primary Command is not an ALTCMD).
+ #   GD2/GDA/GDD/GDE  function written second, third or last: evaluated.
+ #   GDF/GDG/GDH    "attic"/"STUDY"/"Attic" all match "Attic"/"Study", so the
+ #                  comparison is case-insensitive both ways and the LCase()
+ #                  in the P-code is redundant.
+ #   GDI/GDJ/GDK    "dark cave", "winecellar" and "wine cellar" ALL miss: the
+ #                  argument is squeezed but the room name is not, so no room
+ #                  whose name contains a space is reachable -- not even by
+ #                  the manual's own example, "getdynfromroom(The Park)".
+ #   GDL            "getdynfromroom(larder)x" misses: the raw command's last
+ #                  character has to be ")".
+ #   GDM            the cellar's mop, added as the LAST object, is still found.
+ #   GDN            "larder" as room 10 of 10 missed, and started returning
+ #                  its pie the moment a spare 11th room was appended -- the
+ #                  room loop drops the last room, the object loop does not.
+ #   GDE/GDR        the vault holds "ring" then "gem" and yields the ring:
+ #                  first in object order wins.
+ #   GD3            the cellar holding only a static yields nothing.
+ #
+ # Scarier reproduces all of that except the two run400 bugs that can only
+ # lose an intended match: it squeezes the room name too (so GDI/GDJ/GDK do
+ # fire) and it scans every room (so GDN would fire even as the last room).
+ # Both are marked "deliberate:" in scrunner.cpp run_is_task_function().
+ #
+ # Every syntax variant gets a room of its own, holding exactly one dynamic
+ # object nothing else claims.  That matters because the probes are destructive
+ # -- each one that works empties its room -- so two probes sharing a room would
+ # leave the second one silent for the wrong reason.
+ #
+ #   0 hall         coin      the player's own room, plain lowercase name
+ #   1 kitchen      spoon     function line written *second*
+ #   2 cellar       (static)  a room whose only content is a static
+ #   3 Attic        trunk     lowercase argument vs a capitalised room
+ #   4 dark cave    bat       argument with a space, matching the room
+ #   5 Study        lamp      uppercase argument vs a capitalised room
+ #   6 wine cellar  rope      space-stripped argument vs a spaced room
+ #   7 vault        ring,gem  two candidates: which one wins?
+ #   8 shed         hoe       reached only by a task with no typeable command
+ #   9 larder       pie       argument with junk after the ")"
+ 'GD': dict(name="Probe GD", persp=1, maxscore=0,
+    player=(200,0,0,0,0,0,0,0,0,0),
+    # Long descriptions are deliberately identical to the Shorts, so a probe
+    # that fires tells us nothing about *which* room field run400 matches
+    # against -- and one that still misses rules the question out entirely.
+    rooms=[("hall","hall",{}), ("kitchen","kitchen",{}),
+           ("cellar","cellar",{}), ("Attic","Attic",{}),
+           ("dark cave","dark cave",{}), ("Study","Study",{}),
+           ("wine cellar","wine cellar",{}), ("vault","vault",{}),
+           ("shed","shed",{}), ("larder","larder",{}),
+           # A sacrificial last room and a sacrificial last object: run400's
+           # room and object loops both run 0 To count-1 over 1-based arrays,
+           # so whatever sits last is never reached.  Parking a spare at each
+           # end keeps "larder" and "the mop" inside the visited range -- and
+           # the mop, in the otherwise static-only cellar, is what proves the
+           # object loop drops its last entry too.
+           ("spare","spare",{})],
+    objects=[("a","key",1,0,0,0,0,0,0),      # held by the player
+             ("a","coin",4,0,0,0,0,0,0),     # hall
+             ("a","spoon",5,0,0,0,0,0,0),    # kitchen
+             ("a","trunk",7,0,0,0,0,0,0),    # Attic
+             ("a","bat",8,0,0,0,0,0,0),      # dark cave
+             ("a","lamp",9,0,0,0,0,0,0),     # Study
+             ("a","rope",10,0,0,0,0,0,0),    # wine cellar
+             ("a","ring",11,0,0,0,0,0,0),    # vault, first
+             ("a","gem",11,0,0,0,0,0,0),     # vault, second
+             ("a","hoe",12,0,0,0,0,0,0),     # shed
+             ("a","pie",13,0,0,0,0,0,0),    # larder
+             ("a","mop",6,0,0,0,0,0,0)],     # cellar, alone with the static
+    statics=[("a","plaque",1,2)],            # cellar: the only thing in it
+    npcs=[],
+    # run400 does not expand %object% in CompleteText at all -- it prints the
+    # placeholder verbatim -- so each probe instead carries a "move the
+    # REFERENCED object to held by the player" action (type 0, Var1 = 2 the
+    # referenced object, Var2 = 4 held by, Var3 = 0 the player) and the answer
+    # is read off the inventory.
+    tasks=[# Control: prove the observation channel itself.  `gdc coin` sets the
+           # referenced object the ordinary way, so if this one does not bring
+           # the coin to hand then a silent getdynfromroom probe below means
+           # nothing.
+           dict(commands=["gdc %object%"],
+                complete="GDC [%theobject%]", actions=[(0,2,4,0)]),
+           dict(commands=["# %object% = getdynfromroom(hall)","gd1"],
+                complete="GD1 [%theobject%]", actions=[(0,2,4,0)]),
+           # Function line second: does the scan look past the first command?
+           dict(commands=["gd2","# %object% = getdynfromroom(kitchen)"],
+                complete="GD2 [%theobject%]", actions=[(0,2,4,0)]),
+           dict(commands=["# %object% = getdynfromroom(cellar)","gd3"],
+                complete="GD3 [%theobject%]", actions=[(0,2,4,0)]),
+           dict(commands=["# %object% = getdynfromroom(attic)","gd4"],
+                complete="GD4 [%theobject%]", actions=[(0,2,4,0)]),
+           dict(commands=["# %object% = getdynfromroom(STUDY)","gd5"],
+                complete="GD5 [%theobject%]", actions=[(0,2,4,0)]),
+           dict(commands=["# %object% = getdynfromroom(dark cave)","gd6"],
+                complete="GD6 [%theobject%]", actions=[(0,2,4,0)]),
+           dict(commands=["# %object% = getdynfromroom(winecellar)","gd7"],
+                complete="GD7 [%theobject%]", actions=[(0,2,4,0)]),
+           dict(commands=["# %object% = getdynfromroom(vault)","gd8"],
+                complete="GD8 [%theobject%]", actions=[(0,2,4,0)]),
+           dict(commands=["# %object% = getdynfromroom(larder)x","gd9"],
+                complete="GD9 [%theobject%]", actions=[(0,2,4,0)]),
+           # No typeable command at all.  Scarier used to scan for the function
+           # in a pass over every task on every player command and fire the
+           # task itself when it matched, so this one fired spontaneously
+           # there; run400 only evaluates the function while running a task by
+           # index, and stayed silent.  That whole spontaneous pass is gone as
+           # of the section 9 port, so this probe is silent in both now.
+           dict(commands=["# %object% = getdynfromroom(shed)"],
+                complete="GD0 SPONTANEOUS [%theobject%]", actions=[(0,2,4,0)]),
+           # run400 evaluates the function only inside the by-index task runner
+           # (mdlSpreadTheLoad.Sub_20_22), which the typed-command matcher never
+           # reaches -- so these three drive the same probes the other way, via
+           # an "execute task" action (type 5, Var1 = 0, Var2 = 0-based index).
+           dict(commands=["gdx1"], complete="GDX1 [%theobject%]",
+                actions=[(5,0,1)]),
+           dict(commands=["gdx2"], complete="GDX2 [%theobject%]",
+                actions=[(5,0,2)]),
+           dict(commands=["gdx3"], complete="GDX3 [%theobject%]",
+                actions=[(5,0,3)]),
+           dict(commands=["gdx4"], complete="GDX4 [%theobject%]",
+                actions=[(5,0,4)]),
+           dict(commands=["gdx5"], complete="GDX5 [%theobject%]",
+                actions=[(5,0,5)]),
+           dict(commands=["gdx6"], complete="GDX6 [%theobject%]",
+                actions=[(5,0,6)]),
+           dict(commands=["gdx7"], complete="GDX7 [%theobject%]",
+                actions=[(5,0,7)]),
+           dict(commands=["gdx8"], complete="GDX8 [%theobject%]",
+                actions=[(5,0,8)]),
+           dict(commands=["gdx9"], complete="GDX9 [%theobject%]",
+                actions=[(5,0,9)]),
+           dict(commands=["gdx0"], complete="GDX0 [%theobject%]",
+                actions=[(5,0,10)]),
+           # Only GD2 above matched, and GD2 is the only one whose function
+           # line is not the *first* command -- so this pair swaps the two
+           # variables over: hall with the function second, kitchen with the
+           # function first.  Whichever fires names the real discriminator.
+           dict(commands=["gda","# %object% = getdynfromroom(hall)"],
+                complete="GDA [%theobject%]"),
+           dict(commands=["# %object% = getdynfromroom(kitchen)","gdb"],
+                complete="GDB [%theobject%]"),
+           dict(commands=["gdxa"], complete="GDXA [%theobject%]",
+                actions=[(5,0,21)]),
+           dict(commands=["gdxb"], complete="GDXB [%theobject%]",
+                actions=[(5,0,22)]),
+           # Three-command tasks pin down the scanned range: is it "every
+           # command but the first", or only the last?
+           dict(commands=["dd1","dd2","# %object% = getdynfromroom(shed)"],
+                complete="GDD [%theobject%]"),
+           dict(commands=["ee1","# %object% = getdynfromroom(vault)","ee2"],
+                complete="GDE [%theobject%]"),
+           dict(commands=["gdxd"], complete="GDXD [%theobject%]",
+                actions=[(5,0,25)]),
+           dict(commands=["gdxe"], complete="GDXE [%theobject%]",
+                actions=[(5,0,26)]),
+           # With the position question settled, the argument-syntax questions
+           # get re-asked with the function safely in second place, and with no
+           # actions at all so that nothing empties a room behind our back.
+           dict(commands=["ff","# %object% = getdynfromroom(attic)"],
+                complete="GDF [%theobject%]"),      # lower arg vs "Attic"
+           dict(commands=["gg","# %object% = getdynfromroom(STUDY)"],
+                complete="GDG [%theobject%]"),      # upper arg vs "Study"
+           dict(commands=["hh","# %object% = getdynfromroom(Attic)"],
+                complete="GDH [%theobject%]"),      # exact arg vs "Attic"
+           dict(commands=["ii","# %object% = getdynfromroom(dark cave)"],
+                complete="GDI [%theobject%]"),      # spaced arg, spaced room
+           dict(commands=["jj","# %object% = getdynfromroom(winecellar)"],
+                complete="GDJ [%theobject%]"),      # stripped vs "wine cellar"
+           dict(commands=["kk","# %object% = getdynfromroom(wine cellar)"],
+                complete="GDK [%theobject%]"),      # spaced vs "wine cellar"
+           dict(commands=["ll","# %object% = getdynfromroom(larder)x"],
+                complete="GDL [%theobject%]"),      # junk after the ")"
+           dict(commands=["mm","# %object% = getdynfromroom(cellar)"],
+                complete="GDM [%theobject%]"),      # a room holding only a static
+           dict(commands=["gdxf"], complete="GDXF [%theobject%]",
+                actions=[(5,0,29)]),
+           dict(commands=["gdxg"], complete="GDXG [%theobject%]",
+                actions=[(5,0,30)]),
+           dict(commands=["gdxh"], complete="GDXH [%theobject%]",
+                actions=[(5,0,31)]),
+           dict(commands=["gdxi"], complete="GDXI [%theobject%]",
+                actions=[(5,0,32)]),
+           dict(commands=["gdxj"], complete="GDXJ [%theobject%]",
+                actions=[(5,0,33)]),
+           dict(commands=["gdxk"], complete="GDXK [%theobject%]",
+                actions=[(5,0,34)]),
+           dict(commands=["gdxl"], complete="GDXL [%theobject%]",
+                actions=[(5,0,35)]),
+           dict(commands=["gdxm"], complete="GDXM [%theobject%]",
+                actions=[(5,0,36)]),
+           # The shape "Humbug" uses, and the only shape in either corpus: a
+           # "#" comment first, the function second, nothing typeable.  Does
+           # the Runner ever run such a task by itself?
+           dict(commands=["# gdn comment","# %object% = getdynfromroom(larder)"],
+                complete="GDN FIRED [%theobject%]"),
+           dict(commands=["gdxn"], complete="GDXN [%theobject%]",
+                actions=[(5,0,45)]),
+           # GDN came back empty even though its function line is second and
+           # its room is a plain lowercase one with a pie in it -- so a leading
+           # "#" comment does something.  These four vary where the comment
+           # sits relative to a plain command and to the function.
+           dict(commands=["# o1","# o2","# %object% = getdynfromroom(larder)"],
+                complete="GDO [%theobject%]"),
+           dict(commands=["pp","# p1","# %object% = getdynfromroom(larder)"],
+                complete="GDP [%theobject%]"),
+           dict(commands=["# q1","qq","# %object% = getdynfromroom(larder)"],
+                complete="GDQ [%theobject%]"),
+           dict(commands=["# r1","# %object% = getdynfromroom(vault)"],
+                complete="GDR [%theobject%]"),
+           dict(commands=["gdxo"], complete="GDXO [%theobject%]",
+                actions=[(5,0,47)]),
+           dict(commands=["gdxp"], complete="GDXP [%theobject%]",
+                actions=[(5,0,48)]),
+           dict(commands=["gdxq"], complete="GDXQ [%theobject%]",
+                actions=[(5,0,49)]),
+           dict(commands=["gdxr"], complete="GDXR [%theobject%]",
+                actions=[(5,0,50)])]),
+ # Moving a static object (RUNNER_TESTS_TODO section 9, "static objects moved
+ # into the inventory"), SETTLED LIVE 2026-08-17.  Three results, from four
+ # run400 sessions over this one probe:
+ #
+ #   smhold, z, i   -> "You are carrying a plaque."  An EVENT moves a static
+ #                     into the hand; run400 does it too.
+ #   grab plaque    -> "SM: grabbed [the plaque]." and the plaque does not
+ #                     move.  A TASK ACTION never moves a static, whatever the
+ #                     selector or destination -- run400's mover Sub_20_11
+ #                     @0008C200 bails at @0008C360, "If Objects(o).Static = 1
+ #                     Then <next object>", ahead of the destination cases.
+ #                     "hide plaque" with the plaque already in hand is
+ #                     refused the same way.  Scarier moved it; now ported
+ #                     (task_move_object).  So evt_move_object() really is the
+ #                     only place a static moves.
+ #   count          -> 0 while the coin is in the inventory BY EVENT, and 1
+ #                     after "take coin"; and after "grab coin" twice it is
+ #                     still 1, so the total is recomputed, not counted up.
+ #                     An event's "held by player" is a half-move in run400:
+ #                     listed, but not held.  deliberate: not reproduced.
+ 'SM': dict(name="Probe SM", persp=1, maxscore=0,
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Probe Room","A bare probe room.",{0: 1}),
+           ("Far Room","A far room.",{2: 0})],
+    objects=[("a","coin",4,0,0,0,0,0,0)],
+    statics=[("a","plaque",1,0)],            # Probe Room only
+    npcs=[],
+    tasks=[dict(commands=["smcoin"], complete="SM: coin event armed."),
+           dict(commands=["smhold"], complete="SM: plaque-to-player armed."),
+           dict(commands=["smroom"], complete="SM: plaque-to-Far-Room armed."),
+           dict(commands=["smaway"], complete="SM: coin-to-Far-Room armed."),
+           # The event mover is not the only way a static can reach the hand:
+           # a task action's "referenced object" selector reaches statics too,
+           # since only the by-index selector is restricted to dynamics.
+           dict(commands=["grab %object%"], complete="SM: grabbed [%theobject%].",
+                actions=[(0,2,4,0)]),
+           dict(commands=["hide %object%"], complete="SM: hid [%theobject%].",
+                actions=[(0,2,0,0)])],
+    events=[dict(short="SM Coin", affected=0, starter=3, tasknum=1, restart=0,
+                 time1=1, time2=1, starttext="SM1 start.",
+                 obj1=1, obj1dest=1),        # coin -> held by player
+            dict(short="SM Hold", affected=0, starter=3, tasknum=2, restart=0,
+                 time1=1, time2=1, starttext="SM2 start.",
+                 obj1=2, obj1dest=1),        # plaque -> held by player
+            dict(short="SM Room", affected=0, starter=3, tasknum=3, restart=0,
+                 time1=1, time2=1, starttext="SM3 start.",
+                 obj1=2, obj1dest=4),        # plaque -> Far Room
+            dict(short="SM Away", affected=0, starter=3, tasknum=4, restart=0,
+                 time1=1, time2=1, starttext="SM4 start.",
+                 obj1=1, obj1dest=4)]),      # coin -> Far Room, from the hand
+ # NPC in-room text (RUNNER_TESTS_TODO section 9, "'#' in-room text for NPCs").
+ # run400 does the "#" substitution in the *loader* @00091EDF -- the text
+ # becomes "<name> is here." there and then -- and the room lister @00072944
+ # partitions the NPCs on Right(text, 9) = " is here.", emitting that group
+ # first as one joined sentence and the custom texts after it.  Scarier tests
+ # for a literal "#" at list time and emits the two groups the other way
+ # round, so an author text that happens to end in " is here." is never folded
+ # into the joined sentence.  Delta below is exactly that case.
+ 'NH': dict(name="Probe NH", persp=1, maxscore=0,
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Probe Room","A bare probe room.",{})],
+    objects=[], tasks=[],
+    npcs=[("Alpha",0,0,250,0,0,0,0,0,0,0,0,0,0,0,0,"#"),
+          ("Bravo",0,0,250,0,0,0,0,0,0,0,0,0,0,0,0,
+           "Bravo lurks in the corner."),
+          ("Charlie",0,0,250,0,0,0,0,0,0,0,0,0,0,0,0,"#"),
+          ("Delta",0,0,250,0,0,0,0,0,0,0,0,0,0,0,0,"Delta is here."),
+          ("Echo",0,0,250,0,0,0,0,0,0,0,0,0,0,0,0,""),
+          # Does the joined sentence name the NPC, or echo the text with its
+          # " is here." trimmed off?  Foxtrot's text names someone else.
+          ("Foxtrot",0,0,250,0,0,0,0,0,0,0,0,0,0,0,0,
+           "The stranger is here."),
+          # A near miss: same words, wrong punctuation -- stays custom.
+          ("Golf",0,0,250,0,0,0,0,0,0,0,0,0,0,0,0,"Golf is here!"),
+          # Is the suffix test Option Compare Text, like the module's other
+          # string compares (see the GD probes), or Binary?
+          ("Hotel",0,0,250,0,0,0,0,0,0,0,0,0,0,0,0,"Hotel IS HERE.")]),
+ # Event-length RANGE semantics (RUNNER_TESTS_TODO section 10).  Every earlier
+ # event probe set Time1 == Time2, where the roll's range semantics are
+ # invisible; the run400 P-code says every two-field range roll near the event
+ # machinery is `lo + Int(Rnd*(hi-lo))` (EXCLUSIVE hi), with a `+ 1` variant
+ # ([lo+1, hi]) on one restart and one load branch, while scr_randomint is
+ # inclusive of both bounds.  Which family rolls which field is unreadable in
+ # the dump (FMemLdI2 prints no operand), so measure all of them at once:
+ #   E1  starter=1, restart=1, len 1..3  -> first 1F gap since load = the
+ #       load-path length roll; every later 1S->1F gap = the restart-branch
+ #       length roll.  Exclusive: lengths in {1,2}; inclusive: {1,2,3};
+ #       the +1 form: {2,3}.
+ #   E2  starter=2 delay 1..1, restart=2, len 1..3 -> each 2S->2F gap = the
+ #       in-play (delay-countdown-zero) length roll, same three signatures.
+ #   E3  starter=2 delay 1..3, restart=2, len 1..1 -> first 3S turn = the
+ #       load delay roll + 1; later 3F->3S gaps = the restart-after-delay
+ #       roll (scevents.cpp's other scr_randomint site).
+ # The load path re-seeds from Timer, so fresh sessions are independent; ~25
+ # x `z` per session reads out ~8 draws per family.
+ # PREC: task-vs-system-get precedence when restrictions FAIL.  Measured need:
+ # provenance (4.0) shows `* get * tent *` with a failing messaged restriction
+ # BLOCKS the system take in run400 (bulldog); SCARE's run_all_commands comment
+ # claims TWAD's (3.9) `* ball *` must NOT block it.  Four objects, one per
+ # pattern shape:
+ #   tent: `* get * tent *` failing restr, message   -> does it block?
+ #   ball: `* ball *`       failing restr, message   -> does it block?
+ #   coin: `* get * coin *` failing restr, NO message-> silent fallthrough?
+ #   rock: no task                                    -> control
+ # Restrs are "object held by player" (v2=1 v3=0) on an object that starts on
+ # the floor, so they always fail before any successful take.
+ 'PREC': dict(name="Probe PREC",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    objects=[("a","tent",4,0,0,0,0,0,0),
+             ("a","ball",4,0,0,0,0,0,0),
+             ("a","coin",4,0,0,0,0,0,0),
+             ("a","rock",4,0,0,0,0,0,0)],
+    npcs=[],
+    tasks=[dict(commands=["* get * tent *","* take * tent *"],
+                complete="TENT-TASK-RAN.",
+                restrs=[(3,1,0,"BLOCK-TENT: something stops you.")]),
+           dict(commands=["* ball *"],
+                complete="BALL-TASK-RAN.",
+                restrs=[(4,1,0,"BLOCK-BALL: not holding it.")]),
+           dict(commands=["* get * coin *"],
+                complete="COIN-TASK-RAN.",
+                restrs=[(5,1,0,"")])]),
+ # PREC2: which pattern verbs count as "naming" the system get for the
+ # override-blocking rule measured by PREC?  All patterns wildcard-leading,
+ # all restrictions fail with a message.  tenta/tentb have take-only
+ # patterns (probe both typed "get" and typed "take"); tentc has a
+ # grab-only pattern; tentd a get-only pattern probed with typed "take".
+ 'PREC2': dict(name="Probe PREC2",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    objects=[("a","tenta",4,0,0,0,0,0,0),
+             ("a","tentb",4,0,0,0,0,0,0),
+             ("a","tentc",4,0,0,0,0,0,0),
+             ("a","tentd",4,0,0,0,0,0,0)],
+    npcs=[],
+    tasks=[dict(commands=["* take * tenta *"],
+                complete="TENTA-TASK-RAN.",
+                restrs=[(3,1,0,"BLOCK-TENTA.")]),
+           dict(commands=["* take * tentb *"],
+                complete="TENTB-TASK-RAN.",
+                restrs=[(4,1,0,"BLOCK-TENTB.")]),
+           dict(commands=["* grab * tentc *"],
+                complete="TENTC-TASK-RAN.",
+                restrs=[(5,1,0,"BLOCK-TENTC.")]),
+           dict(commands=["* get * tentd *"],
+                complete="TENTD-TASK-RAN.",
+                restrs=[(6,1,0,"BLOCK-TENTD.")])]),
+ # DONE: what does the Runner answer when a command matches a task that has
+ # already been done (non-repeatable) and whose restrictions now FAIL with a
+ # message?  Provenance's squeeze-through-hole task suggests the restriction
+ # message still prints (restrictions checked before done state).  Cells:
+ #   alpha: done task alone, custom command      -> message vs refusal?
+ #   beta:  done task 2 vs runnable task 3, both matching, both failing
+ #          -> whose message wins?
+ #   book:  done task vs library examine (book has a description)
+ #   gem:   done `* get * gem *` vs system take (library callback path)
+ #   gamma: done task WITH RepeatText, restr pass and fail cells
+ #   mmm/s: done task with `* s` alt command, no south exit (the provenance
+ #          measurement, minimized)
+ # All restrictions are "holding the stone": pass while held, fail after
+ # dropping it, so each task can be completed once and re-tried failing.
+ 'DONE': dict(name="Probe DONE",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    objects=[("a","stone",4,0,0,0,0,0,0),
+             ("a","ball",4,0,0,0,0,0,0),
+             ("a","book",4,0,0,0,0,0,0),
+             ("a","gem",4,0,0,0,0,0,0),
+             ("an","emerald",4,0,0,0,0,0,0)],
+    npcs=[],
+    tasks=[dict(commands=["alpha"], complete="ALPHA-RAN.",
+                repeatable=0, restrs=[(3,1,0,"BLOCK-ALPHA.")]),
+           dict(commands=["beta"], complete="BETA1-RAN.",
+                repeatable=0, restrs=[(3,1,0,"BLOCK-BETA1.")]),
+           dict(commands=["beta"], complete="BETA2-RAN.",
+                repeatable=1, restrs=[(7,1,0,"BLOCK-BETA2.")]),
+           dict(commands=["* x * book *","* examine * book *"],
+                complete="BOOK-CRUMBLES.",
+                repeatable=0, restrs=[(3,1,0,"BOOK-DUST.")]),
+           dict(commands=["* get * gem *"], complete="GEM-TASK-RAN.",
+                repeatable=0, restrs=[(3,1,0,"BLOCK-GEM.")]),
+           dict(commands=["gamma"], complete="GAMMA-RAN.",
+                repeat="GAMMA-REPEAT.",
+                repeatable=0, restrs=[(3,1,0,"BLOCK-GAMMA.")]),
+           dict(commands=["mmm","* s"], complete="MOVE-TASK-RAN.",
+                repeatable=0, restrs=[(3,1,0,"BLOCK-MOVE.")])]),
+ 'EL': dict(name="Probe EL",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    npcs=[],
+    events=[dict(short="Len Imm Restart", affected=0, starter=1, restart=1,
+                 time1=1, time2=3, starttext="1S.", finishtext="1F."),
+            dict(short="Len Delay", affected=0, starter=2, restart=2,
+                 start=1, end=1, time1=1, time2=3,
+                 starttext="2S.", finishtext="2F."),
+            dict(short="Delay Range", affected=0, starter=2, restart=2,
+                 start=1, end=3, time1=1, time2=1,
+                 starttext="3S.", finishtext="3F.")]),
+ # ET: "Space Boy's First Adventure" Task 72 ("drop cape to the floor") has
+ # empty CompleteText/RepeatText, is unrestricted, and scores +250 (action
+ # type 4) plus moves the cape and hides an NPC.  Scarier's
+ # run_game_commands_common() calls task_run_task() unconditionally on an
+ # unrestricted match, so those effects land silently and it then falls
+ # through to the library "Drop what?" refusal because CompleteText produced
+ # no output.  A live run400 transcript instead shows an ordinary "You drop
+ # the red Cape." with NO score change, which only makes sense if run400
+ # either never selects Task 72 as the match at all, or selects it but skips
+ # RUNNING its actions when it has nothing to say.  RUNNER_TESTS_TODO rows
+ # 774-776 (measured 2026-08-23) establish that a *silent* task match still
+ # falls through to the plain library verb -- consistent with "You drop the
+ # red Cape." -- but not whether the task's actions ran first.  This probe
+ # isolates that with the engine score as an unambiguous side channel (read
+ # with the "score" library command, which is untouched by any of this):
+ #   etcontrol: real CompleteText, +5.  Control -- proves scoring/`score`
+ #              works at all in this probe.
+ #   etquiet:   empty Complete/RepeatText, unrestricted, undone, +7, command
+ #              "etquiet" collides with no library verb -- isolates the
+ #              silent-task-action question from the library-fallthrough one.
+ #   the drop:  mirrors Task 72's exact shape -- empty Complete/RepeatText,
+ #              unrestricted, undone, +250, matched via a library-colliding
+ #              wildcard pattern ("* drop * rock *") the way Task 72 is
+ #              matched from the drop callback.  rock starts held so "drop
+ #              rock" is a legal library drop.  If run400 prints "You drop
+ #              the rock." and `score` stays wherever etquiet left it, the
+ #              action never ran; if score jumps by 250, it ran silently
+ #              behind the library's own message, exactly as Scarier does.
+ 'ET': dict(name="Probe ET",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    objects=[("a","rock",1,0,0,0,0,0,0), ("a","cape",1,0,0,0,0,0,0)],
+    npcs=[],
+    tasks=[dict(commands=["etcontrol"], complete="ET control fired.",
+                actions=[(4,5)]),
+           dict(commands=["etquiet"], complete="", actions=[(4,7)]),
+           dict(commands=["* drop * rock *"], complete="",
+                actions=[(4,250)]),
+           # ET2: Task 72's ACTUAL shape (SCR_DUMP_TASKS on the real game,
+           # 2026-08-23) is not a wildcard -- it's the literal 6-word command
+           # "drop cape to the floor", unrestricted, empty text, +250.  A
+           # player typing the plain "drop cape" the library recognises does
+           # NOT match that literal command at all, so the question is what
+           # run400's own library drop does with the trailing junk when
+           # Task 72's exact literal command IS typed: does its %text%/
+           # %object% matching still resolve "cape" out of "cape to the
+           # floor" and drop it normally, the way the real transcript's "You
+           # drop the red Cape." implies?
+           dict(commands=["drop cape to the floor"], complete="",
+                actions=[(4,250)]),
+           # ET3: same literal words, but with a wildcard splice ("*" for
+           # "to the") -- isolates whether it's specifically the presence of
+           # a wildcard/bracket glyph in the task's OWN command pattern (not
+           # word count, not trailing junk, not the object itself) that
+           # decides whether a silently-matched task's action runs at all.
+           dict(commands=["drop hat * floor"], complete="",
+                actions=[(4,250)])]),
+
+    # ET4: isolates the wildcard-vs-literal question cleanly.  ET2 above
+    # proved real run400 does NOT apply a literal task's silent action when
+    # its exact command "drop cape to the floor" is typed (library's own
+    # drop wins, task never fires).  ET3's control ("drop hat * floor") was
+    # contaminated by "hat" not being a real object, so the parser rejected
+    # the whole line before task matching was ever attempted.
+'ET4': dict(name="Probe ET4",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    objects=[("a","rock",1,0,0,0,0,0,0), ("a","cape",1,0,0,0,0,0,0)],
+    npcs=[],
+    tasks=[dict(commands=["drop cape * floor"], complete="",
+                actions=[(4,250)])]),
+
+    # SRD: where does a task's ShowRoomDesc sit relative to its own actions?
+    # Space Boy task 24 ("{take/get} {them/goggles}", ShowRoomDesc = Treasure
+    # Island, action = move the goggles to held-by-player) makes run400 print
+    # a room description that STILL lists the goggles on the platform, while
+    # scarier -- which ran actions first, then appended the room description
+    # -- omitted them.  Six tasks pin the order down from every side.
+    #
+    # Measured on run400 2026-08-23; the answer is room-then-actions, with the
+    # description built from the world as it stood when the task matched:
+    #
+    #   alpha    room object -> player's hands   widget STILL listed
+    #   beta     held object -> into the room    gizmo NOT listed
+    #   gamma    redirect to a "DELTA." task     room text first, DELTA. after
+    #   epsilon  as gamma, + AdditionalMessage   EPSILON. / room / DELTA. / ADDMSG.
+    #   zeta     NPC -> player's room            Bob NOT listed
+    #   eta      NPC -> away                     Bob STILL listed
+    #
+    # So the full emission order is CompleteText, room description, action
+    # output, AdditionalMessage.
+'SRD': dict(name="Probe SRD",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{}),
+           ("Back Room","A back room.",{})],
+    objects=[("a","widget",4,0,0,0,0,0,0), ("a","gizmo",1,0,0,0,0,0,0)],
+    npcs=[("Bob",1,0,10,0,0,0,0,0,0,0,0,0,0)],
+    tasks=[dict(commands=["alpha"], complete="ALPHA.", showroomdesc=1,
+                actions=[(0,3,4,0)]),
+           dict(commands=["beta"], complete="BETA.", showroomdesc=1,
+                actions=[(0,4,6,0)]),
+           # gamma redirects to deltaxyzzy, whose CompleteText dates the room
+           # build: if "DELTA." lands after the room text, the room was built
+           # before the action ran.
+           dict(commands=["gamma"], complete="GAMMA.", showroomdesc=1,
+                actions=[(5,0,3)]),
+           dict(commands=["deltaxyzzy"], complete="DELTA."),
+           # epsilon adds AdditionalMessage to the mix, so one task fixes the
+           # whole emission order: complete text, room description, action
+           # output and additional message all carry a distinct marker.
+           dict(commands=["epsilon"], complete="EPSILON.", additional="ADDMSG.",
+                showroomdesc=1, actions=[(5,0,3)]),
+           # zeta/eta repeat the alpha/beta pair for an NPC rather than an
+           # object, because the room description lists NPCs too and several
+           # corpus games (light_up, thorn) turn on exactly that.
+           dict(commands=["zeta"], complete="ZETA.", showroomdesc=1,
+                actions=[(1,2,2,0)]),
+           dict(commands=["eta"], complete="ETA.", showroomdesc=1,
+                actions=[(1,2,0,2)])]),
+
+    # SRD2: the SRD order settled WHEN a task's ShowRoomDesc is built (before
+    # its actions).  It never asked WHICH room's contents that build lists,
+    # because every SRD task showed the room the player was already standing
+    # in.  lca turn 252 is the case that separates them: task 237 answers `ne`
+    # from Hell with ShowRoomDesc = Haunted House, and its actions move the
+    # player there and Daisy and Witherspoon out.  Scarier lists "The ever
+    # alluring Daisy is here." (Haunted House's pre-action contents); run400
+    # (Adrift_328_lca.txt, 2026-09-06) lists nobody.
+    #
+    # Two readings fit that one line:
+    #   (a) the block lists the DESCRIBED room's contents, but as they stand
+    #       AFTER the actions -- i.e. SRD's answer is narrower than it looks;
+    #   (b) the block lists the contents of the room the PLAYER is in, which
+    #       at ShowRoomDesc time is still Hell, so Haunted House's Daisy is
+    #       never a candidate.
+    #
+    # Bob and the widget both start in the Back Room and the player in the
+    # Test Arena, so the two rooms are never the same one and each command
+    # tells the readings apart:
+    #
+    #   iota    show Back Room, no actions       (b) drops Bob, (a) lists him
+    #   theta   show Back Room, Bob -> hidden    (a) lists him, after-state does not
+    #   bobback restore Bob (no room shown)
+    #   kappa   show Back Room, player -> Back   the lca shape exactly
+    #           Room AND Bob -> hidden
+    #   reset   restore player and Bob
+    #   lambda  show Back Room, player -> Back   player arrives, Bob stays
+    #           Room only
+    #   reset
+    #   mu      show TEST ARENA, Bob -> player's the SRD zeta shape, but with
+    #           room                             Bob starting elsewhere
+    #   reset
+    #   nu      show Back Room, widget -> hidden does an OBJECT behave like Bob?
+'SRD2': dict(name="Probe SRD2",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{1: 1}),
+           ("Back Room","A back room.",{3: 0}),
+           ("Store","A store room.",{})],
+    objects=[("a","widget",5,0,0,0,0,0,0)],
+    npcs=[("Bob",1,0,10,0,0,0,0,0,0,0,0,0,0)],
+    tasks=[dict(commands=["iota"], complete="IOTA.", showroomdesc=2),
+           dict(commands=["theta"], complete="THETA.", showroomdesc=2,
+                actions=[(1,2,0,0)]),
+           dict(commands=["bobback"], complete="BOBBACK.",
+                actions=[(1,2,0,2)]),
+           # The player's own "to room" Var3 is 0-BASED (there is no hidden
+           # slot for the player), unlike an NPC's or an object's, which is
+           # 1-based with 0 = hidden.  Written 1-based at first, kappa and
+           # lambda silently left the player where he was.
+           dict(commands=["kappa"], complete="KAPPA.", showroomdesc=2,
+                actions=[(1,0,0,1), (1,2,0,0)]),
+           dict(commands=["reset"], complete="RESET.",
+                actions=[(1,0,0,0), (1,2,0,2), (0,3,0,2)]),
+           dict(commands=["lambda"], complete="LAMBDA.", showroomdesc=2,
+                actions=[(1,0,0,1)]),
+           dict(commands=["mu"], complete="MU.", showroomdesc=1,
+                actions=[(1,2,2,0)]),
+           dict(commands=["nu"], complete="NU.", showroomdesc=2,
+                actions=[(0,3,0,0)]),
+           # The first eight commands all leave Bob in the described room at
+           # the moment the block is built, so they cannot tell "before the
+           # actions" from "at the player-move action".  lca's task 237 puts
+           # the player move LAST, after both NPC moves; these three vary the
+           # order and the NPC's destination around that.
+           dict(commands=["xi"], complete="XI.", showroomdesc=2,
+                actions=[(1,2,0,3), (1,0,0,1)]),   # lca's order exactly
+           dict(commands=["pi"], complete="PI.", showroomdesc=2,
+                actions=[(1,0,0,1), (1,2,0,3)]),   # player move first
+           dict(commands=["rho"], complete="RHO.", showroomdesc=2,
+                actions=[(1,2,0,3)])]),            # to a ROOM, player stays
+
+    # SRD3: SRD2 said the ShowRoomDesc block lists the DESCRIBED room's
+    # contents as they stood before the task's actions, even when the player
+    # is somewhere else and even when an action moves the listed character
+    # out (xi/pi/rho, run400 Adrift_934.txt).  lca's task 237 is that exact
+    # shape and yet drops "The ever alluring Daisy is here." -- and a copy of
+    # the game with only the two character-move actions removed puts the line
+    # back (run400 Adrift_935.txt), so the moves really are what suppresses it.
+    #
+    # The four differences between xi and task 237 are the ones this probe
+    # walks, one at a time, all with the same ShowRoomDesc = Back Room and the
+    # same trailing "move player to the Back Room":
+    #
+    #   a1  no actions at all                          control: Bob is listed
+    #   a5  Bob -> Store, player                        xi again, in this game
+    #   a2  set a variable, Bob -> Store, player        does a type-3 action
+    #                                                   ahead of the moves bite?
+    #   a3  Carl -> Store, Bob -> Store, player         does a SECOND character
+    #                                                   move bite?
+    #   a4  variable, Carl, Bob, player                 task 237's shape exactly
+    #
+    # Carl starts in the Test Arena, like Witherspoon (who is not in the
+    # Haunted House when task 237 runs), so a3/a4 move one character that is
+    # in the described room and one that is not.
+ 'SRD3': dict(name="Probe SRD3",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{1: 1}),
+           ("Back Room","A back room.",{3: 0}),
+           ("Store","A store room.",{})],
+    objects=[("a","widget",5,0,0,0,0,0,0)],
+    npcs=[("Bob",1,0,10,0,0,0,0,0,0,0,0,0,0),
+          ("Carl",0,0,10,0,0,0,0,0,0,0,0,0,0)],
+    vars=[("counter", 0, "0")],
+    tasks=[dict(commands=["a1"], complete="A1.", showroomdesc=2),
+           dict(commands=["a5"], complete="A5.", showroomdesc=2,
+                actions=[(1,2,0,3), (1,0,0,1)]),
+           dict(commands=["a2"], complete="A2.", showroomdesc=2,
+                actions=[(3,0,1,1,"",0), (1,2,0,3), (1,0,0,1)]),
+           dict(commands=["a3"], complete="A3.", showroomdesc=2,
+                actions=[(1,3,0,3), (1,2,0,3), (1,0,0,1)]),
+           dict(commands=["a4"], complete="A4.", showroomdesc=2,
+                actions=[(3,0,1,1,"",0), (1,3,0,3), (1,2,0,3), (1,0,0,1)]),
+           dict(commands=["r"], complete="R.",
+                actions=[(1,0,0,0), (1,2,0,2), (1,3,0,1)])]),
+
+    # SRD4: SRD3 said none of the SHAPE differences between the probe and
+    # lca's task 237 -- an extra variable action ahead of the moves, a second
+    # character move, the action order -- changes the ShowRoomDesc listing:
+    # run400 still names the character the task is about to move away
+    # (Adrift_936.txt).  So whatever suppresses "The ever alluring Daisy is
+    # here." is one of the FIELD differences, and this probe walks those, each
+    # cell preceded by `r` (player back to the Test Arena, Bob back into the
+    # Back Room):
+    #
+    #   b1  empty CompleteText                     lca's task 237 has none
+    #   b2  empty CompleteText + AdditionalMessage  its exact text layout
+    #   b3  CompleteText + AdditionalMessage        the AdditionalMessage alone
+    #   b4  Repeatable = 0                          it is a one-shot
+    #   b5  Where = the one room the player is in   it is room-scoped
+    #   b6  all five at once, on the command `ne`   task 237 to the letter
+    #
+    # Every cell has the same ShowRoomDesc = Back Room and the same two
+    # actions, "Bob -> Store" then "player -> Back Room", so a cell that omits
+    # "Bob is here, looking dangerous." is the one that reproduces lca.
+    #
+    # DRIVEN in run400 2026-09-07, transcript Adrift_949_SRD4.txt.  b2 and `ne`
+    # drop Bob; b0, b1, b3, b4 and b5 all list him.  So it is neither field
+    # alone: the ShowRoomDesc block moves BEHIND the actions exactly when the
+    # task has an EMPTY CompleteText and a NON-EMPTY AdditionalMessage -- with
+    # no CompleteText to ride out on, the description goes with the
+    # AdditionalMessage instead, which is emitted after the actions.  b3 shows
+    # the AdditionalMessage alone does not move it and b1 that an empty
+    # CompleteText alone does not either.  Closes lca T252 and ghosttown T19
+    # (task 129 `{go} [u/up]`: no CompleteText, AdditionalMessage "   ",
+    # ShowRoomDesc = the Kitchen, actions move Ninette in and the player in --
+    # run400 lists her, scarier did not).  PORTED 2026-09-07 as
+    # task_defers_room_desc() in sctasks_run.cpp; ghosttown's whitespace-only
+    # AdditionalMessage is what shows the test is on the raw field and not on
+    # scr_strempty(), which is whitespace-blind.  Nine goldens moved, seven of
+    # them confirmed against their own run400 transcripts; see
+    # notes/WINE-TRANSCRIPTS-TODO.md.
+ 'SRD4': dict(name="Probe SRD4",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{1: 1}),
+           ("Back Room","A back room.",{3: 0}),
+           ("Store","A store room.",{})],
+    objects=[("a","widget",5,0,0,0,0,0,0)],
+    npcs=[("Bob",1,0,10,0,0,0,0,0,0,0,0,0,0)],
+    tasks=[dict(commands=["b0"], complete="B0.", showroomdesc=2,
+                actions=[(1,2,0,3), (1,0,0,1)]),
+           dict(commands=["b1"], complete="", showroomdesc=2,
+                actions=[(1,2,0,3), (1,0,0,1)]),
+           dict(commands=["b2"], complete="", additional="ADDMSG.",
+                showroomdesc=2, actions=[(1,2,0,3), (1,0,0,1)]),
+           dict(commands=["b3"], complete="B3.", additional="ADDMSG.",
+                showroomdesc=2, actions=[(1,2,0,3), (1,0,0,1)]),
+           dict(commands=["b4"], complete="B4.", repeatable=0, showroomdesc=2,
+                actions=[(1,2,0,3), (1,0,0,1)]),
+           dict(commands=["b5"], complete="B5.", where=(1,0), showroomdesc=2,
+                actions=[(1,2,0,3), (1,0,0,1)]),
+           dict(commands=["ne"], complete="", additional="ADDMSG.",
+                repeatable=0, where=(1,0), showroomdesc=2,
+                actions=[(1,2,0,3), (1,0,0,1)]),
+           dict(commands=["r"], complete="R.",
+                actions=[(1,0,0,0), (1,2,0,2)])]),
+
+    # PUT4 -- the PUTPASS400 / PUTBIG400 pair from
+    # notes/WINE-TRANSCRIPTS-TODO.md, in one game.  The offline reading of
+    # run400's `insides` (46639C) says the result byte var_86 is set to 1 only
+    # when the move COMPLETES and is never set at all on a refusal path, so:
+    #
+    #   put pill in cup   library completes it, returns 1, PUTPASS. never runs
+    #   put rock in slot  size refusal prints, returns 0, PUTBIG. follows it
+    #
+    # The run390 PUTPASS probe of 2026-08-02 said the opposite for the first
+    # line (task claimed, container left empty), which is the version-split
+    # question this probe exists to settle.
+    #
+    # This is the first probe to need real dimensions, so it sets the scale
+    # factors to the 3 the ADRIFT editor always writes.  pill is SizeWeight 0
+    # (size 3^0 = 1, weight 3^0 = 1) and fits the cup's capacity 100
+    # (10 x 3^0 = 10); rock is SizeWeight 30 (size 3^3 = 27) and cannot fit
+    # the slot's identical 10 -- 27 > the container TOTAL, which is the
+    # "is too big to fit inside" refusal rather than the "at the moment" one.
+    # Both movables start HELD so no implicit take runs first, and the player
+    # limits are raised to 902 (90 x 3^2 = 810) so carrying the rock is legal.
+    #
+    # zzput / zzbig are the aliveness controls: each is a second command on
+    # the same task, so if they print their text the task itself matches and
+    # its (empty) restrictions pass, and a silent `put ...` line can only mean
+    # the library took it.
+    # PUT4 -- the PUTPASS400 and PUTBIG400 probes the Wine notes asked for,
+    # in one game.  DRIVEN in run400 2026-09-05, transcript Adrift_81.txt:
+    #   put pill in cup   -> no output at all, but zzin1 says PILL IN CUP and
+    #                        zzput still prints PUTPASS, so the library
+    #                        completed the put and the PASSING task never ran.
+    #   put rock in slot  -> "The rock is too big to fit inside the slot.
+    #                        PUTBIG."  -- one line, library refusal then the
+    #                        task's text; the rock did not move.
+    # So: a put the library can COMPLETE claims the line even over a passing
+    # task, and a put it REFUSES prints and lets the task fire.  (The silence
+    # on the first line is a separate quirk -- see PUT7.)
+# PFX: is the Runner's article normalizer case-sensitive?
+#
+# The X-Files: A New Beginning (4.00) replay of 2026-09-07 answers `u` from
+# the stool with "(Getting off A Stool first)" where scarier says "the Stool".
+# That object's Prefix is the capital "A", and Form1.tense() is VB6 string
+# equality under the default Option Compare Binary -- so a capital article
+# would never match the six literals it tests ("a", "an", "some" whole, and
+# "a ", "an ", "some " as heads) and would come back untouched, exactly as an
+# authored "The" already does.  scarier's scr_compare_word() is deliberately
+# case-INSENSITIVE, so it folds them.
+#
+# Eleven objects lie in the arena, one per prefix spelling, so one `take`
+# each measures the definite form (lib_print_object_np) and the opening
+# `look` measures the indefinite one (lib_print_object, scobjcts.cpp) in the
+# same run.  alpha/charlie/echo/golf/juliet/kilo are the controls whose
+# answers are already known; bravo/delta/foxtrot/hotel/india are the question.
+ 'PFX': dict(name="Probe PFX",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    objects=[("a",     "alpha",   4,0,0,0,0,0,0),
+             ("A",     "bravo",   4,0,0,0,0,0,0),
+             ("an",    "charlie", 4,0,0,0,0,0,0),
+             ("An",    "delta",   4,0,0,0,0,0,0),
+             ("some",  "echo",    4,0,0,0,0,0,0),
+             ("Some",  "foxtrot", 4,0,0,0,0,0,0),
+             ("a big", "golf",    4,0,0,0,0,0,0),
+             ("A big", "hotel",   4,0,0,0,0,0,0),
+             ("SOME",  "india",   4,0,0,0,0,0,0),
+             ("the",   "juliet",  4,0,0,0,0,0,0),
+             ("The",   "kilo",    4,0,0,0,0,0,0)],
+    npcs=[],
+    tasks=[]),
+# ISARE: the is/are helper, cell by cell.
+#
+# All four Runners carry the SAME `isare(prefix, name)` (run370 423E5C,
+# run380 428EAC, run390 431038, run400 4507BC/Proc_19_69), and it is not the
+# rule scarier's obj_appears_plural() has:
+#
+#     r = " is "
+#     If Left(prefix, 4) = "some" And Right(name, 1) = "s" Then r = " are "
+#     If Right(name, 1) = "s" Then
+#       If Mid(name, Len(name) - 1, 1) <> "u" Then r = " are "
+#     End If
+#     If prefix = "a"  Or Left(prefix, 2) = "a "  Then r = " is "
+#     If prefix = "an" Or Left(prefix, 3) = "an " Then r = " is "
+#
+# so an EMPTY prefix does not force the singular (only "a"/"an" do), the
+# "some" clause reaches a name the -us exception would otherwise spare, and
+# every comparison is VB6 Option Compare Binary, i.e. case-SENSITIVE (the
+# same fact the PFX probe measured for the article normalizer).
+#
+# Twelve objects, one per cell, all on the arena floor.  `where <name>` is
+# the per-object oracle: whereis() composes name & isare(prefix, short) &
+# LCase(room name) & "." (run400 @468115, run380 @4374E1), so one command
+# reads one cell.  Predicted, with the cells scarier gets wrong marked:
+#
+#     (empty)  boots    are   <- scarier says "is"  (empty prefix)
+#     (empty)  cactus   is
+#     some     gloves   are
+#     some     walrus   are   <- scarier says "is"  (the -us exception)
+#     a        beads    is
+#     an       eggs     is
+#     A        shoes    are   <- scarier says "is"  (case: "A" is not "a")
+#     the      keys     are
+#     the      NAILS    is    <- scarier says "are" (case: "S" is not "s")
+#     a big    pins     is
+#     Some     socks    are
+#     (space)  rings    are   <- scarier says "is"  (scr_strempty trims)
+ 'ISARE': dict(name="Probe ISARE",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    rooms=[("Test Arena","A bare arena.",{})],
+    objects=[("",      "boots",  4,0,0,0,0,0,0),
+             ("",      "cactus", 4,0,0,0,0,0,0),
+             ("some",  "gloves", 4,0,0,0,0,0,0),
+             ("some",  "walrus", 4,0,0,0,0,0,0),
+             ("a",     "beads",  4,0,0,0,0,0,0),
+             ("an",    "eggs",   4,0,0,0,0,0,0),
+             ("A",     "shoes",  4,0,0,0,0,0,0),
+             ("the",   "keys",   4,0,0,0,0,0,0),
+             ("the",   "NAILS",  4,0,0,0,0,0,0),
+             ("a big", "pins",   4,0,0,0,0,0,0),
+             ("Some",  "socks",  4,0,0,0,0,0,0),
+             (" ",     "rings",  4,0,0,0,0,0,0)],
+    npcs=[],
+    tasks=[]),
+# PSTAT: a 4.0 put naming a STATIC, and what the leftover report says when
+# the player is carrying nothing at all.
+#
+# thelasthour turn 26 (`put hands into hole`, Adrift_297/366/422, all three
+# drives identical) answers
+#
+#     I can't take the hand!  I am carrying nothing!  Can't take the mouse. Too far.
+#
+# with "(Taking the hand first)" ahead of it, blanked by one of the game's own
+# ALRs.  So run400's name_object runs its implicit take on a static piece --
+# announcement, then the take's own " can't take " + name + "!" refusal --
+# and only then hands the pair to `insides`, whose static exit (@465ED7) is
+# silent and where the task claims.  scarier's lib_put_drop_statics_400() had
+# it as a silent drop with no take at all.
+#
+# The second string is the question this probe was built for.  House
+# (Adrift_91, wood on the floor, axe in hand) gets the list form,
+# "You are not holding the wood.", off the same path -- so the two differ in
+# the player's inventory, empty in thelasthour and not in House.  "carrying
+# nothing!" is name_object's own literal at 46E5A0, the one `drop all` with
+# an empty inventory prints (see lib_cmd_drop_all).
+#
+# Six cells, one arena, nothing random:
+#
+#      2  put anvil in box   static, inventory EMPTY      the thelasthour cell
+#      4  put anvil in box   static, inventory = coin     the House cell
+#      5  put coin in box    coin held: the ordinary put, the control
+#      6  put coin in box    coin already in the box (the take is skipped,
+#                            @46E2xx obj.global_46 = var_92), inventory EMPTY
+#      8  put coin in box    the same, inventory = ring   -- 6 and 8 say
+#                            whether "carrying nothing!" replaces a NON-static
+#                            leftover list too, or only a static one
+#     12  put slab in box    static WITH a matching task, inventory EMPTY:
+#                            thelasthour reproduced exactly, and a check that
+#                            a `put` task does not set the take gate's mode-1
+#                            filter and so cannot suppress the announcement.
+# PBOXBOX: `put box in box` at 4.0, with dynamic object #1 kept out of the
+# way (PSTAT's cmd 13/18 silence had the coin, object #1, inside the box, so
+# the implicit take's carried-weight walk 447680 cycled -- the deviation in
+# the 46E5D8/447680 annotations -- and the itself-test at 46602A never ran).
+# The pebble is object #1 and is never moved; the box is object #2.
+#
+#      2  put box in box     box on the floor: the take piece first?
+#      4  put box in box     box held
+#      6  put box in box     box held with the ring inside
+#      8  put box in box     box on the floor with the ring inside
+#     10  put pebble in box  object #1 into the box: the PSTAT cycle, control
+#     12  put box in box     after the cycle: PSTAT's silent cell reproduced?
+ 'PBOXBOX': dict(name="Probe PBOXBOX", persp=1,
+    rooms=[("Test Arena","A bare arena.",{})],
+    player=(200,0,0,0,0,0,0,0,0,0),
+    #        prefix short pos wpn prot hv meth acc wear cont parent sw  cap
+    objects=[("a","pebble",4,  0,  0,  0,  0,  0,  0,   0,    0,    2),
+             ("a","box",   4,  0,  0,  0,  0,  0,  0,   1,    0,    2,  100),
+             ("a","ring",  4,  0,  0,  0,  0,  0,  0,   0,    0,    2)],
+    statics=[],
+    npcs=[],
+    tasks=[]),
+# PPUTTIE: the 4.0 put noun with a held/loose namesake pair.  name_object
+# 46E5D8 resolves the object fragment with 463640 mode 2 (@46E02D): pass 1
+# scores only objects indirectly held (44615C), pass 2 every present object
+# (452E9C), no seen gate in either.  So `put key in box` with the brass key
+# in hand and the iron key on the floor should take the brass key without a
+# Which prompt; both keys loose, or both coins held, should tie into one.
+# The pebble is object #1 and is never moved (the 447680 weight cycle).
+#
+#      2  put key in box     brass held, iron loose: brass, no prompt?
+#      4  put key in box     brass now inside the held box: still pass 1?
+#      5  drop key           drop's own held-first pass (control)
+#      7  put gem in box     both gems loose: tie -> Which gem?
+#      8  look               what the pending prompt does with a plain line
+#      9  put coin in box    both coins held: pass-1 tie -> Which coin?
+ 'PPUTTIE': dict(name="Probe PPUTTIE", persp=1,
+    rooms=[("Test Arena","A bare arena.",{})],
+    player=(200,0,0,0,0,0,0,0,0,0),
+    #        prefix short pos wpn prot hv meth acc wear cont parent sw  cap
+    objects=[("a","pebble",   4,  0,  0,  0,  0,  0,  0,   0,    0,    2),
+             ("a","box",      1,  0,  0,  0,  0,  0,  0,   1,    0,    2,  100),
+             ("a brass","key",1,  0,  0,  0,  0,  0,  0,   0,    0,    2),
+             ("an iron","key",4,  0,  0,  0,  0,  0,  0,   0,    0,    2),
+             ("a red","gem",  4,  0,  0,  0,  0,  0,  0,   0,    0,    2),
+             ("a blue","gem", 4,  0,  0,  0,  0,  0,  0,   0,    0,    2),
+             ("a gold","coin",1,  0,  0,  0,  0,  0,  0,   0,    0,    2),
+             ("a silver","coin",1,0,  0,  0,  0,  0,  0,   0,    0,    2)],
+    statics=[],
+    npcs=[],
+    tasks=[]),
+    # ANON: an empty authored PlayerName with PromptName off.  run400's
+    # openadv (48F39F) is read as filling "Anonymous" at load; measure what
+    # %player% and the third-person library wording print.
+    'ANON': dict(name="Probe ANON", persp=2, playername="", rooms=[("Test Arena","A bare arena.",{})],
+       player=(200,0,0,0,0,0,0,0,0,0), objects=[("a","pebble", 4, 0,0,0,0,0,0)], statics=[], npcs=[],
+       tasks=[dict(commands=["say name"], complete="Name is [%player%].", repeatable=1)]),
+ 'EVRS': dict(name="Probe EVRS", persp=1,
+    # Immediate-starter events of non-zero length: R2 restarts "after a
+    # delay" (RestartType 2), R1 restarts immediately (RestartType 1, the
+    # measured control: "FINISH.  START." every period in run400).
+    rooms=[("Test Arena","A bare arena.",{})],
+    player=(200,0,0,0,0,0,0,0,0,0),
+    objects=[("a","pebble", 4,  0,  0,  0,  0,  0,  0)],
+    statics=[],
+    npcs=[],
+    tasks=[],
+    events=[dict(short="R2", affected=0, starter=1, restart=2, time1=2, time2=2,
+                 starttext="R2 START.", looktext="R2 LOOK.", finishtext="R2 FINISH."),
+            dict(short="R1", affected=0, starter=1, restart=1, time1=3, time2=3,
+                 starttext="R1 START.", looktext="R1 LOOK.", finishtext="R1 FINISH.")]),
+ 'PCLOSED': dict(name="Probe PCLOSED", persp=1,
+    # Put corners: the "(Taking X first)" line against a CLOSED container
+    # (held box #2, room chest #3), and `put all in <container>` with the
+    # container the only thing carried, shut and then opened.  The pebble is
+    # dynamic object #1 and is never moved (447680 weight-cycle deviation).
+    rooms=[("Test Arena","A bare arena.",{})],
+    player=(200,0,0,0,0,0,0,0,0,0),
+    #        prefix short pos wpn prot hv meth acc wear cont parent sw  cap open
+    objects=[("a","pebble", 4,  0,  0,  0,  0,  0,  0,   0,    0,    2,    0,  0),
+             ("a","box",    1,  0,  0,  0,  0,  0,  0,   1,    0,    2,  100,  6),
+             ("a","chest",  4,  0,  0,  0,  0,  0,  0,   1,    0,    2,  100,  6),
+             ("a","ring",   4,  0,  0,  0,  0,  0,  0,   0,    0,    2),
+             ("a","coin",   4,  0,  0,  0,  0,  0,  0,   0,    0,    2),
+             ("a","stone",  1,  0,  0,  0,  0,  0,  0,   0,    0,    2)],
+    statics=[],
+    npcs=[],
+    tasks=[]),
+ 'PSTAT': dict(name="Probe PSTAT", persp=1,
+    rooms=[("Test Arena","A bare arena.",{})],
+    player=(200,0,0,0,0,0,0,0,0,0),
+    #        prefix short pos wpn prot hv meth acc wear cont parent sw  cap
+    objects=[("a","coin",  4,  0,  0,  0,  0,  0,  0,   0,    0,    2),
+             ("a","box",   4,  0,  0,  0,  0,  0,  0,   1,    0,    2,  100),
+             ("a","ring",  4,  0,  0,  0,  0,  0,  0,   0,    0,    2),
+             ("a","cap",   4,  0,  0,  0,  0,  0,  1,   0,    0,    2)],
+    statics=[("an","anvil", 1, 0),
+             ("a", "slab",  1, 0)],
+    npcs=[],
+    tasks=[dict(commands=["put slab in box"], complete="SLABTASK.")]),
+
+    # SEEN -- the yak_shaving row.  yak_shaving.taf's jar of pickled eggs is
+    # dynamic object 0, InitialPosition 0 (hidden), and the Dada Lama's event
+    # puts it straight into the player's hands; run400 then answers `x eggs`
+    # with "Either that isn't here, or it's not important." for the rest of
+    # the game, while every `give*eggs*<npc>` task pattern -- which resolves
+    # no noun -- fires normally.  Scarier resolves it, because obj_turn_update()
+    # stamps the seen byte on anything held or worn at the top of every turn.
+    # That blanket stamp is justified in its comment from run390's LOADER and
+    # its inventory lister, neither of which is a per-turn sweep, so this probe
+    # asks 4.0 which of the four ways into the player's possession actually
+    # reveal an object:
+    #
+    #   zza  task action, move object -> held by player      (alpha)
+    #   zzb  task action, move object -> worn by player      (bravo)
+    #   zzc  task action, move object -> room 1, the player
+    #        standing in it, with no room description        (gamma)
+    #   zzd  a task whose completion starts an event whose
+    #        Obj1 goes -> held by player                     (delta)
+    #
+    # and then whether `i` and `look` retroactively reveal what stayed unseen.
+    # echo is the control: it starts in room 1, so the opening look lists it
+    # and it is seen from turn 1.
+ 'SEEN': dict(name="Probe SEEN", persp=1,
+    rooms=[("Test Arena","A bare arena.",{})],
+    player=(200,0,0,0,0,0,0,0,0,0),
+    npcs=[],
+    #        prefix short   pos wpn prot hv meth acc wear
+    objects=[("an","alpha",  0,  0,  0,  0,  0,  0,  0),
+             ("a", "bravo",  0,  0,  0,  0,  0,  0,  1),
+             ("a", "gamma",  0,  0,  0,  0,  0,  0,  0),
+             ("a", "delta",  0,  0,  0,  0,  0,  0,  0),
+             ("an","echo",   4,  0,  0,  0,  0,  0,  0)],
+    # Var1 is 3 + the object's 0-based index; Var2 4 = held by, 5 = worn by,
+    # 0 = to room (Var3 1-based).
+    tasks=[dict(commands=["zza"], complete="ZZA.", actions=[(0,3,4,0)]),
+           dict(commands=["zzb"], complete="ZZB.", actions=[(0,4,5,0)]),
+           dict(commands=["zzc"], complete="ZZC.", actions=[(0,5,0,1)]),
+           dict(commands=["zzd"], complete="ZZD.")],
+    # Starter 3 = "when task 4 (zzd) completes"; Obj1/Obj1Dest are stored
+    # one-based, so 4/1 is "object index 3 (delta) -> held by player".
+    events=[dict(short="giver", affected=0, starter=3, tasknum=4,
+                 time1=1, time2=1, obj1=4, obj1dest=1)]),
+
+'PUT4': dict(name="Probe PUT4",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    sizemult=3, weightmult=3, maxsize=902, maxwt=902,
+    rooms=[("Test Arena","A bare arena.",{})],
+    npcs=[],
+    #        prefix short  pos wpn prot hv meth acc wear cont parent sw  cap
+    objects=[("a","pill",   1,  0,  0,  0,  0,  0,  0,   0,    0,    0),
+             ("a","cup",    4,  0,  0,  0,  0,  0,  0,   1,    0,    2,  100),
+             ("a","rock",   1,  0,  0,  0,  0,  0,  0,   0,    0,   30),
+             ("a","slot",   4,  0,  0,  0,  0,  0,  0,   1,    0,    2,  100)],
+    tasks=[dict(commands=["put pill in cup","zzput"], complete="PUTPASS."),
+           dict(commands=["put rock in slot","zzbig"], complete="PUTBIG."),
+           # State reporters, so "did the object actually move?" is answered
+           # by the game rather than by reading a room description.  Var1 is
+           # 3 + the dynamic object's 0-based index, Var2 4 is "inside", Var3
+           # is the 1-based index into the CONTAINER sublist (cup 1, slot 2).
+           dict(commands=["zzin1"], complete="PILL IN CUP.",
+                restrs=[(3,4,1,"PILL NOT IN CUP.")]),
+           dict(commands=["zzin2"], complete="ROCK IN SLOT.",
+                restrs=[(5,4,2,"ROCK NOT IN SLOT.")])]),
+
+    # PUT5 -- the follow-up PUT4 asked for, and the probe that killed the
+    # obvious explanation.  The reading under test was that the `tasks()` call
+    # inside `insides` (run400 465EB5) is made on the CANONICAL, fully-
+    # prefixed rebuild of the line -- "put a pill in a cup" -- not on what was
+    # typed, so a literal task spelled the way the player types it could never
+    # claim while a wildcarded or prefix-spelled one could.  Three pairs, one
+    # spelling each, all in one drive:
+    #   pill/cup   task `put * pill in cup`      wildcard
+    #   bean/jar   task `put a bean in a jar`    the canonical prefixed form
+    #   coin/box   task `put coin in box`        literal, as typed
+    # zzw / zzp / zzl are the aliveness controls, and zzin1-3 report where each
+    # movable actually ended up (Var3 indexes the container sublist: cup 1,
+    # jar 2, box 3).
+    #
+    # DRIVEN in run400 2026-09-05, Adrift_82.txt: ALL THREE moved, NONE of the
+    # three tasks claimed, and all three were still alive afterwards.  The
+    # in-handler tasks() call claims nothing in any spelling, so the rule is
+    # simply "a completable put wins, a refused put does not" -- and the
+    # silence on `put pill in cup` is something else again (see PUT7).
+'PUT5': dict(name="Probe PUT5",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    sizemult=3, weightmult=3, maxsize=902, maxwt=902,
+    rooms=[("Test Arena","A bare arena.",{})],
+    npcs=[],
+    objects=[("a","pill", 1, 0,0,0,0,0, 0, 0, 0, 0),
+             ("a","cup",  4, 0,0,0,0,0, 0, 1, 0, 2, 100),
+             ("a","bean", 1, 0,0,0,0,0, 0, 0, 0, 0),
+             ("a","jar",  4, 0,0,0,0,0, 0, 1, 0, 2, 100),
+             ("a","coin", 1, 0,0,0,0,0, 0, 0, 0, 0),
+             ("a","box",  4, 0,0,0,0,0, 0, 1, 0, 2, 100)],
+    tasks=[dict(commands=["put * pill in cup","zzw"], complete="WILDPASS."),
+           dict(commands=["put a bean in a jar","zzp"], complete="PREFPASS."),
+           dict(commands=["put coin in box","zzl"], complete="LITPASS."),
+           dict(commands=["zzin1"], complete="PILL IN CUP.",
+                restrs=[(3,4,1,"PILL NOT IN CUP.")]),
+           dict(commands=["zzin2"], complete="BEAN IN JAR.",
+                restrs=[(5,4,2,"BEAN NOT IN JAR.")]),
+           dict(commands=["zzin3"], complete="COIN IN BOX.",
+                restrs=[(7,4,3,"COIN NOT IN BOX.")])]),
+
+    # PUT6 -- control for PUT5.  Same six objects, same three puts, but NO
+    # task matches any put line: only the zzin reporters exist.  It separates
+    # "the Runner's put message is suppressed when a task pre-matched" from
+    # "the message is suppressed for this particular object pair".
+    #
+    # DRIVEN in run400 2026-09-05.  Adrift_84.txt: pill still silent with no
+    # tasks in sight, so tasks have nothing to do with it.  Adrift_85.txt
+    # (fed `put pill in jar` / `put bean in cup` instead) put the silence on
+    # the pill again in a different container, so it is not the container
+    # either.
+'PUT6': dict(name="Probe PUT6",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    sizemult=3, weightmult=3, maxsize=902, maxwt=902,
+    rooms=[("Test Arena","A bare arena.",{})],
+    npcs=[],
+    objects=[("a","pill", 1, 0,0,0,0,0, 0, 0, 0, 0),
+             ("a","cup",  4, 0,0,0,0,0, 0, 1, 0, 2, 100),
+             ("a","bean", 1, 0,0,0,0,0, 0, 0, 0, 0),
+             ("a","jar",  4, 0,0,0,0,0, 0, 1, 0, 2, 100),
+             ("a","coin", 1, 0,0,0,0,0, 0, 0, 0, 0),
+             ("a","box",  4, 0,0,0,0,0, 0, 1, 0, 2, 100)],
+    tasks=[dict(commands=["zzin1"], complete="PILL IN CUP.",
+                restrs=[(3,4,1,"PILL NOT IN CUP.")]),
+           dict(commands=["zzin2"], complete="BEAN IN JAR.",
+                restrs=[(5,4,2,"BEAN NOT IN JAR.")]),
+           dict(commands=["zzin3"], complete="COIN IN BOX.",
+                restrs=[(7,4,3,"COIN NOT IN BOX.")])]),
+
+    # PUT7 -- PUT6 with the object table permuted so that `bean` is dynamic
+    # object 1 and `pill` object 3.  PUT6 showed run400 doing the put but
+    # printing NO confirmation for `pill`, whichever container it went into,
+    # while `bean` and `coin` were announced normally; this asks whether that
+    # follows the object's NUMBER (1) or its name.
+    #
+    # DRIVEN in run400 2026-09-05.  Adrift_86.txt: bean, now object 1, is the
+    # silent one and pill prints -- so it is the NUMBER.  Adrift_87.txt drove
+    # the same game with `drop bean in jar` / `drop pill in cup`: same
+    # suppression, and the drop spelling yields the same "put ... inside ..."
+    # wording, so it is one handler.  Rule: run400 prints no confirmation for
+    # a completed put/drop-into when the moved object is dynamic object #1.
+    # Scarier prints all three; recorded, not ported.
+    #
+    # MECHANISM (2026-09-19, vbrng.dll stack sampler, run400x): the silence
+    # is a swallowed "evaluate error - Out of stack space".  447680, the
+    # recursive carried-weight walk, sums every object whose parent field
+    # (+46) equals the object's index without checking the position, and an
+    # object that has never been inside anything still has parent 0 = object
+    # #1.  move_object 4528D8 writes bean.parent = jar, then walks weight(bean)
+    # -> jar (parent 0) -> bean (parent jar) -> ... until the stack dies; the
+    # move stands, the message is lost, and every later weight walk over the
+    # pair (`take bean`, `take jar`, `put all`) dies the same way.  Proof:
+    # `put jar in box`, `take jar` (parent now -1), `put bean in jar` prints
+    # "Player put the bean inside the jar." and `take bean` works, while a
+    # following `put bean in cup` (cup never moved) is silent again
+    # (Adrift_put7_cycle.txt, cmdfile_put7_cycle.txt); `put all in jar` moves
+    # only the bean (Adrift_put7_all.txt).  The surf6 "put all on a room
+    # supporter moves only the first" deviation is the same bug.  run390 has
+    # no recursive weight walk and prints.  Deliberate deviation, see
+    # notes/WINE-TRANSCRIPTS-TODO.md.
+'PUT7': dict(name="Probe PUT7",
+    player=(200,0,0,0,0,0,0,0,0,0),
+    sizemult=3, weightmult=3, maxsize=902, maxwt=902,
+    rooms=[("Test Arena","A bare arena.",{})],
+    npcs=[],
+    objects=[("a","bean", 1, 0,0,0,0,0, 0, 0, 0, 0),
+             ("a","jar",  4, 0,0,0,0,0, 0, 1, 0, 2, 100),
+             ("a","pill", 1, 0,0,0,0,0, 0, 0, 0, 0),
+             ("a","cup",  4, 0,0,0,0,0, 0, 1, 0, 2, 100),
+             ("a","coin", 1, 0,0,0,0,0, 0, 0, 0, 0),
+             ("a","box",  4, 0,0,0,0,0, 0, 1, 0, 2, 100)],
+    tasks=[dict(commands=["zzin1"], complete="BEAN IN JAR.",
+                restrs=[(3,4,1,"BEAN NOT IN JAR.")]),
+           dict(commands=["zzin2"], complete="PILL IN CUP.",
+                restrs=[(5,4,2,"PILL NOT IN CUP.")]),
+           dict(commands=["zzin3"], complete="COIN IN BOX.",
+                restrs=[(7,4,3,"COIN NOT IN BOX.")])]),
+}
+
+if __name__ == '__main__':
+    which = sys.argv[1]
+    out = sys.argv[2]
+    open(out, 'wb').write(build(CONFIGS[which]))
+    print("wrote", out)

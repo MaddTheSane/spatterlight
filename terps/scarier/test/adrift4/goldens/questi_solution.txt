@@ -1,0 +1,14 @@
+open dumpster
+eat cat
+eat man
+score
+z
+z
+z
+z
+z
+z
+z
+z
+z
+z

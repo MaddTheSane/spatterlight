@@ -1,0 +1,51 @@
+Loading game...
+
+Matt's House
+You are playing as Matt Mancini. You can explore his house and do the things
+he does in an average day.
+
+> n
+(Standing up first)
+You move north.
+
+Hallway
+The hallway  Dozer is here.  You can move north, east, south and west.
+
+> e
+You move east.
+
+Hallway
+You are in your hallway.  You can move north, east, south and west.
+
+> e
+You move east.
+
+Hallway
+You are in your hallway.  You can move east, west and down.
+
+> d
+You move down.
+
+Downstairs Hallway
+Your hallway.  You can move north, west, up and out.
+
+> n
+You move north.
+
+Kitchen
+You are in your kitchen. Wow!!! Look at all of the appliances! There is a
+refridgerator, an oven, a cupboard, and a water faucet  You can move east,
+south, west, out and southeast.
+
+> open refridgerator
+You open the Refridgerator.  Inside the Refridgerator are a Root Beer, a
+Apple, a Turkey and a Soup Container.
+
+> eat apple
+You ate the apple!
+
+> score
+Your score is 5 out of a maximum of 5.  (100%)
+
+> quit
+Do you really want to quit? [Y/N]

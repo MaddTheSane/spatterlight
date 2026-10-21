@@ -1,0 +1,26 @@
+Del Test
+Exercises ADRIFT del (delete last character).
+
+Unflushed: the deleted character is still in the HTML walker buffer (works everywhere).
+Flushed style / br: Scarier deletes in-buffer before Glk, so style boundaries and newlines are removable (unlike Gargoyle unput).
+
+Commands: unflushed, flushed style, flushed br, help.
+
+Delete Lab
+A quiet room for testing del. Type help for commands.
+
+> help
+Commands: unflushed, flushed style, flushed br.
+
+> unflushed
+Unflushed: abc + del -- expect ab
+Result: [ab]
+
+> flushed style
+Flushed style: a + bold x + del -- expect a (in-buffer delete across style marks)
+Result: [a]
+
+> flushed br
+Flushed br: a + br + del -- expect a (newline removed in-buffer)
+Result: [a]
+

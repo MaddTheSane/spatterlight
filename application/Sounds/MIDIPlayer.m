@@ -8,7 +8,7 @@
 #import <AudioToolbox/AudioToolbox.h>
 
 #import "MIDIPlayer.h"
-#import "SoundHandler.h"
+#import "MIDISequenceUtils.h"
 
 
 @interface MIDIPlayer() {
@@ -23,23 +23,45 @@
 
     MusicPlayer player;
     MusicSequence sequence;
+    MusicTimeStamp pausedTime;
+    BOOL hasPausedTime;
+
+    /* Called at the end-of-sequence user event. Held here, and handed to the
+       sequence unretained: the sequence never outlives -stop. */
+    void (^endCallback)(void);
 }
 
 @end
+
+/* Logs a failed Core Audio call. Returns YES if it succeeded. */
+static BOOL Succeeded(OSStatus status, const char *call) {
+    if (status != noErr)
+        NSLog(@"MIDIPlayer: %s failed (%d)", call, (int)status);
+    return status == noErr;
+}
 
 @implementation MIDIPlayer
 
 - (instancetype)initWithData:(NSData *)data {
     if (self = [super init]) {
-        [self createGraph];
-        [self startGraph];
-        [self loadData:data];
+        hasPausedTime = NO;
+        pausedTime = 0;
+        if (![self createGraph] || ![self startGraph] || ![self loadData:data]) {
+            [self stop];
+            return nil;
+        }
     }
     return self;
 }
 
-- (void)createGraph {
-    NewAUGraph(&graph);
+/* Every player builds its own synth graph. Reusing one would save the
+   20-30 ms (97 ms the first time) of setting it up, but the synth would keep
+   the previous sound's programs and controllers. */
+- (BOOL)createGraph {
+    if (!Succeeded(NewAUGraph(&graph), "NewAUGraph")) {
+        graph = NULL;
+        return NO;
+    }
 
     AudioComponentDescription sampleDesc = {};
     sampleDesc.componentType            = kAudioUnitType_MusicDevice;
@@ -47,7 +69,8 @@
     sampleDesc.componentManufacturer    = kAudioUnitManufacturer_Apple;
     sampleDesc.componentFlags           = 0;
     sampleDesc.componentFlagsMask       = 0;
-    AUGraphAddNode(graph, &sampleDesc, &sampleNode);
+    if (!Succeeded(AUGraphAddNode(graph, &sampleDesc, &sampleNode), "AUGraphAddNode (synth)"))
+        return NO;
 
     AudioComponentDescription ioUnitDesc;
     ioUnitDesc.componentType            = kAudioUnitType_Output;
@@ -55,7 +78,8 @@
     ioUnitDesc.componentManufacturer    = kAudioUnitManufacturer_Apple;
     ioUnitDesc.componentFlags           = 0;
     ioUnitDesc.componentFlagsMask       = 0;
-    AUGraphAddNode(graph, &ioUnitDesc, &ioNode);
+    if (!Succeeded(AUGraphAddNode(graph, &ioUnitDesc, &ioNode), "AUGraphAddNode (output)"))
+        return NO;
 
     // A description of the mixer unit
     AudioComponentDescription mixerDescription;
@@ -65,112 +89,198 @@
     mixerDescription.componentFlags = 0;
     mixerDescription.componentFlagsMask = 0;
 
-    AUGraphAddNode(graph, &mixerDescription, &mixerNode);
-    AUGraphOpen(graph);
-    AUGraphNodeInfo(graph, sampleNode, NULL, &sampleUnit);
-    AUGraphNodeInfo(graph, ioNode, NULL, &ioUnit);
-    AUGraphNodeInfo(graph, mixerNode, NULL, &mixerUnit);
-
-    AUGraphConnectNodeInput(graph, sampleNode, 0, mixerNode, 0);
-    AUGraphConnectNodeInput(graph, mixerNode, 0, ioNode, 0);
+    if (!Succeeded(AUGraphAddNode(graph, &mixerDescription, &mixerNode), "AUGraphAddNode (mixer)") ||
+        !Succeeded(AUGraphOpen(graph), "AUGraphOpen") ||
+        !Succeeded(AUGraphNodeInfo(graph, sampleNode, NULL, &sampleUnit), "AUGraphNodeInfo (synth)") ||
+        !Succeeded(AUGraphNodeInfo(graph, ioNode, NULL, &ioUnit), "AUGraphNodeInfo (output)") ||
+        !Succeeded(AUGraphNodeInfo(graph, mixerNode, NULL, &mixerUnit), "AUGraphNodeInfo (mixer)") ||
+        !Succeeded(AUGraphConnectNodeInput(graph, sampleNode, 0, mixerNode, 0), "AUGraphConnectNodeInput (synth)") ||
+        !Succeeded(AUGraphConnectNodeInput(graph, mixerNode, 0, ioNode, 0), "AUGraphConnectNodeInput (mixer)"))
+        return NO;
 
     [self setVolume:1.0];
 
-    AUGraphInitialize(graph);
+    return Succeeded(AUGraphInitialize(graph), "AUGraphInitialize");
 }
 
 - (void)setVolume:(CGFloat)volume {
-    if (mixerUnit) {
-        AudioUnitSetParameter(mixerUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Output, 0, (AudioUnitParameterValue)volume, 0);
-        AudioUnitSetParameter(mixerUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Input, 0, (AudioUnitParameterValue)volume, 0);
-    }
+    if (!mixerUnit)
+        return;
+    const AudioUnitScope scopes[] = { kAudioUnitScope_Output, kAudioUnitScope_Input };
+    for (size_t i = 0; i < sizeof scopes / sizeof *scopes; i++)
+        AudioUnitSetParameter(mixerUnit, kMultiChannelMixerParam_Volume, scopes[i], 0, (AudioUnitParameterValue)volume, 0);
 }
 
-- (void)startGraph {
-    if (graph) {
-        Boolean isRunning;
-        AUGraphIsRunning(graph, &isRunning);
-        if (!isRunning) {
-            AUGraphStart(graph);
-        }
-    }
+- (BOOL)startGraph {
+    if (!graph)
+        return NO;
+    Boolean isRunning = false;
+    if (Succeeded(AUGraphIsRunning(graph, &isRunning), "AUGraphIsRunning") && isRunning)
+        return YES;
+    return Succeeded(AUGraphStart(graph), "AUGraphStart");
 }
 
 - (void)stopGraph {
     if (graph) {
-        Boolean isRunning;
-        AUGraphIsRunning (graph, &isRunning);
-        if (isRunning) {
-            AUGraphStop(graph);
-        }
+        Boolean isRunning = false;
+        if (AUGraphIsRunning(graph, &isRunning) == noErr && isRunning)
+            Succeeded(AUGraphStop(graph), "AUGraphStop");
     }
 }
 
-- (void)loadData:(NSData *)data {
-    NewMusicSequence(&sequence);
-    MusicSequenceFileLoadData (sequence, (__bridge CFDataRef _Nonnull)(data), kMusicSequenceFile_MIDIType, kMusicSequenceLoadSMF_ChannelsToTracks);
-    MusicSequenceSetAUGraph(sequence, graph);
+- (BOOL)loadData:(NSData *)data {
+    if (!Succeeded(NewMusicSequence(&sequence), "NewMusicSequence")) {
+        sequence = NULL;
+        return NO;
+    }
+    if (!Succeeded(MusicSequenceFileLoadData(sequence, (__bridge CFDataRef)data, kMusicSequenceFile_MIDIType, kMusicSequenceLoadSMF_ChannelsToTracks), "MusicSequenceFileLoadData") ||
+        !Succeeded(MusicSequenceSetAUGraph(sequence, graph), "MusicSequenceSetAUGraph"))
+        return NO;
 
-    NewMusicPlayer(&player);
-    MusicPlayerSetSequence(player, sequence);
-    MusicPlayerPreroll(player);
+    MIDISequenceTrimLeadingSilence(sequence);
+
+    if (!Succeeded(NewMusicPlayer(&player), "NewMusicPlayer")) {
+        player = NULL;
+        return NO;
+    }
+    if (!Succeeded(MusicPlayerSetSequence(player, sequence), "MusicPlayerSetSequence"))
+        return NO;
+    Succeeded(MusicPlayerPreroll(player), "MusicPlayerPreroll");
+
+    _duration = 0;
+    MusicTimeStamp longest = MIDISequenceLength(sequence);
+    if (longest > 0) {
+        Float64 seconds = 0;
+        if (MusicSequenceGetSecondsForBeats(sequence, longest, &seconds) == noErr)
+            _duration = (NSTimeInterval)seconds;
+    }
+    return YES;
+}
+
+- (double)position {
+    if (hasPausedTime)
+        return pausedTime;
+    MusicTimeStamp now = 0;
+    if (!player || MusicPlayerGetTime(player, &now) != noErr)
+        return 0;
+    return now;
+}
+
+- (void)seekToPosition:(double)beats {
+    if (beats <= 0)
+        return;
+
+    MusicTimeStamp target = beats;
+    /* A looping player keeps counting past the end of the tracks, so a position
+       taken during the third pass has to be folded back into the sequence. */
+    MusicTimeStamp length = MIDISequenceLength(sequence);
+    if (length > 0 && target >= length)
+        target = fmod(target, length);
+
+    AudioUnit synth = sampleUnit;
+    if (synth) {
+        MIDISequenceChaseSynthState(sequence, target, ^(const UInt8 *bytes, UInt32 count) {
+            if (bytes[0] == 0xf0)
+                MusicDeviceSysEx(synth, bytes, count);
+            else
+                MusicDeviceMIDIEvent(synth, bytes[0], bytes[1], count > 2 ? bytes[2] : 0, 0);
+        });
+    }
+
+    /* -play applies this the same way it resumes from a pause. */
+    pausedTime = target;
+    hasPausedTime = YES;
 }
 
 - (void)loop:(NSInteger)repeats {
     if (repeats == -1)
         repeats = 0; //Loop forever
 
-    UInt32 numberOfTracks;
-
-    MusicSequenceGetTrackCount(sequence, &numberOfTracks);
-    for (UInt32 i = 0; i < numberOfTracks; i++) {
-        MusicTrack track = NULL;
+    MIDISequenceForEachTrack(sequence, NO, ^(MusicTrack track) {
         MusicTimeStamp trackLen = 0;
-
         UInt32 trackLenLen = sizeof(trackLen);
-
-        MusicSequenceGetIndTrack(sequence, i, &track);
-
         MusicTrackGetProperty(track, kSequenceTrackProperty_TrackLength, &trackLen, &trackLenLen);
         MusicTrackLoopInfo loopInfo = { trackLen, (SInt32)repeats };
         MusicTrackSetProperty(track, kSequenceTrackProperty_LoopInfo, &loopInfo, sizeof(loopInfo));
-    }
+    });
 }
 
-- (void)play {
-    [self startGraph];
-    MusicPlayerStart(player);
+- (BOOL)play {
+    if (!player || ![self startGraph])
+        return NO;
+    if (hasPausedTime) {
+        Succeeded(MusicPlayerSetTime(player, pausedTime), "MusicPlayerSetTime");
+        hasPausedTime = NO;
+    }
+    return Succeeded(MusicPlayerStart(player), "MusicPlayerStart");
 }
 
 - (void)pause {
+    /* Pausing something that is not playing must not throw away the point it is
+       waiting to resume from: a channel restored from an autosave holds one before
+       it has ever been started. */
+    if (!player)
+        return;
+    Boolean isPlaying = false;
+    if (MusicPlayerIsPlaying(player, &isPlaying) == noErr && !isPlaying) {
+        [self stopGraph];
+        return;
+    }
+
+    pausedTime = 0;
+    hasPausedTime = (MusicPlayerGetTime(player, &pausedTime) == noErr);
+    Succeeded(MusicPlayerStop(player), "MusicPlayerStop");
     [self stopGraph];
-    MusicPlayerStop(player);
 }
 
+/* Tear everything down. The player is unusable afterwards, and a second call
+   does nothing. */
 - (void)stop {
-    MusicPlayerStop(player);
-    DisposeMusicPlayer(player);
-    DisposeMusicSequence(sequence);
+    if (player) {
+        MusicPlayerStop(player);
+        DisposeMusicPlayer(player);
+        player = NULL;
+    }
+    if (sequence) {
+        DisposeMusicSequence(sequence);
+        sequence = NULL;
+    }
     [self stopGraph];
-    DisposeAUGraph(graph);
+    if (graph) {
+        DisposeAUGraph(graph);
+        graph = NULL;
+        sampleUnit = NULL;
+        ioUnit = NULL;
+        mixerUnit = NULL;
+    }
+    endCallback = nil;
+}
+
+- (void)dealloc {
+    [self stop];
 }
 
 static void userCallback (void *inClientData, MusicSequence inSequence, MusicTrack inTrack, MusicTimeStamp inEventTime, const MusicEventUserData *inEventData, MusicTimeStamp inStartSliceBeat, MusicTimeStamp inEndSliceBeat);
 
 - (void)addCallback:(void (^)(void))block {
+    if (!sequence)
+        return;
     MusicTrack track = NULL;
     MusicTimeStamp trackLen = 0;
     UInt32 trackLenLen = sizeof(trackLen);
     //Get main track
-    MusicSequenceGetIndTrack(sequence, 0, &track);
+    if (!Succeeded(MusicSequenceGetIndTrack(sequence, 0, &track), "MusicSequenceGetIndTrack"))
+        return;
     //Get length of track
     MusicTrackGetProperty(track, kSequenceTrackProperty_TrackLength, &trackLen, &trackLenLen);
     //Create UserData for User Event with any data
     static const MusicEventUserData userData = {1, {0x09}};
     //Put new user event at the end of the track
-    MusicTrackNewUserEvent(track, trackLen, &userData);
+    if (!Succeeded(MusicTrackNewUserEvent(track, trackLen, &userData), "MusicTrackNewUserEvent"))
+        return;
     //Set a callback for when User Events occur
-    MusicSequenceSetUserCallback(sequence, userCallback, (void * _Nullable)CFBridgingRetain(block));
+    endCallback = [block copy];
+    Succeeded(MusicSequenceSetUserCallback(sequence, userCallback, (__bridge void *)endCallback), "MusicSequenceSetUserCallback");
 }
 
 static void userCallback (void *inClientData, MusicSequence inSequence, MusicTrack inTrack, MusicTimeStamp inEventTime, const MusicEventUserData *inEventData, MusicTimeStamp inStartSliceBeat, MusicTimeStamp inEndSliceBeat) {

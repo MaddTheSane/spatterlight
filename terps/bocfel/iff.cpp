@@ -1,4 +1,4 @@
-// Copyright 2010-2021 Chris Spiegel.
+// Copyright 2010-2023 Chris Spiegel.
 //
 // SPDX-License-Identifier: MIT
 
@@ -12,10 +12,8 @@
 IFF::IFF(std::shared_ptr<IO> io, TypeID type) : m_io(std::move(io))
 {
     try {
-        uint32_t type_val;
-
         m_io->seek(0, IO::SeekFrom::Start);
-        type_val = m_io->read32();
+        uint32_t type_val = m_io->read32();
         if (type_val != TypeID("FORM").val()) {
             throw InvalidFile();
         }
@@ -25,6 +23,8 @@ IFF::IFF(std::shared_ptr<IO> io, TypeID type) : m_io(std::move(io))
         if (type_val != type.val()) {
             throw InvalidFile();
         }
+
+        auto filesize = m_io->filesize();
 
         while (true) {
             try {
@@ -37,6 +37,10 @@ IFF::IFF(std::shared_ptr<IO> io, TypeID type) : m_io(std::move(io))
 
             auto size = m_io->read32();
             auto offset = m_io->tell();
+
+            if (filesize.has_value() && (offset > *filesize || size > *filesize - offset)) {
+                throw InvalidFile();
+            }
 
             m_entries.emplace_back(TypeID(type_val), offset, size);
 

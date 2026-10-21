@@ -1,0 +1,30 @@
+
+Items210
+
+You are in Room.
+There is nobody here.
+A plain room.
+
+> check
+got lamp: no
+
+> i
+You are not carrying anything.
+
+> arm
+
+> check
+got lamp: yes
+
+> i
+You are carrying:
+Lamp.
+
+> disarm
+
+> check
+got lamp: no
+
+> i
+You are not carrying anything.
+[runner] turns=8 leftover=0 running=true

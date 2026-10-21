@@ -1,0 +1,118 @@
+# Comprehend headless walkthrough tests
+
+A small text regression harness for the Comprehend interpreter, modelled on
+`terps/question/test`. It drives the existing headless build (`comprehend_hl`) from a
+command script and checks the transcript for a **win marker** -- a line the game
+only prints once the script has driven it to that point. This is far more robust
+than diffing a byte-exact golden transcript: it pins the behaviour that matters
+(the game reaches a known state) without breaking on incidental wording changes.
+
+The games are **not** in this repo (copyrighted); point the runner at your own
+copies. The command scripts in `scripts/` are the "raw" form Question also commits:
+one input per line, `#`-comments and blank lines ignored.
+
+## Build
+
+The harness uses the headless interpreter, built from the parent directory:
+
+```sh
+make -C ../.. -f Makefile.headless      # produces ../../comprehend_hl
+```
+
+## Run
+
+One game:
+
+```sh
+./run_walkthrough.sh covetedmirror \
+    "~/Downloads/comprehend games/The Coveted Mirror 2.0 (woz-a-day collection)/The Coveted Mirror 2.0 side B (boot).woz" \
+    scripts/covetedmirror.txt \
+    "My horoscope was horrible."
+```
+
+Exit status is 0 if the marker is seen, else 1 (and the transcript tail is
+printed to stderr so a desync is easy to locate).
+
+The whole table:
+
+```sh
+./run_walkthroughs.sh "~/Downloads/comprehend games"
+```
+
+## A note on timers
+
+The interpreter has no real-time clock here, but turn timers still tick: the
+Coveted Mirror hourglass runs down per turn and, when it expires, the jailer
+teleports you back to the throne -- so a full Coveted Mirror walkthrough only
+completes if the script bribes the jailer on a strict cadence (the Question runner
+solves the same class of problem with `--tick`). The committed
+`scripts/covetedmirror.txt` **manages that cadence**: the hourglass is variable
+`0x11` (starts 74, -1 per recognised turn); the script reaches the barrel hub
+("Outskirts of town", the south end of the town spine) and bribes jailer Boris
+twice (`GO BARREL, E, WAIT, GIVE <item>, MOVE BED, GO HOLE, GO BARREL`), which
+resets the sand to 74 -- once with the axe, once with the telescope -- so it
+plays the whole early/mid game (out of the cell, through town, the astrologer's
+constellation puzzle, the eastern collection loop) without ever being caught.
+This exercises string-bank decoding, the parser, NPC dialogue, the throne-room
+override **and** the daemon's once-per-turn sand drain together.
+
+## Extending
+
+To add a game, write `scripts/<gameid>.txt` (drive it to a distinctive line),
+add a `play` entry to `run_walkthroughs.sh`, and pick that line as the marker.
+
+All five Polarware/Penguin games ship a deterministic script here (verified
+identical across runs). Four are full winning playthroughs (Oo-Topos, Crimson
+Crown, Talisman, Transylvania); only the Coveted Mirror still stops early, in the
+mid-game collection loop:
+
+  * **Coveted Mirror** -- out of the cell, through town, the astrologer's
+    constellation puzzle and the eastern collection loop (axe, ball, lockpick,
+    telescope, candlestick, bellows, shovel, jug, ladder, grain). Bribes the
+    jailer twice to outlast the hourglass; stops before the maze/spell endgame,
+    which needs the non-deterministic NPC waits and extra bribes pinned to MAME.
+  * **Oo-Topos** -- a *full* winning playthrough to "But your part has been done!
+    Congratulations!": out of the prison through the scripted stun-capture, the
+    alien/sentinel fights, the gravtube and garbage-disposal suit-up, the radiation
+    and bright rooms, the viewscreen/library puzzles, the alien jungle and pyramid,
+    then the long endgame of ferrying the ship's parts up and down the gravcar
+    tunnels, re-installing them, and valuing the treasures for fuel until the
+    computer can depart. Two notes on the magic-word teleporter inside the ship:
+    the parser resolves "TAKA ELE-LEVA" to the single noun 'taka', which only fires
+    the *outbound* teleport, so the two return trips use the other magic word,
+    'leva' (the real dictionary word for the 0x24->0x0c teleport); both directions
+    also require the light-rod in hand. No engine change was needed -- this was a
+    parser-disambiguation and route problem, found by tracing the two teleport
+    functions (0x86 out, 0x90 back) in the game bytecode.
+  * **Crimson Crown** -- a *full* winning playthrough to the closing "THE END."
+    epilogue, across both disk sides (the engine switches from side A to side B by
+    itself when disk one is finished). It answers the gryphon's three riddles for
+    the scepter, threads the censer/Zin/tablet chain for the LORELEI password,
+    floats the party out of the flooding pit on the beehive, and rides the timed
+    disk-two endgame: free the dragon Fury, ward off the vampire's fire with the
+    shell-shield, and flee the collapsing fortress to the beach while Erik shakes
+    off the spell and dons the crown. (Two disk-two endgame bugs had to be fixed
+    first: handle_restart() dereferenced a null _gameStrings on any disk-two
+    death, and the win printed strings 0x21c/0x21d -- two off from the real
+    victory text, the merchant-ship rescue 0x21a and the "THE END." epilogue
+    0x21b. The original stops on "THE END." -- confirmed on the woz in MAME; the
+    adjacent "...completion code is @." string is a dead contest stub the game
+    never prints.)
+  * **Talisman** -- a *full* winning playthrough to "the Empire shalt flourish
+    through eternity": WAIT x5 in the cell until the reprieve cutscene delivers
+    Abu to the King's audience chamber, a single BOW frees him, and the run goes
+    on through the Persian Empire and the Lands Beyond desert (a second disk side)
+    home to the final bow before King Darius.
+  * **Transylvania** -- a *full* winning playthrough to "Well Done!!!", and the
+    one script (`scripts/transylvania.txt`) wins both releases: the 1985 Penguin
+    Apple II original (gameid `transylvania`) and the 1987 Polarware DOS re-release
+    (gameid `transylvaniav2`, the TransylvaniaPC files). It kills the werewolf and
+    vampire, threads the deterministic werewolf coffin-window, frees the statue
+    djinn for the ring, and waits out the dawn flying saucer to wake Sabrina. (The
+    Apple original needed a two-slot `_strings2` alignment fix in
+    `GameData::load_extra_string_files` -- without it the kill actions printed the
+    wrong lines and never fired, leaving the game unwinnable.)
+
+The one remaining full-completion script still to be authored is the Coveted
+Mirror's: its jailer-bribe cadence is worked out through the mid-game, but the
+maze/spell endgame's random NPC waits still need to be pinned against MAME.

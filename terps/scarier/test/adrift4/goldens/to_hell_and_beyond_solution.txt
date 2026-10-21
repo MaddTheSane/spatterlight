@@ -1,0 +1,4 @@
+greet zifan
+open door
+s
+score

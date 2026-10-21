@@ -555,7 +555,6 @@ AddFontCode:
 		linebreak = 0;
 		linebreaklen = 0;
 		thisline = 0;
-		plen = 0;
 #ifdef USE_TEXTBUFFER
 		bufferbreak = 0;
 		bufferbreaklen = 0;
@@ -669,14 +668,12 @@ int CallRoutine(unsigned int addr)
 
 void ContextCommand(void)
 {
-	unsigned int n;
-
 ContextCommandLoop:
 
 	codeptr++;
 	
-	n = GetValue();
 #if !defined (COMPILE_V25)
+	unsigned int n = GetValue();
 	if (n==0)
 	{
 		context_commands = 0;

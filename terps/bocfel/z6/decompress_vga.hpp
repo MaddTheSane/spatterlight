@@ -4,17 +4,15 @@
 //
 //  Created by Administrator on 2023-08-03.
 //
-//  Based on drilbo-mg1.h from Fizmo by Christoph Ender,
-//  which in turn is based on Mark Howell's pix2gif utility
 
 #ifndef decompress_vga_hpp
 #define decompress_vga_hpp
 
-#include <stdio.h>
-
-#include <stdio.h>
 #include "v6_image.h"
 
-uint8_t *decompress_vga(ImageStruct *image);
+// LZW decompression of VGA/EGA/CGA image data to width * height palette
+// indices; see decompress_vga.cpp. The caller frees the result. Returns
+// nullptr on bad dimensions, allocation failure or corrupt data.
+uint8_t *decompress_vga(const ImageStruct *image);
 
 #endif /* decompress_vga_hpp */

@@ -230,3 +230,69 @@ fastlane/screenshots
 #
 
 .gdb_history
+
+terps/comprehend/test/rgbacrc
+
+# Headless ScottFree test harness build artifacts
+terps/scott/headless_obj/
+terps/scott/scott_hl
+terps/scott/scott_death_test
+terps/scott/scott_all_audit
+terps/scott/scott_format_probe
+terps/scott/scott_cond_audit
+
+# Apple II disk reader snapshot probe
+terps/readwoz/test/ciderpress_probe
+terps/readwoz/test/ciderpress_probe.dSYM/
+terps/readwoz/test/v6games
+terps/c64diskimage/test/c64diskimage_probe
+terps/c64diskimage/test/c64diskimage_probe.dSYM/
+
+# ZX Spectrum snapshot and tape reader snapshot probe
+terps/decompressz80/test/z80_probe
+terps/decompressz80/test/z80_probe.dSYM/
+
+# Plus and TaylorMade picture test build artifacts and (copyrighted) games
+terps/plus/headless_obj/
+terps/plus/plus_image_probe
+terps/plus/headless_text_obj/
+terps/plus/plus_hl
+terps/plus/headless_asan_obj/
+terps/plus/headless_asan_text_obj/
+terps/plus/plus_image_probe_asan
+terps/plus/plus_hl_asan
+terps/plus/test/images/games/
+terps/taylor/headless_obj/
+terps/taylor/taylor_image_probe
+terps/taylor/headless_text_obj/
+terps/taylor/taylor_hl
+terps/taylor/test/images/games/
+terps/taylor/test/images/mame/
+terps/level9/headless_obj/
+terps/level9/level9_hl
+terps/level9/test/games/
+
+# Scarier build artifacts (Makefile.headless compiles in place; the test
+# harnesses have their own .gitignore files under terps/scarier/test/)
+/terps/scarier/*.[od]
+/terps/scarier/core/*.[od]
+/terps/scarier/platform/*.[od]
+/terps/scarier/adrift5/*.[od]
+/terps/scarier/adrift5/text/*.[od]
+/terps/scarier/adrift5/run/*.[od]
+/terps/scarier/library/*.[od]
+/terps/scarier/runner/*.[od]
+/terps/scarier/tools/*.[od]
+/terps/scarier/headless/*.[od]
+/terps/scarier/glk/*.[od]
+/terps/scarier/common_utils/*.[od]
+/terps/scarier/scarier
+/terps/scarier/glkscarier
+/terps/scarier/sx
+
+# Python bytecode caches (harness/probe scripts under terps/)
+__pycache__/
+*.pyc
+
+# Xcode DerivedData from xcodebuild -derivedDataPath xc
+/xc/

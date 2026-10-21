@@ -3,8 +3,9 @@
 #ifndef ZTERP_STACK_H
 #define ZTERP_STACK_H
 
+#include <optional>
 #include <stdexcept>
-#include <string>
+#include <vector>
 
 #include "types.h"
 
@@ -22,24 +23,27 @@ void init_stack(bool first_run);
 
 uint16_t variable(uint16_t var);
 void store_variable(uint16_t var, uint16_t n);
-uint16_t *stack_top_element();
+uint8_t current_frame_nlocals();
 
 void start_v6();
-#ifdef ZTERP_GLK
-uint16_t internal_call(uint16_t routine);
-#endif
+uint16_t internal_call(uint16_t routine, std::vector<uint16_t> args = {}, std::optional<uint8_t> store_var = std::nullopt);
 void do_return(uint16_t retval);
 
 enum class SaveType {
     Normal,
     Meta,
     Autosave,
+    AutosaveLib,
 };
 
 enum class SaveOpcode {
     None = -1,
     Read = 0,
     ReadChar = 1,
+    // Yes, we can autosave in the middle of a @save or @restore! It’s the
+    // fileref prompt that does it, not the save operation.
+    Save = 2,
+    Restore = 3,
 };
 
 bool do_save(SaveType savetype, SaveOpcode saveopcode);
@@ -84,9 +88,6 @@ void zcall_store();
 void zcall_nostore();
 
 #ifdef SPATTERLIGHT
-uint16_t internal_call_with_arg(uint16_t routine, uint16_t arg);
-uint16_t internal_call_with_2_args(uint16_t routine, uint16_t arg1, uint16_t arg2);
-uint16_t internal_call_with_args(uint16_t routine, uint16_t number_of_args, uint16_t *args);
 uint16_t internal_arg_count(void);
 #endif
 

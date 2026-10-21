@@ -1,0 +1,23 @@
+read checklist
+take jacket
+take key card
+drop jacket
+look at key card
+read key card
+north
+east
+use toilet
+flush toilet
+west
+90238
+down
+take bag
+open bag
+take learner
+1
+wear learner
+learn how to fly
+up
+fly
+turn right
+land

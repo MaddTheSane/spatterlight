@@ -30,6 +30,7 @@
 
 #include "glk.h"
 #include "glkstart.h"
+#include "randomness.h"
 
 #define VERSION "0.8.5/tor"
 #define BUILDDATE "2005-09-06"
@@ -65,6 +66,17 @@ void opword(ushort);
 void opcond(ushort *);
 void opact(ushort *);
 void opch32(char);
+void put_ch(char);
+void put_str(char *);
+void status_begin(void);
+void status_end(void);
+extern winid_t statuswin;		/* defined in unquill.c, used by illustrator.c */
+void draw_location_graphic(uchar loc);	/* illustrator.c */
+void pic_relayout(void);		/* illustrator.c */
+void do_pause(glui32 millisecs);
+#ifdef SPATTERLIGHT
+void win_beep_spectrum(int pitch, int duration);
+#endif
 void opcact(char,char *);
 void expch (uchar, ushort *);
 void expdict (uchar, ushort *);
@@ -87,6 +99,16 @@ char yesno(void);
 void savegame(void);
 void loadgame(void);
 
+/* End-of-game prompt outcomes (playgame.c) */
+#define END_QUIT  0	/* stop playing */
+#define END_AGAIN 1	/* start a new game */
+#define END_UNDO  2	/* undo the fatal move and resume the same game */
+int end_game_prompt(void);
+void undo_reset(void);
+
+/* "#transcript" meta-command: start/stop a transcript of the session (unquill.c) */
+void script_toggle(void);
+
 void inform_src(ushort);
 void zcode_binary(void);
 
@@ -100,8 +122,11 @@ void zcode_binary(void);
 
 winid_t mainwin = 0;
 
-uchar zxmemory[0xA500];    /* Spectrum memory from 0x5C00 up 
-			    * In CPC mode, CPC memory from 0x1B00 to 0xBFFF */
+uchar zxmemory[0x10000];   /* Spectrum memory from 0x5C00 up
+			    * In CPC mode, CPC memory from 0x1B00 to 0xBFFF.
+			    * Full 64K so the C64 path (mem_base 0) can hold a
+			    * whole RAM image; larger C64 Quill games such as
+			    * Blizzard Pass use memory up past 0xC000. */
 
 char arch = ARCH_SPECTRUM;		  /* Architecture */
 char copt=0;		  /* -C option */
@@ -160,7 +185,7 @@ char snapid[20];
 
 extern winid_t mainwin;
 
-extern uchar zxmemory[0xA400];
+extern uchar zxmemory[0x10000];
 
 extern char copt, gopt, mopt;
 extern char oopt, xpos, dbver,verbose,nobeep,running,indent,*inname;

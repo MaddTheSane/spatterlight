@@ -1,0 +1,88 @@
+
+open desk
+x desk
+take all from desk
+clean desk
+burn memo
+strip
+wear holster
+drink coffee
+d
+e
+d
+ask cancerman about 1
+ask cancerman about 2
+ask cancerman about 3
+take case file
+x Case File 10193
+take warehouse key
+examine warehouse key
+u
+out
+w
+n
+use key
+# SEEN-MODEL RE-DERIVE (2026-08-24): a dynamic object lying loose in a room
+# is not referenceable until something LISTS it -- the Runner stamps the seen
+# byte in its room lister, not once a turn.  Measured live in run400
+# (Adrift_22_xfiles.txt, The X-Files): `take knife` in a room entered through a
+# ShowRoomDesc=0 task answers "Take what?" although the knife is on the floor.
+# Task 7 "Use Key" carries ShowRoomDesc = 0, so entering Garage 5 through it
+# prints no room description and the Small Pocket Knife stays unlisted.  This
+# is the case measured live in run400 (Adrift_22_xfiles.txt, lines 92-93).
+look
+take knife
+out
+s
+examine nameplate
+donate to the poor
+s
+in
+play jukebox
+u
+x Your Coffee Table
+take fish food container
+open fish food container
+take pellet
+open fish tank
+feed fish
+d
+out
+n
+
+sw
+knock
+out
+ne
+w
+look at camera
+call ruth
+open gift
+take gun
+out
+get in the van
+e
+in
+u
+touch labtop
+sleep
+take phone book
+open phone book
+look up byers
+d
+out
+n
+se
+in
+buzzer
+out
+nw
+ne
+in
+take directions
+out
+climb in the van
+look
+enter the forest
+ko
+the end

@@ -1,13 +1,15 @@
-// Copyright 2010-2021 Chris Spiegel.
+// Copyright 2010-2025 Chris Spiegel.
 //
 // SPDX-License-Identifier: MIT
 
+#include <cerrno>
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
 #include <functional>
 #include <iostream>
+#include <optional>
 #include <string>
 
 #include "util.h"
@@ -18,18 +20,6 @@
 
 #ifdef ZTERP_GLK
 #include <glk.h>
-
-#ifdef SPATTERLIGHT
-extern glui32 gli_error_handling;
-
-enum
-{
-    IGNORE_ERRORS,
-    DISPLAY_ERRORS,
-    ERRORS_ARE_FATAL
-};
-#endif // SPATTERLIGHT
-
 #endif
 
 // Values are usually stored in a uint16_t because most parts of the
@@ -100,33 +90,35 @@ void die(const char *fmt, ...)
     throw Exit(EXIT_FAILURE);
 }
 
-long parseint(const std::string &s, int base, bool &valid)
+std::optional<long> parseint(const std::string &s, int base)
 {
-    long ret;
     char *endptr;
     const char *cstr = s.c_str();
 
-    ret = std::strtol(cstr, &endptr, base);
-    valid = endptr != cstr && *endptr == 0;
+    errno = 0;
+    long ret = std::strtol(cstr, &endptr, base);
 
-    return ret;
+    if (endptr != cstr && *endptr == 0 && errno != ERANGE) {
+        return ret;
+    } else {
+        return std::nullopt;
+    }
 }
 
 std::string vstring(const char *fmt, std::va_list ap)
 {
     std::va_list ap_copy;
     std::string s;
-    int n;
 
     va_copy(ap_copy, ap);
 
-    n = std::vsnprintf(nullptr, 0, fmt, ap);
+    int n = std::vsnprintf(nullptr, 0, fmt, ap);
     if (n < 0) {
         die("error processing format string");
     }
 
     s.resize(n);
-    std::vsnprintf(&s[0], n + 1, fmt, ap_copy);
+    std::vsnprintf(s.data(), n + 1, fmt, ap_copy);
 
     va_end(ap_copy);
 
@@ -147,9 +139,7 @@ std::string fstring(const char *fmt, ...)
 
 std::string ltrim(const std::string &s)
 {
-    auto pos = s.find_first_not_of(" \t\r");
-
-    if (pos != std::string::npos) {
+    if (auto pos = s.find_first_not_of(" \t\r"); pos != std::string::npos) {
         return s.substr(pos);
     } else {
         return "";
@@ -158,16 +148,14 @@ std::string ltrim(const std::string &s)
 
 std::string rtrim(const std::string &s)
 {
-    auto pos = s.find_last_not_of(" \t\r");
-
-    if (pos != std::string::npos) {
+    if (auto pos = s.find_last_not_of(" \t\r"); pos != std::string::npos) {
         return s.substr(0, pos + 1);
     } else {
-        return s;
+        return "";
     }
 }
 
-void parse_grouped_file(std::ifstream &f, const std::function<void(const std::string &line, int lineno)> &callback)
+void parse_grouped_file(std::istream &f, const std::function<void(const std::string &line, int lineno)> &callback)
 {
     std::string line;
     bool story_matches = true;
@@ -175,8 +163,7 @@ void parse_grouped_file(std::ifstream &f, const std::function<void(const std::st
     for (int lineno = 1; std::getline(f, line); lineno++) {
         line = ltrim(line);
 
-        auto comment = line.find('#');
-        if (comment != std::string::npos) {
+        if (auto comment = line.find('#'); comment != std::string::npos) {
             line.erase(comment);
         }
         line = rtrim(line);
@@ -198,4 +185,14 @@ void parse_grouped_file(std::ifstream &f, const std::function<void(const std::st
 
         callback(line, lineno);
     }
+}
+
+std::optional<std::string> zterp_getenv(const std::string &name)
+{
+    const char *val = std::getenv(name.c_str());
+    if (val == nullptr) {
+        return std::nullopt;
+    }
+
+    return val;
 }

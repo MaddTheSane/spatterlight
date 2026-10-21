@@ -1,0 +1,40 @@
+n
+n
+goodbye
+secretweapon97531
+e
+attack ogre
+get ogre meat
+eat ogre meat
+n
+n
+n
+farewell
+n
+e
+e
+u
+get potion
+drink potion
+n
+attack knight
+get food
+eat food
+w
+n
+n
+n
+u
+u
+w
+w
+n
+e
+e
+attack executioner
+take amulet
+w
+w
+n
+break mirror
+east

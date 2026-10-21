@@ -72,7 +72,11 @@ static void deep_babel_ifiction(char stopped)
 
         ep=strtok(buffer, ",");
     }
-    else ep="-";
+    else
+    {
+        buffer[0]=0;
+        ep="-";
+    }
     i=babel_treaty(GET_STORY_FILE_METADATA_EXTENT_SEL,NULL,0);
     if (i<=0)
     {
@@ -91,7 +95,8 @@ static void deep_babel_ifiction(char stopped)
         char epb[TREATY_MINIMUM_EXTENT+9];
         if (stopped!=2)
         {
-            strcpy(epb,ep);
+            strncpy(epb, ep, sizeof(epb) - 1);
+            epb[sizeof(epb) - 1] = '\0';
             strcat(epb, IFICTION_EXT);
 
             f=fopen(epb,"w");
@@ -120,6 +125,7 @@ static char *get_jpeg_dim(void *img, int32 extent)
     unsigned int t1, t2, w, h;
 
 
+    if (extent<2) return "(invalid)";
     t1=*(dp++);
     t2=*(dp++);
     if (t1!=0xff || t2!=0xD8 )
@@ -129,21 +135,16 @@ static char *get_jpeg_dim(void *img, int32 extent)
 
     while(1)
     {
-        if (dp>ep) return "(invalid)";
-        for(t1=*(dp++);t1!=0xff;t1=*(dp++)) if (dp>ep) return "(invalid)";
-        do { t1=*(dp++); if (dp>ep) return "(invalid 4)";} while (t1 == 0xff);
+        if (dp>=ep) return "(invalid)";
+        for(t1=*(dp++);t1!=0xff;t1=*(dp++)) if (dp>=ep) return "(invalid)";
+        do { if (dp>=ep) return "(invalid 4)"; t1=*(dp++); } while (t1 == 0xff);
 
         if ((t1 & 0xF0) == 0xC0 && !(t1==0xC4 || t1==0xC8 || t1==0xCC))
         {
+            if (ep-dp<7) return "(invalid)";
             dp+=3;
-            if (dp>ep) return "(invalid)";
-            h=*(dp++) << 8;
-            if (dp>ep) return "(invalid)";
-            h|=*(dp++);
-            if (dp>ep) return "(invalid)";
-            w=*(dp++) << 8;
-            if (dp>ep) return "(invalid)";
-            w|=*(dp);
+            h=dp[0] << 8 | dp[1];
+            w=dp[2] << 8 | dp[3];
             sprintf(buffer, "(%dx%d)",w,h);
             return buffer;
         }
@@ -153,13 +154,12 @@ static char *get_jpeg_dim(void *img, int32 extent)
         {
             int l;
 
-            if (dp>ep) return "(invalid)";
-            l=*(dp++) << 8;
-            if (dp>ep) return "(invalid)";
-            l|= *(dp++);
+            if (ep-dp<2) return "(invalid)";
+            l=dp[0] << 8 | dp[1];
+            dp+=2;
             l-=2;
+            if (l>ep-dp) return "(invalid)";
             dp+=l;
-            if (dp>ep) return "(invalid)";
         }
     }
     return "(invalid)";
@@ -240,7 +240,8 @@ static void deep_babel_cover(char stopped)
     while(ep)
     {
         char epb[TREATY_MINIMUM_EXTENT+9];
-        strcpy(epb,ep);
+        strncpy(epb, ep, sizeof(epb) - 1);
+        epb[sizeof(epb) - 1] = '\0';
         strcat(epb, ext);
 
         f=fopen(epb,"wb");
@@ -297,7 +298,7 @@ static char *get_biblio(void)
             sprintf(buffer, "\"%s\" ",t);
             *bibe='<';
         }
-        else strcpy(buffer,"<no title found> ");
+        else snprintf(buffer, sizeof(buffer), "%s", "<no title found> ");
     }
     t=strstr(bibb,"<author>");
     if (t)

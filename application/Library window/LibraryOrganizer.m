@@ -1,0 +1,650 @@
+//
+//  LibraryOrganizer.m
+//  Spatterlight
+//
+
+#import "LibraryOrganizer.h"
+
+#import "Game.h"
+#import "Metadata.h"
+#import "Fetches.h"
+#import "FolderAccess.h"
+#import "NSString+Categories.h"
+
+NSString * const kKeepGamesOrganisedKey = @"KeepGamesOrganised";
+NSString * const kOrganiseDirBookmarkKey = @"OrganiseDirBookmark";
+
+// Marker file dropped in every game folder, naming the owning game so we never
+// move a game into, or clobber, a folder that belongs to a different game.
+static NSString * const kIdentityFilename = @".spatterlightIdentity";
+
+// How many "Title", "Title 1", "Title 2"… variants to try before giving up on
+// finding a free game folder in a group.
+static const NSInteger kMaxDuplicateDirs = 20;
+
+// File paths on the default (case-insensitive) volume compare equal
+// regardless of case.
+static BOOL PathsEqual(NSString *a, NSString *b) {
+    return [a.lowercaseString isEqualToString:b.lowercaseString];
+}
+
+static NSError *OrganiserError(NSInteger code, NSString *description) {
+    return [NSError errorWithDomain:NSCocoaErrorDomain
+                               code:code
+                           userInfo:@{ NSLocalizedDescriptionKey: description }];
+}
+
+// Creates `dir` with any missing parents. YES if it exists afterwards.
+static BOOL CreateDirectory(NSURL *dir, NSError **outError) {
+    return [NSFileManager.defaultManager createDirectoryAtURL:dir
+                                  withIntermediateDirectories:YES
+                                                   attributes:nil
+                                                        error:outError] ||
+        [dir checkResourceIsReachableAndReturnError:NULL];
+}
+
+@interface LibraryOrganizer ()
+// Kept alive so a custom (security-scoped) library folder stays accessible for
+// the life of the app once resolved.
+@property (nonatomic) NSURL *accessedCustomURL;
+
+/// The library root actually in effect (custom folder if configured, else the
+/// default app-group location). Optionally creates it. Returns nil on failure.
+- (nullable NSURL *)libraryRootURLCreatingIfNeeded:(BOOL)create;
+@end
+
+@implementation LibraryOrganizer
+
++ (instancetype)sharedOrganizer {
+    static LibraryOrganizer *shared = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        shared = [[LibraryOrganizer alloc] init];
+    });
+    return shared;
+}
+
++ (BOOL)keepGamesOrganised {
+    return [NSUserDefaults.standardUserDefaults boolForKey:kKeepGamesOrganisedKey];
+}
+
+#pragma mark - Library location
+
+- (NSURL *)defaultLibraryRootURL {
+    // Store the library in the shared app-group container so the QuickLook and
+    // Thumbnailer extensions - separate sandboxed processes that share the group
+    // but each have their own private container - can reach the game files.
+    return [[FolderAccess sharedContainerURL] URLByAppendingPathComponent:@"Library" isDirectory:YES];
+}
+
+- (nullable NSURL *)customLibraryURL {
+    NSData *bookmark = [NSUserDefaults.standardUserDefaults dataForKey:kOrganiseDirBookmarkKey];
+    if (!bookmark)
+        return nil;
+
+    // Reuse the already-accessed URL if we resolved this bookmark before.
+    if (self.accessedCustomURL)
+        return self.accessedCustomURL;
+
+    BOOL stale = NO;
+    NSError *error = nil;
+    NSURL *url = [NSURL URLByResolvingBookmarkData:bookmark
+                                          options:NSURLBookmarkResolutionWithSecurityScope
+                                    relativeToURL:nil
+                              bookmarkDataIsStale:&stale
+                                            error:&error];
+    if (!url) {
+        NSLog(@"LibraryOrganizer: could not resolve custom library bookmark: %@", error);
+        return nil;
+    }
+    if (![url startAccessingSecurityScopedResource]) {
+        NSLog(@"LibraryOrganizer: could not access custom library folder %@", url.path);
+        return nil;
+    }
+    if (stale) {
+        NSData *fresh = [url bookmarkDataWithOptions:NSURLBookmarkCreationWithSecurityScope
+                      includingResourceValuesForKeys:nil
+                                       relativeToURL:nil
+                                               error:NULL];
+        if (fresh)
+            [NSUserDefaults.standardUserDefaults setObject:fresh forKey:kOrganiseDirBookmarkKey];
+    }
+    self.accessedCustomURL = url;
+    return url;
+}
+
+- (nullable NSURL *)libraryRootURLCreatingIfNeeded:(BOOL)create {
+    NSURL *root = self.customLibraryURL ?: self.defaultLibraryRootURL;
+    if (create) {
+        NSError *error = nil;
+        if (!CreateDirectory(root, &error)) {
+            NSLog(@"LibraryOrganizer: could not create library root %@: %@", root.path, error);
+            return nil;
+        }
+    }
+    return root;
+}
+
+- (BOOL)setCustomLibraryURL:(nullable NSURL *)url error:(NSError **)error {
+    NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
+
+    // Drop any access we hold to a previous custom folder.
+    if (self.accessedCustomURL) {
+        [self.accessedCustomURL stopAccessingSecurityScopedResource];
+        self.accessedCustomURL = nil;
+    }
+
+    if (!url) {
+        [defaults removeObjectForKey:kOrganiseDirBookmarkKey];
+        return YES;
+    }
+
+    NSData *bookmark = [url bookmarkDataWithOptions:NSURLBookmarkCreationWithSecurityScope
+                     includingResourceValuesForKeys:nil
+                                      relativeToURL:nil
+                                              error:error];
+    if (!bookmark)
+        return NO;
+
+    [defaults setObject:bookmark forKey:kOrganiseDirBookmarkKey];
+    return YES;
+}
+
+#pragma mark - Name and path helpers
+
+// Removes characters that are illegal or ugly in a folder name. '/' becomes ':'
+// (which the Finder displays as '/'), ':' becomes '_', control characters
+// become '?'. Ported from ZoomStoryOrganiser -sanitiseDirectoryName:.
+- (NSString *)sanitiseName:(nullable NSString *)name fallback:(NSString *)fallback {
+    NSString *trimmed = [name stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+    if (!trimmed.length)
+        return fallback;
+
+    NSMutableString *result = [NSMutableString stringWithCapacity:trimmed.length];
+    [trimmed enumerateSubstringsInRange:NSMakeRange(0, trimmed.length)
+                               options:NSStringEnumerationByComposedCharacterSequences
+                            usingBlock:^(NSString *sub, NSRange r1, NSRange r2, BOOL *stop) {
+        unichar c = [sub characterAtIndex:0];
+        if ([sub isEqualToString:@"/"])
+            [result appendString:@":"];
+        else if ([sub isEqualToString:@":"])
+            [result appendString:@"_"];
+        else if (c < ' ')
+            [result appendString:@"?"];
+        else
+            [result appendString:sub];
+    }];
+    return result.length ? result : fallback;
+}
+
+- (NSString *)groupNameForGame:(Game *)game {
+    NSString *group = game.group;
+    if (!group.length)
+        group = game.metadata.group;
+    if (group.length)
+        return [self sanitiseName:group fallback:@"Ungrouped"];
+    // No group set: file the game under a folder named after its format.
+    return [self formatGroupNameForGame:game];
+}
+
+// The group-folder name for a game with no group of its own: the game's format
+// spelled out as a proper label with " games" appended, e.g. "Z-code games" or
+// "Quest 5 games". Falls back to "Ungrouped" when the format is unknown.
+- (NSString *)formatGroupNameForGame:(Game *)game {
+    // Maps the babel format codes stored in Game.detectedFormat to the labels
+    // players see, for the formats where the code isn't already a nice name.
+    static NSDictionary<NSString *, NSString *> *labels = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        labels = @{
+            @"adrift"     : @"Adrift",
+            @"advsys"     : @"AdvSys",
+            @"agt"        : @"AGT",
+            @"alan2"      : @"Alan 2",
+            @"alan3"      : @"Alan 3",
+            @"archetype"  : @"Archetype",
+            @"comprehend" : @"Comprehend",
+            @"glulx"      : @"Glulx",
+            @"hugo"       : @"Hugo",
+            @"jacl"       : @"JACL",
+            @"level9"     : @"Level 9",
+            @"magscrolls" : @"Magnetic Scrolls",
+            @"quest4"     : @"Quest 4",
+            @"quest5"     : @"Quest 5",
+            @"quill"      : @"Quill",
+            @"sagaplus"   : @"SAGA Plus",
+            @"scott"      : @"Scott Adams",
+            @"tads2"      : @"TADS 2",
+            @"tads3"      : @"TADS 3",
+            @"taylor"     : @"Taylor",
+            @"twine"      : @"Twine",
+            @"zcode"      : @"Z-code",
+        };
+    });
+
+    NSString *format = game.detectedFormat.length ? game.detectedFormat : game.metadata.format;
+    if (!format.length)
+        return @"Ungrouped";
+    // Use the pretty label when we have one, otherwise the raw code capitalised.
+    NSString *label = labels[format] ?: format.capitalizedString;
+    return [self sanitiseName:[label stringByAppendingString:@" games"] fallback:@"Ungrouped"];
+}
+
+- (NSString *)titleNameForGame:(Game *)game {
+    NSString *title = game.metadata.title;
+    if (!title.length)
+        title = game.path.lastPathComponent.stringByDeletingPathExtension;
+    return [self sanitiseName:title fallback:@"Untitled"];
+}
+
+// The identity string written into a game folder's marker file. This is the
+// IFID where there is one, so every library entry for the same work (other
+// releases, other platforms' versions, the disks of a set) shares one folder.
+// It therefore does not identify a file: anything that could replace or move
+// a file must check the file itself, see -directory:holdsDifferentFileNamedLike:
+// and -directory:holdsOtherGamesThan:file:.
+- (nullable NSString *)identityForGame:(Game *)game {
+    if (game.ifid.length)
+        return game.ifid;
+    if (game.hashTag.length)
+        return game.hashTag;
+    return nil;
+}
+
+// The identity stored in `dir`'s marker file, or nil if it has none.
+- (nullable NSString *)storedIdentityInDirectory:(NSURL *)dir {
+    NSURL *idFile = [dir URLByAppendingPathComponent:kIdentityFilename];
+    return [NSString stringWithContentsOfURL:idFile
+                                    encoding:NSUTF8StringEncoding
+                                       error:NULL];
+}
+
+// YES if `dir` carries an identity marker naming this very game, i.e. it is a
+// game folder the organiser created for `game`. The library root, group
+// folders and the user's own folders never carry a marker.
+- (BOOL)directory:(NSURL *)dir isOwnedByGame:(Game *)game {
+    NSString *stored = [self storedIdentityInDirectory:dir];
+    if (!stored.length)
+        return NO;                // someone else's (or an unmarked) folder
+    NSString *mine = [self identityForGame:game];
+    return mine.length && [stored isEqualToString:mine];
+}
+
+// YES if `dir` already holds a file with the name of `sourceURL` that is a
+// different game file. The identity marker is the game's IFID, which other
+// releases and other platforms' versions of the same work share, so they
+// share a game folder too. That is fine as long as their files have different
+// names. When the names clash, the marker cannot tell the two apart, but the
+// file signature (what the library itself knows a game by) can.
+- (BOOL)directory:(NSURL *)dir holdsDifferentFileNamedLike:(NSURL *)sourceURL {
+    NSURL *existing = [dir URLByAppendingPathComponent:sourceURL.lastPathComponent].URLByStandardizingPath;
+    if (![existing checkResourceIsReachableAndReturnError:NULL])
+        return NO;
+    if (PathsEqual(existing.path, sourceURL.path))
+        return NO;                // the game's own file
+    NSString *theirs = existing.path.signatureFromFile;
+    NSString *mine = sourceURL.path.signatureFromFile;
+    if (theirs.length && mine.length)
+        return ![theirs isEqualToString:mine];
+    // Too small for a signature: compare byte for byte.
+    return ![NSFileManager.defaultManager contentsEqualAtPath:existing.path
+                                                      andPath:sourceURL.path];
+}
+
+// YES if `dir` is free to use for `game`, whose file is `sourceURL`: it either
+// does not exist yet, or it exists, its identity marker names this same game
+// and putting the game file there would not replace a different one.
+- (BOOL)directory:(NSURL *)dir isAvailableForGame:(Game *)game file:(NSURL *)sourceURL {
+    NSFileManager *fm = NSFileManager.defaultManager;
+    BOOL isDir = NO;
+    if (![fm fileExistsAtPath:dir.path isDirectory:&isDir])
+        return YES;               // does not exist: free to create
+    if (!isDir)
+        return NO;                // a file is in the way
+
+    return [self directory:dir isOwnedByGame:game] &&
+        ![self directory:dir holdsDifferentFileNamedLike:sourceURL];
+}
+
+- (void)writeIdentityForGame:(Game *)game inDirectory:(NSURL *)dir {
+    NSString *identity = [self identityForGame:game];
+    if (!identity.length)
+        return;
+    NSURL *idFile = [dir URLByAppendingPathComponent:kIdentityFilename];
+    [identity writeToURL:idFile atomically:YES encoding:NSUTF8StringEncoding error:NULL];
+}
+
+// Finds (and, if `create`, creates) the game folder for `game` under `root`,
+// i.e. <root>/<group>/<title>, disambiguating with "Title 1" etc. when a
+// different game already owns the plain name, or when a different file with
+// the name of the game file `sourceURL` is already in it.
+- (nullable NSURL *)gameDirectoryForGame:(Game *)game
+                                    file:(NSURL *)sourceURL
+                               underRoot:(NSURL *)root
+                                  create:(BOOL)create {
+    NSString *group = [self groupNameForGame:game];
+    NSString *title = [self titleNameForGame:game];
+
+    NSURL *groupDir = [root URLByAppendingPathComponent:group isDirectory:YES];
+    if (create && !CreateDirectory(groupDir, NULL))
+        return nil;
+
+    for (NSInteger n = 0; n < kMaxDuplicateDirs; n++) {
+        NSString *name = n == 0 ? title : [NSString stringWithFormat:@"%@ %ld", title, (long)n];
+        NSURL *candidate = [groupDir URLByAppendingPathComponent:name isDirectory:YES];
+        if ([self directory:candidate isAvailableForGame:game file:sourceURL]) {
+            if (create && !CreateDirectory(candidate, NULL))
+                return nil;
+            return candidate;
+        }
+    }
+    return nil;
+}
+
+- (BOOL)url:(NSURL *)url isInsideRoot:(NSURL *)root {
+    NSString *rootPath = root.URLByStandardizingPath.path;
+    if (![rootPath hasSuffix:@"/"])
+        rootPath = [rootPath stringByAppendingString:@"/"];
+    NSString *path = url.URLByStandardizingPath.path;
+    return [path.lowercaseString hasPrefix:rootPath.lowercaseString];
+}
+
+#pragma mark - Organising a single game
+
+- (BOOL)organiseGame:(Game *)game error:(NSError **)outError {
+    NSFileManager *fm = NSFileManager.defaultManager;
+
+    NSString *sourcePath = game.path;
+    if (!sourcePath.length || ![fm fileExistsAtPath:sourcePath]) {
+        // Fall back to resolving the stored bookmark.
+        sourcePath = game.urlForBookmark.path;
+    }
+    if (!sourcePath.length || ![fm fileExistsAtPath:sourcePath]) {
+        if (outError)
+            *outError = OrganiserError(NSFileNoSuchFileError, @"The game file could not be found.");
+        return NO;
+    }
+
+    NSURL *sourceURL = [NSURL fileURLWithPath:sourcePath isDirectory:NO].URLByStandardizingPath;
+
+    NSURL *root = [self libraryRootURLCreatingIfNeeded:YES];
+    if (!root) {
+        if (outError)
+            *outError = OrganiserError(NSFileWriteUnknownError, @"The library folder could not be created.");
+        return NO;
+    }
+
+    NSURL *destDir = [self gameDirectoryForGame:game file:sourceURL underRoot:root create:YES];
+    if (!destDir) {
+        if (outError)
+            *outError = OrganiserError(NSFileWriteUnknownError, @"No free folder for this game in the library.");
+        return NO;
+    }
+
+    NSURL *destFile = [destDir URLByAppendingPathComponent:sourceURL.lastPathComponent].URLByStandardizingPath;
+
+    // Already where it belongs.
+    if (PathsEqual(destFile.path, sourceURL.path)) {
+        [self recordGroupAndIdentityOfGame:game inDirectory:destDir];
+        return YES;
+    }
+
+    NSURL *sourceDir = sourceURL.URLByDeletingLastPathComponent;
+
+    // Emptying and removing the source folder is only safe when it is a game
+    // folder the organiser created for this very game: it must carry this
+    // game's identity marker, and the destination must not be nested inside
+    // it. A game sitting loose in the library root (e.g. when the user points
+    // the library at a folder that already holds their games) fails this test
+    // and takes the copying path below, which never touches the originals.
+    BOOL sourceIsOwnGameDir = [self url:sourceURL isInsideRoot:root] &&
+        !PathsEqual(sourceDir.path, destDir.path) &&
+        ![self url:destDir isInsideRoot:sourceDir] &&
+        [self directory:sourceDir isOwnedByGame:game];
+
+    if (sourceIsOwnGameDir) {
+        // Reorganisation within the library: move the game and its companion
+        // files out of the old game folder into the new one. When other
+        // library entries with the same IFID keep their files in the old
+        // folder, only this game's own files move, and the folder (it is not
+        // empty, so it survives below) stays behind for the others.
+        BOOL shared = [self directory:sourceDir holdsOtherGamesThan:game file:sourceURL];
+        NSArray<NSURL *> *contents =
+        [fm contentsOfDirectoryAtURL:sourceDir
+          includingPropertiesForKeys:nil
+                             options:0
+                               error:NULL];
+        for (NSURL *item in contents) {
+            if (shared && ![self file:item belongsWithGameFile:sourceURL])
+                continue;
+            NSURL *target = [destDir URLByAppendingPathComponent:item.lastPathComponent];
+            if ([target checkResourceIsReachableAndReturnError:NULL] &&
+                ![fm removeItemAtURL:target error:NULL])
+                continue;
+            if (![fm moveItemAtURL:item toURL:target error:outError] &&
+                PathsEqual(item.path, sourceURL.path))
+                return NO;
+        }
+        // Remove the old folder, but only once it is verifiably empty:
+        // removeItemAtURL: deletes recursively, so it must never see a folder
+        // that still has anything in it.
+        NSArray<NSURL *> *remaining =
+        [fm contentsOfDirectoryAtURL:sourceDir
+          includingPropertiesForKeys:nil
+                             options:0
+                               error:NULL];
+        if (remaining && remaining.count == 0)
+            [fm removeItemAtURL:sourceDir error:NULL];
+    } else {
+        // Anything else: copy the game file and any sibling files that share
+        // its name (companion data files, cover art, etc.), leaving the
+        // originals in place.
+        if (![self copyGameFileAndSiblings:sourceURL intoDirectory:destDir error:outError])
+            return NO;
+    }
+
+    [self recordGroupAndIdentityOfGame:game inDirectory:destDir];
+    [game bookmarkForPath:destFile.path];
+    return YES;
+}
+
+/// Record the named group folder the game landed in, so a format-derived
+/// group like "Z-code games" becomes a real group on the game itself. A game
+/// filed under "Ungrouped" (unknown format / no usable name) keeps no group.
+/// Also (re)writes the folder's identity marker.
+- (void)recordGroupAndIdentityOfGame:(Game *)game inDirectory:(NSURL *)destDir {
+    NSString *groupName = [self groupNameForGame:game];
+    if (![groupName isEqualToString:@"Ungrouped"] &&
+        ![game.group isEqualToString:groupName])
+        game.group = groupName;
+
+    [self writeIdentityForGame:game inDirectory:destDir];
+}
+
+// The "disk set" key for a multi-disk game file, or nil if the name does not
+// look like one disk of a numbered set. Multi-disk disk-image games (e.g. the
+// Apple II Infocom titles) are split across files that share a name but for a
+// disk number following a "side"/"disk"/… word, such as "Zork Zero side 1.woz"
+// … "Zork Zero side 4.woz". The interpreters find the other sides by swapping
+// that digit (see terps/bocfel/z6/extract_apple_2.cpp), so we must keep the
+// whole set together. Replacing the digits with '#' yields a key shared by
+// every disk in the set. The keyword guard keeps genuinely different games
+// that merely carry a number (e.g. "Zork 1" vs "Zork 2") from being grouped.
+- (nullable NSString *)diskSetKeyForFilename:(NSString *)filename {
+    static NSRegularExpression *regex = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        regex = [NSRegularExpression
+                 regularExpressionWithPattern:@"^(.*(?:side|disk|disc|part)[ _]*)[0-9]+(.*)$"
+                                      options:NSRegularExpressionCaseInsensitive
+                                        error:NULL];
+    });
+    NSString *lower = filename.lowercaseString;
+    NSTextCheckingResult *match =
+    [regex firstMatchInString:lower options:0 range:NSMakeRange(0, lower.length)];
+    if (!match)
+        return nil;
+    NSString *prefix = [lower substringWithRange:[match rangeAtIndex:1]];
+    NSString *suffix = [lower substringWithRange:[match rangeAtIndex:2]];
+    return [NSString stringWithFormat:@"%@#%@", prefix, suffix];
+}
+
+// YES if `item` is the game file `sourceURL` itself or a file that belongs to
+// the same game: one that shares the main file's name without extension
+// (AGT's .d$$ plus .da1, .da2 …; companion data files; cover art) or another
+// disk of the same numbered set (multi-disk .woz/.dsk games such as
+// "Zork Zero side 1…4.woz").
+- (BOOL)file:(NSURL *)item belongsWithGameFile:(NSURL *)sourceURL {
+    NSString *name = item.lastPathComponent;
+    NSString *mainName = sourceURL.lastPathComponent;
+    if (PathsEqual(name.stringByDeletingPathExtension, mainName.stringByDeletingPathExtension))
+        return YES;               // also covers the main file itself
+    NSString *diskSetKey = [self diskSetKeyForFilename:mainName];
+    return diskSetKey && [diskSetKey isEqualToString:[self diskSetKeyForFilename:name]];
+}
+
+// YES if another library entry keeps its file directly in `dir`, and that
+// file is not one of those that belong with the game file `sourceURL` (the
+// disks of one set are entries of their own, but always travel together).
+- (BOOL)directory:(NSURL *)dir holdsOtherGamesThan:(Game *)game file:(NSURL *)sourceURL {
+    NSManagedObjectContext *context = game.managedObjectContext;
+    if (!context)
+        return NO;
+    NSString *dirPath = dir.URLByStandardizingPath.path;
+    NSFetchRequest *request = [Game fetchRequest];
+    request.predicate = [NSPredicate predicateWithFormat:@"path BEGINSWITH[c] %@",
+                         [dirPath stringByAppendingString:@"/"]];
+    for (Game *other in [context executeFetchRequest:request error:NULL]) {
+        if (other == game || other.isDeleted)
+            continue;
+        NSURL *otherURL = [NSURL fileURLWithPath:other.path isDirectory:NO].URLByStandardizingPath;
+        if (!PathsEqual(otherURL.URLByDeletingLastPathComponent.path, dirPath))
+            continue;             // in a subfolder
+        if (![self file:otherURL belongsWithGameFile:sourceURL])
+            return YES;
+    }
+    return NO;
+}
+
+// Copies `sourceURL` and every file in its folder that belongs to the same
+// game (see -file:belongsWithGameFile:) into `destDir`.
+- (BOOL)copyGameFileAndSiblings:(NSURL *)sourceURL
+                  intoDirectory:(NSURL *)destDir
+                          error:(NSError **)outError {
+    NSFileManager *fm = NSFileManager.defaultManager;
+    NSURL *sourceDir = sourceURL.URLByDeletingLastPathComponent;
+
+    NSArray<NSURL *> *contents =
+    [fm contentsOfDirectoryAtURL:sourceDir
+      includingPropertiesForKeys:@[ NSURLIsDirectoryKey ]
+                         options:NSDirectoryEnumerationSkipsHiddenFiles
+                           error:NULL];
+
+    BOOL copiedMain = NO;
+    for (NSURL *item in contents) {
+        NSNumber *isDir = nil;
+        [item getResourceValue:&isDir forKey:NSURLIsDirectoryKey error:NULL];
+        if (isDir.boolValue)
+            continue;
+        BOOL isMain = PathsEqual(item.path, sourceURL.path);
+        if (!isMain && ![self file:item belongsWithGameFile:sourceURL])
+            continue;
+
+        NSURL *target = [destDir URLByAppendingPathComponent:item.lastPathComponent];
+        if ([target checkResourceIsReachableAndReturnError:NULL])
+            [fm removeItemAtURL:target error:NULL];
+
+        NSError *copyError = nil;
+        if ([fm copyItemAtURL:item toURL:target error:&copyError]) {
+            if (isMain)
+                copiedMain = YES;
+        } else if (isMain) {
+            if (outError)
+                *outError = copyError;
+            return NO;
+        }
+    }
+
+    if (!copiedMain) {
+        // The stem loop should always cover the main file, but make sure.
+        NSURL *target = [destDir URLByAppendingPathComponent:sourceURL.lastPathComponent];
+        if (![target checkResourceIsReachableAndReturnError:NULL] &&
+            ![fm copyItemAtURL:sourceURL toURL:target error:outError])
+            return NO;
+    }
+    return YES;
+}
+
+#pragma mark - Re-organise on rename
+
+- (void)reorganiseGame:(Game *)game {
+    if (![LibraryOrganizer keepGamesOrganised])
+        return;
+    NSURL *root = [self libraryRootURLCreatingIfNeeded:NO];
+    if (!root || !game.path.length)
+        return;
+    NSURL *current = [NSURL fileURLWithPath:game.path isDirectory:NO];
+    // Only touch games that already live inside the library.
+    if (![self url:current isInsideRoot:root])
+        return;
+    NSError *error = nil;
+    if (![self organiseGame:game error:&error])
+        NSLog(@"LibraryOrganizer: reorganiseGame failed: %@", error.localizedDescription);
+}
+
+#pragma mark - Identity change
+
+- (void)updateIdentityMarkerForGame:(Game *)game previousIdentity:(NSString *)oldIdentity {
+    if (!oldIdentity.length || !game.path.length)
+        return;
+    NSURL *root = [self libraryRootURLCreatingIfNeeded:NO];
+    NSURL *current = [NSURL fileURLWithPath:game.path isDirectory:NO];
+    if (!root || ![self url:current isInsideRoot:root])
+        return;
+    NSURL *dir = current.URLByDeletingLastPathComponent;
+    if ([[self storedIdentityInDirectory:dir] isEqualToString:oldIdentity])
+        [self writeIdentityForGame:game inDirectory:dir];
+}
+
+#pragma mark - Organise everything
+
+- (void)organiseAllGamesInContext:(NSManagedObjectContext *)context
+                       completion:(nullable void (^)(NSUInteger))completion {
+    [context performBlock:^{
+        NSArray<Game *> *games =
+        [Fetches fetchObjects:@"Game" predicate:@"hidden == NO" inContext:context];
+
+        NSUInteger organised = 0;
+        for (Game *game in games) {
+            NSURL *source = game.urlForBookmark;
+            if (!source)
+                continue;
+
+            // Grant read access to the source folder (a no-op / nil for files
+            // that already live in our container, which are readable anyway).
+            NSURL *granted = [FolderAccess grantAccessToFile:source];
+
+            NSError *error = nil;
+            if ([self organiseGame:game error:&error])
+                organised++;
+            else if (error)
+                NSLog(@"LibraryOrganizer: could not organise \"%@\": %@",
+                      game.metadata.title, error.localizedDescription);
+
+            if (granted)
+                [FolderAccess releaseBookmark:granted];
+        }
+
+        NSError *saveError = nil;
+        if (context.hasChanges && ![context save:&saveError])
+            NSLog(@"LibraryOrganizer: save failed: %@", saveError);
+
+        if (completion) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                completion(organised);
+            });
+        }
+    }];
+}
+
+@end

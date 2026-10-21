@@ -121,8 +121,9 @@ public:
     CVmDateLocale(VMG0_)
     {
         /* get the state Vector from the Date static class state holder */
-        const vm_val_t *val = vm_classobj_for(CVmObjDate)->get_class_state();
-        vecid = val->typ == VM_OBJ ? val->val.obj : VM_INVALID_OBJ;
+        CVmObjClass *classobj = vm_classobj_for(CVmObjDate);
+        const vm_val_t *val = classobj != 0 ? classobj->get_class_state() : 0;
+        vecid = val != 0 && val->typ == VM_OBJ ? val->val.obj : VM_INVALID_OBJ;
         vec = vm_objid_cast(CVmObjVector, vecid);
     }
 
@@ -498,7 +499,33 @@ struct date_parse_result
 
     date_parse_result(date_parse_result &src)
     {
-        memcpy(this, &src, sizeof(*this));
+        cal = src.cal;
+        era = src.era;
+        yy = src.yy;
+        mm = src.mm;
+        dd = src.dd;
+        w = src.w;
+        yy_needs_century = src.yy_needs_century;
+        ampm = src.ampm;
+        hh = src.hh;
+        mi = src.mi;
+        ss = src.ss;
+        ms = src.ms;
+        tz = src.tz;
+        tzofs = src.tzofs;
+        pera = src.pera;
+        pyy = src.pyy;
+        pmm = src.pmm;
+        pdd = src.pdd;
+        pdoy = src.pdoy;
+        pw = src.pw;
+        pampm = src.pampm;
+        phh = src.phh;
+        pmi = src.pmi;
+        pss = src.pss;
+        pms = src.pms;
+        punix = src.punix;
+        ptz = src.ptz;
     }
 
     /* translate a time from local to UTC using our parsed timezone info */
@@ -2149,7 +2176,7 @@ int CVmObjDate::parse_date_string(
 
     /* copy back the results if the caller's interested */
     if (resultp != 0)
-        memcpy(resultp, &result, sizeof(result));
+        *resultp = result;
 
     /* tell the caller how many format strings we matched, if desired */
     if (nfmtlist != 0)

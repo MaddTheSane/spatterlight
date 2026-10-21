@@ -1,0 +1,147 @@
+D E T E C T I V E
+Por Scott Greig y Mauricio Díaz
+
+ 1. Juego Básico
+
+ 2. Juego Personalizado
+
+ 3. Revisar Instrucciones
+
+Basado en el juego de 1983 por Eric N. Miller.  Realizado con permiso del autor.
+Imagen por Sam Kabo Ashwell.
+> 1
+
+> 1
+
+MODO DE JUEGO
+1: Clásico - Comandos de Texto
+2: Moderno - Hipervínculos
+> 1
+Es una noche oscura y tormentosa.
+
+Un crimen está siendo cometido...
+Elise Seaton fue víctima de un brutal asesinato hace tan solo unas horas.  El cuerpo fue removido de la escena del crimen por personas desconocidas.  Ahora estás de pie en la puerta delantera de la mansión Seaton. La puerta está abierta.
+
+El Pórtico
+
+Estás de pie en el pórtico.  Está cayendo una fuerte tormenta aquí afuera.  Puedes entrar a la mansión al norte.
+
+> n
+
+> n
+
+El Pasillo Principal
+
+Estás caminando por el pasillo principal.  Las paredes están cubiertas con una variedad de pinturas antiguas.  Hay algunos escalones que se dirigen arriba al 2do Piso.  Una entrada al oeste conduce a la sala de estar.  Puedes ver la entrada al conservatorio al este.  El pasillo continua al norte y la puerta de entrada está al sur.
+
+> n
+
+> n
+
+El Pasillo Principal
+
+Estás caminando por el pasillo principal.  Las paredes están cubiertas con una variedad de pinturas antiguas.   Una entrada al oeste conduce al comedor.  La puerta al este lleva a la cocina.  El pasillo continua al sur.
+
+> o
+
+> o
+
+El Comedor
+
+Ahora estás en el comedor.  Una larga mesa de roble domina la sala. Un juego de utensilios está colocado en una mesa más pequeña en una esquina de la habitación.  Puedes salir al este.
+ Una congelada codorniz se está descongelando sobre la mesa. Una lupa yace sobre el piso.
+> coger lupa
+
+> coger lupa
+
+Ahora llevas la lupa.
+> ver con lupa codorniz
+
+> ver con lupa codorniz
+
+Tiene rastros de sangre! Esta debe ser el arma homicida!!
+
+Con la lupa logras ver unas huellas dactilares: (((O))).
+> coger codorniz
+
+> coger codorniz
+
+Ahora llevas la codorniz.
+> e
+
+> e
+
+El Pasillo Principal
+
+Estás caminando por el pasillo principal.  Las paredes están cubiertas con una variedad de pinturas antiguas.   Una entrada al oeste conduce al comedor.  La puerta al este lleva a la cocina.  El pasillo continua al sur.
+
+¡El asesino ahora te está acechando!
+> s
+
+> s
+
+El Pasillo Principal
+
+Estás caminando por el pasillo principal.  Las paredes están cubiertas con una variedad de pinturas antiguas.  Hay algunos escalones que se dirigen arriba al 2do Piso.  Una entrada al oeste conduce a la sala de estar.  Puedes ver la entrada al conservatorio al este.  El pasillo continua al norte y la puerta de entrada está al sur.
+
+Edward Crawford estaba mirando las pinturas con nostalgia.
+
+> arriba
+
+> arriba
+
+El Pasillo Superior
+
+Estás caminando por el pasillo de arriba.  Discretos murales de seda ornamental decoran las paredes. Hay aquí algunos escalones que se dirigen abajo al 1er piso.  La puerta oeste conduce al cuarto de huéspedes.  La puerta este lleva al estudio.  El pasillo continua al norte.
+
+John Winston inclina la cabeza al pasar, para saludarte.
+
+ ¡Oyes unos tenebrosos pasos muy cerca de tí!
+> n
+
+> n
+
+El Pasillo Superior
+
+Estás caminando por el pasillo de arriba.  Discretos murales de seda ornamental decoran las paredes.  Una puerta al oeste conduce a la biblioteca.  El pasillo continua al norte y sur.
+
+Lizbeth Slocombe se detiene brevemente a saludarte.
+
+ ¡Oyes unos tenebrosos pasos muy cerca de tí!
+> n
+
+> n
+
+El Pasillo Superior
+
+Estás caminando por el pasillo de arriba.  Discretos murales de seda ornamental decoran las paredes.  Puedes ver la entrada al baño al oeste y la entrada al dormitorio principal al este.  El pasillo continua al sur.
+
+Vanessa Werner te pasa adelante con gran prisa.
+
+ ¡Oyes unos tenebrosos pasos muy cerca de tí!
+> o
+
+> o
+
+El Baño Principal
+
+Estás de pie en el baño principal.  accesorios en mármol adornan la habitación.  La salida está al este.
+ Un peine de plata yace sobre el tocador.
+> reune
+
+> reune
+
+Los sospechosos se agrupan en la habitación y toman asiento. Te miran expectantes, esperando escuchar tu deducción.  Ahora la puerta está cerrada.
+
+Puedes ver a  Edward Crawford, John Winston, Wayne Donleavy, Esther Malone, Lizbeth Slocombe y Vanessa Werner.
+
+> acusa a Lizbeth
+
+> acusa a Lizbeth
+
+Lizbeth Slocombe se vuelve hacia ti, en estado de shock.  "¿Cómo es que llegó a sospechar de mí?  Claro, yo maté a Elise, y justo aquí en esta habitación.  Como se las arregló para averiguarlo, ¡nunca lo sabré!"
+
+Se cierra el caso después de 14 movidas.  Tu rango ahora es Detective Profesional.
+
+¡HAS GANADO!!!
+[state=Finished]

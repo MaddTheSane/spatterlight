@@ -1,0 +1,263 @@
+/* vi: set ts=8:
+ *
+ * Copyright (C) 2026  Petter Sjölund
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+ *
+ * Headless ADRIFT 4 map renderer: loads a .taf, optionally plays a command
+ * script (to build up the visited set), then lays the rooms out the way the
+ * ADRIFT 4 runner would and rasterises the map to a PPM.  Lets the layout be
+ * eyeballed and diffed without the Glk layer -- the v4 counterpart of
+ * a5map_dump.
+ *
+ *   ./scmap_dump <game.taf> [script.txt] [-o out.ppm] [-w W] [-h H] [-all]
+ *                [-grid] [-zoom N] [-chrome]
+ *
+ *   -all      mark every room seen (whole-map view, for development)
+ *   -grid     print the grid as ASCII, the way Form29.display_grid did
+ *   -zoom N   pin the map scale (pixels per map unit); default auto-fits
+ *   -chrome   draw the pan/zoom buttons, as the Glk frontend does
+ *   -bg/-fg   the host text style the palette is built from, RRGGBB hex
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "core/scarier.h"
+#include "core/scprotos.h"
+#include "core/scmap.h"
+#include "../../map_ppm.h"
+
+static FILE *g_script = nullptr;
+static int g_reveal_all = 0;
+static scr_gameref_t g_game = nullptr;
+static const char *g_out = "scmap.ppm";
+static int g_width = 480, g_height = 480, g_grid = 0;
+/* -bg/-fg stand in for the host's text style, which the Glk frontend measures
+   off the story window. */
+static long g_bg = -1, g_fg = -1;
+static int g_zoom = 0;          /* 0 = auto-fit; else pin map_frame scale */
+static int g_chrome = 0;        /* draw the pan/zoom buttons */
+
+static void draw_and_exit (void);
+
+/* --- the os layer, such as it is ----------------------------------------
+   The do-nothing stubs live in harness_os_stubs.cpp; os_read_line is ours. */
+
+/*
+ * Feed the script; when it runs out, draw the map and stop.
+ *
+ * Drawing from here, rather than after scr_interpret_game() returns, is what
+ * makes this reliable: there is no way to make the interpreter's read loop give
+ * up (it re-asks until it gets a line, scinterf.c if_read_line_common), and
+ * QUIT is not a way out either -- a game is free to define a task of its own
+ * that matches "quit" and swallows it, and some do, whereupon the harness would
+ * sit there feeding QUIT for ever.  At this point the game state is exactly
+ * what the script left it as, which is what we want to map.
+ */
+scr_bool
+os_read_line (scr_char *buffer, scr_int length)
+{
+  char line[1024];
+
+  if (g_script != nullptr)
+    {
+      while (fgets (line, sizeof line, g_script) != nullptr)
+        {
+          char *nl = strchr (line, '\n');
+          if (nl != nullptr)
+            *nl = '\0';
+          if (line[0] == '\0' || line[0] == '#')
+            continue;
+          snprintf ((char *) buffer, (size_t) length, "%s", line);
+          return TRUE;
+        }
+    }
+  draw_and_exit ();
+  return FALSE;                 /* not reached */
+}
+
+/* --- the map ------------------------------------------------------------ */
+
+/* -all: pretend the player has been everywhere. */
+static int
+cb_seen_all (void *ctx, const char *lockey)
+{
+  (void) ctx; (void) lockey;
+  return 1;
+}
+
+static void
+print_grid (const map_t *map, const map_view_t *view)
+{
+  const map_page_t *page;
+  int i, minx = 0, miny = 0, maxx = 0, maxy = 0, first = 1, x, y;
+
+  if (map == nullptr || map->n_pages == 0)
+    return;
+  page = &map->pages[0];
+
+  for (i = 0; i < page->n_nodes; i++)
+    {
+      const map_node_t *n = &page->nodes[i];
+      if (first)
+        { minx = maxx = n->x; miny = maxy = n->y; first = 0; }
+      if (n->x < minx) minx = n->x;
+      if (n->x > maxx) maxx = n->x;
+      if (n->y < miny) miny = n->y;
+      if (n->y > maxy) maxy = n->y;
+    }
+  if (first)
+    return;
+
+  /* Nodes are spaced 1.5 boxes apart; step by that to walk grid cells. */
+  for (y = miny; y <= maxy; y += MAP_NODE_H * 3 / 2)
+    {
+      for (x = minx; x <= maxx; x += MAP_NODE_W * 3 / 2)
+        {
+          const map_node_t *hit = nullptr;
+          for (i = 0; i < page->n_nodes; i++)
+            if (page->nodes[i].x == x && page->nodes[i].y == y)
+              { hit = &page->nodes[i]; break; }
+          if (hit == nullptr)
+            printf (" . ");
+          else if (view->seen (view->ctx, hit->key))
+            printf ("%2s ", hit->key);
+          else
+            printf ("(%s)", hit->key);
+        }
+      printf ("\n");
+    }
+}
+
+static void
+draw_and_exit (void)
+{
+  map_surface_t *surf;
+  map_camera_t cam = { 0 };
+  map_chrome_t chrome;
+  map_view_t view;
+  map_t *map;
+  char player[16];
+
+  scmap_view (g_game, &view);
+  if (g_reveal_all)
+    view.seen = cb_seen_all;
+
+  map = scmap_build (g_game, &view);
+  if (map == nullptr)
+    {
+      int why = scmap_failed ();
+      fprintf (stderr, "nothing to draw (%s)\n",
+               why == 1 ? "layout ran off the grid"
+               : why == 2 ? "layout stuck"
+               : why == 3 ? "layout made too many shifts"
+               : !scmap_available (g_game)
+                 ? "no rooms, or the author turned the map off"
+                 : "the player is in a room hidden from the map");
+      exit (1);
+    }
+
+  snprintf (player, sizeof player, "%ld", (long) gs_playerroom (g_game));
+  fprintf (stderr, "rooms=%d placed=%d player=%s\n",
+           (int) gs_room_count (g_game), map->pages[0].n_nodes, player);
+  if (g_grid)
+    print_grid (map, &view);
+
+  if (g_bg >= 0 || g_fg >= 0)
+    map_set_palette ((unsigned int) (g_bg >= 0 ? g_bg : 0xFFFFFF),
+                     (unsigned int) (g_fg >= 0 ? g_fg : 0x000000));
+  surf = map_surface_new (g_width, g_height);
+  cam.chrome_h = g_chrome ? MAP_CHROME_H : 0;
+  map_frame (map, &view, player, surf, g_zoom, 1, &cam, &chrome);
+  map_render (map, &view, player, &cam, surf);
+  if (g_chrome)
+    map_chrome_draw (surf, &chrome);
+  fprintf (stderr, "scale=%d\n", cam.scale);
+
+  if (!map_write_ppm (surf, g_out))
+    {
+      fprintf (stderr, "%s: cannot write\n", g_out);
+      exit (1);
+    }
+  fprintf (stderr, "wrote %s (%dx%d)\n", g_out, g_width, g_height);
+
+  map_surface_free (surf);
+  map_free (map);
+  exit (0);
+}
+
+int
+main (int argc, char **argv)
+{
+  scr_game g0;
+  const char *script = nullptr;
+  int i;
+
+  if (argc < 2)
+    {
+      fprintf (stderr, "usage: %s <game.taf> [script] [-o out.ppm] [-w W]"
+               " [-h H] [-all] [-grid] [-zoom N] [-chrome]\n"
+               "       [-bg RRGGBB] [-fg RRGGBB]\n", argv[0]);
+      return 1;
+    }
+  for (i = 2; i < argc; i++)
+    {
+      if (strcmp (argv[i], "-o") == 0 && i + 1 < argc)
+        g_out = argv[++i];
+      else if (strcmp (argv[i], "-w") == 0 && i + 1 < argc)
+        g_width = atoi (argv[++i]);
+      else if (strcmp (argv[i], "-h") == 0 && i + 1 < argc)
+        g_height = atoi (argv[++i]);
+      else if (strcmp (argv[i], "-all") == 0)
+        g_reveal_all = 1;
+      else if (strcmp (argv[i], "-grid") == 0)
+        g_grid = 1;
+      else if (strcmp (argv[i], "-zoom") == 0 && i + 1 < argc)
+        g_zoom = atoi (argv[++i]);
+      else if (strcmp (argv[i], "-chrome") == 0)
+        g_chrome = 1;
+      else if (strcmp (argv[i], "-bg") == 0 && i + 1 < argc)
+        g_bg = strtol (argv[++i], nullptr, 16);
+      else if (strcmp (argv[i], "-fg") == 0 && i + 1 < argc)
+        g_fg = strtol (argv[++i], nullptr, 16);
+      else if (argv[i][0] != '-')
+        script = argv[i];
+    }
+
+  g0 = scr_game_from_filename (argv[1]);
+  if (g0 == nullptr)
+    {
+      fprintf (stderr, "%s: could not load\n", argv[1]);
+      return 1;
+    }
+  g_game = (scr_gameref_t) g0;
+
+  if (script != nullptr)
+    {
+      g_script = fopen (script, "r");
+      if (g_script == nullptr)
+        {
+          fprintf (stderr, "%s: cannot open\n", script);
+          return 1;
+        }
+    }
+
+  /* Runs until the script is exhausted, at which point os_read_line draws the
+     map and exits. */
+  scr_interpret_game (g0);
+  return 0;
+}

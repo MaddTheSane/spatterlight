@@ -1,0 +1,800 @@
+Female Villager leaves.
+> drink from bottle
+
+> drink from bottle
+Please choose which 'bottle' you mean:
+1: Bottle
+2: Bottle
+> 1
+ Health increased by 5%.
+You take a drink from it, and feel instantly a little better.
+> drink from bottle
+
+> drink from bottle
+Please choose which 'bottle' you mean:
+1: Bottle
+2: Bottle
+> 1
+ Health increased by 5%.
+You take a drink from it, and feel instantly a little better.
+> drink from bottle
+
+> drink from bottle
+Please choose which 'bottle' you mean:
+1: Bottle
+2: Bottle
+> 1
+ Health increased by 5%.
+You take a drink from it, and feel instantly a little better.
+Cat leaves.
+> drink from bottle
+
+> drink from bottle
+Please choose which 'bottle' you mean:
+1: Bottle
+2: Bottle
+> 1
+ Health increased by 5%.
+You take a drink from it, and feel instantly a little better.
+> drink from bottle
+
+> drink from bottle
+Please choose which 'bottle' you mean:
+1: Bottle
+2: Bottle
+> 1
+ Health increased by 5%.
+ You have reached max health.
+You take a drink from it, and feel instantly a little better.
+> fill bottle
+
+> fill bottle
+Please choose which 'bottle' you mean:
+1: Bottle
+2: Bottle
+> 1
+You fill it.
+> in
+
+> in
+
+You are in a Shrine.
+You can see a Statue of the beloved King, a blue medallion, an orange medallion, an orange, a purple medallion, a green medallion, a yellow medallion, a red medallion and a silver medallion.
+You can go out, down or in the Pillar Room.
+This is the Shrine of the beloved King. The room is hexagon-shaped, with a white marble statue of the beloved King sitting on a pedestal against the wall opposite the door. On the floor, there is a design of an old-fashioned, eight-point compass rose. There is a shabby, rusted lever on the left side of the room.
+> in
+
+> in
+You climb down the ladder into the Pillar Room.
+
+You are in a Dungeon Room.
+You can see a Stone Pillar (on which there is a Faith Stone), a Stone Pillar (on which there is a Loyalty Stone), a Stone Pillar (on which there is a Strength Stone), a Stone Pillar (on which there is a Justice Stone), a Stone Pillar (on which there is a Wisdom Stone), a Stone Pillar (on which there is a Patience Stone), a Stone Pillar (on which there is a Tolerance Stone), a Stone Pillar (on which there is a Courage Stone) and a Metal Chest.
+You can go west, east or up.
+This is a medium-sized room that is mostly circular, around the center of the room, in a circle, stand eight stone pillars.
+> east
+
+> east
+
+You are in a Dungeon Room.
+You can see a Dragon's Treasure and a beguiling giant cave dragon.
+You can go west.
+A dungeon room.
+Beguiling giant cave dragon attacks you and misses...
+Player Health: 110
+> attack beguiling giant cave dragon
+
+> attack beguiling giant cave dragon
+You swing wildly at the beguiling giant cave dragon and miss...
+Player Health: 110
+Beguiling giant cave dragon attacks you and misses...
+Player Health: 110
+> attack beguiling giant cave dragon
+
+> attack beguiling giant cave dragon
+You swing wildly at the beguiling giant cave dragon and miss...
+Player Health: 110
+Your ice stone helps to protect your items from the heat of the dragon's fire.
+The flames from the beguiling giant cave dragon scorch your skin. Health: -13%.
+Beguiling giant cave dragon attacks you and misses...
+Player Health: 97
+> west
+
+> west
+
+You are in a Dungeon Room.
+You can see a Stone Pillar (on which there is a Faith Stone), a Stone Pillar (on which there is a Loyalty Stone), a Stone Pillar (on which there is a Strength Stone), a Stone Pillar (on which there is a Justice Stone), a Stone Pillar (on which there is a Wisdom Stone), a Stone Pillar (on which there is a Patience Stone), a Stone Pillar (on which there is a Tolerance Stone), a Stone Pillar (on which there is a Courage Stone) and a Metal Chest.
+You can go west, east or up.
+This is a medium-sized room that is mostly circular, around the center of the room, in a circle, stand eight stone pillars.
+> up
+
+> up
+You climb up the ladder toward the ceiling.
+
+You are in a Shrine.
+You can see a Statue of the beloved King, a blue medallion, an orange medallion, an orange, a purple medallion, a green medallion, a yellow medallion, a red medallion and a silver medallion.
+You can go out, down or in the Pillar Room.
+This is the Shrine of the beloved King. The room is hexagon-shaped, with a white marble statue of the beloved King sitting on a pedestal against the wall opposite the door. On the floor, there is a design of an old-fashioned, eight-point compass rose. There is a shabby, rusted lever on the left side of the room.
+> out
+
+> out
+
+You are in a Fountain Meadow.
+You can see a Right Fountain, a Left Fountain, a Small Building, a Statue of the fallen king, a Statue of a mother and her child , a Large Building and a bread.
+You can go southwest, in, northwest, down, south or southeast.
+You come into a Fountain Meadow. On one side of the meadow, there are two fountains just in front of a small ornate building; across from the fountains is a great building of some kind; and there are two statues--one is at the entrance to the meadow, a statue of a serious-faced man, and the other statue is of a mother with her child.
+Female Villager enters.
+> drink from bottle
+
+> drink from bottle
+Please choose which 'bottle' you mean:
+1: Bottle
+2: Bottle
+> 1
+ Health increased by 5%.
+You take a drink from it, and feel instantly a little better.
+Female Villager leaves.
+Cat enters.
+> drink from bottle
+
+> drink from bottle
+Please choose which 'bottle' you mean:
+1: Bottle
+2: Bottle
+> 1
+ Health increased by 5%.
+You take a drink from it, and feel instantly a little better.
+Female Villager enters.
+> drink from bottle
+
+> drink from bottle
+Please choose which 'bottle' you mean:
+1: Bottle
+2: Bottle
+> 1
+ Health increased by 5%.
+ You have reached max health.
+You take a drink from it, and feel instantly a little better.
+> fill bottle
+
+> fill bottle
+Please choose which 'bottle' you mean:
+1: Bottle
+2: Bottle
+> 1
+You fill it.
+> in
+
+> in
+
+You are in a Shrine.
+You can see a Statue of the beloved King, a blue medallion, an orange medallion, an orange, a purple medallion, a green medallion, a yellow medallion, a red medallion and a silver medallion.
+You can go out, down or in the Pillar Room.
+This is the Shrine of the beloved King. The room is hexagon-shaped, with a white marble statue of the beloved King sitting on a pedestal against the wall opposite the door. On the floor, there is a design of an old-fashioned, eight-point compass rose. There is a shabby, rusted lever on the left side of the room.
+> in
+
+> in
+You climb down the ladder into the Pillar Room.
+
+You are in a Dungeon Room.
+You can see a Stone Pillar (on which there is a Faith Stone), a Stone Pillar (on which there is a Loyalty Stone), a Stone Pillar (on which there is a Strength Stone), a Stone Pillar (on which there is a Justice Stone), a Stone Pillar (on which there is a Wisdom Stone), a Stone Pillar (on which there is a Patience Stone), a Stone Pillar (on which there is a Tolerance Stone), a Stone Pillar (on which there is a Courage Stone) and a Metal Chest.
+You can go west, east or up.
+This is a medium-sized room that is mostly circular, around the center of the room, in a circle, stand eight stone pillars.
+> east
+
+> east
+
+You are in a Dungeon Room.
+You can see a Dragon's Treasure and a beguiling giant cave dragon.
+You can go west.
+A dungeon room.
+Beguiling giant cave dragon attacks you and misses...
+Player Health: 110
+> attack beguiling giant cave dragon
+
+> attack beguiling giant cave dragon
+You jab the sword at the beguiling giant cave dragon and get a critical (25 hits)!
+Player Health: 110
+Beguiling giant cave dragon claws you (15 hits).
+Player Health: 95
+> west
+
+> west
+
+You are in a Dungeon Room.
+You can see a Stone Pillar (on which there is a Faith Stone), a Stone Pillar (on which there is a Loyalty Stone), a Stone Pillar (on which there is a Strength Stone), a Stone Pillar (on which there is a Justice Stone), a Stone Pillar (on which there is a Wisdom Stone), a Stone Pillar (on which there is a Patience Stone), a Stone Pillar (on which there is a Tolerance Stone), a Stone Pillar (on which there is a Courage Stone) and a Metal Chest.
+You can go west, east or up.
+This is a medium-sized room that is mostly circular, around the center of the room, in a circle, stand eight stone pillars.
+> up
+
+> up
+You climb up the ladder toward the ceiling.
+
+You are in a Shrine.
+You can see a Statue of the beloved King, a blue medallion, an orange medallion, an orange, a purple medallion, a green medallion, a yellow medallion, a red medallion and a silver medallion.
+You can go out, down or in the Pillar Room.
+This is the Shrine of the beloved King. The room is hexagon-shaped, with a white marble statue of the beloved King sitting on a pedestal against the wall opposite the door. On the floor, there is a design of an old-fashioned, eight-point compass rose. There is a shabby, rusted lever on the left side of the room.
+> out
+
+> out
+
+You are in a Fountain Meadow.
+You can see a Right Fountain, a Left Fountain, a Small Building, a Statue of the fallen king, a Statue of a mother and her child , a Large Building and a bread.
+You can go southwest, in, northwest, down, south or southeast.
+You come into a Fountain Meadow. On one side of the meadow, there are two fountains just in front of a small ornate building; across from the fountains is a great building of some kind; and there are two statues--one is at the entrance to the meadow, a statue of a serious-faced man, and the other statue is of a mother with her child.
+> drink from bottle
+
+> drink from bottle
+Please choose which 'bottle' you mean:
+1: Bottle
+2: Bottle
+> 1
+ Health increased by 5%.
+You take a drink from it, and feel instantly a little better.
+> drink from bottle
+
+> drink from bottle
+Please choose which 'bottle' you mean:
+1: Bottle
+2: Bottle
+> 1
+ Health increased by 5%.
+You take a drink from it, and feel instantly a little better.
+> drink from bottle
+
+> drink from bottle
+Please choose which 'bottle' you mean:
+1: Bottle
+2: Bottle
+> 1
+ Health increased by 5%.
+You take a drink from it, and feel instantly a little better.
+> fill bottle
+
+> fill bottle
+Please choose which 'bottle' you mean:
+1: Bottle
+2: Bottle
+> 1
+You fill it.
+> in
+
+> in
+
+You are in a Shrine.
+You can see a Statue of the beloved King, a blue medallion, an orange medallion, an orange, a purple medallion, a green medallion, a yellow medallion, a red medallion and a silver medallion.
+You can go out, down or in the Pillar Room.
+This is the Shrine of the beloved King. The room is hexagon-shaped, with a white marble statue of the beloved King sitting on a pedestal against the wall opposite the door. On the floor, there is a design of an old-fashioned, eight-point compass rose. There is a shabby, rusted lever on the left side of the room.
+> in
+
+> in
+You climb down the ladder into the Pillar Room.
+
+You are in a Dungeon Room.
+You can see a Stone Pillar (on which there is a Faith Stone), a Stone Pillar (on which there is a Loyalty Stone), a Stone Pillar (on which there is a Strength Stone), a Stone Pillar (on which there is a Justice Stone), a Stone Pillar (on which there is a Wisdom Stone), a Stone Pillar (on which there is a Patience Stone), a Stone Pillar (on which there is a Tolerance Stone), a Stone Pillar (on which there is a Courage Stone) and a Metal Chest.
+You can go west, east or up.
+This is a medium-sized room that is mostly circular, around the center of the room, in a circle, stand eight stone pillars.
+> east
+
+> east
+
+You are in a Dungeon Room.
+You can see a Dragon's Treasure and a beguiling giant cave dragon.
+You can go west.
+A dungeon room.
+You hide your items from the dragon's fire.
+Error running script: Error evaluating expression 'Got(melt_name)': Unknown object or variable 'melt_name'
+Beguiling giant cave dragon attacks you and misses...
+Player Health: 110
+> attack beguiling giant cave dragon
+
+> attack beguiling giant cave dragon
+You swing wildly at the beguiling giant cave dragon and miss...
+Player Health: 110
+Beguiling giant cave dragon attacks you and misses...
+Player Health: 110
+> attack beguiling giant cave dragon
+
+> attack beguiling giant cave dragon
+You slash the sword at the beguiling giant cave dragon and hit (8 hits)!
+It is dead!
+Player Health: 110
+> search giant cave dragon
+
+> search giant cave dragon
+You find $834.
+You also find a bread.
+You find a Gold Medallion.
+> take gold medallion
+
+> take gold medallion
+You pick it up.
+You grab the medallion and instantly you are drawn through time and space into the Shrine of the Beloved King.
+
+You are in a Shrine.
+You can see a Statue of the beloved King, a blue medallion, an orange medallion, an orange, a purple medallion, a green medallion, a yellow medallion, a red medallion and a silver medallion.
+You can go out, down or in the Pillar Room.
+This is the Shrine of the beloved King. The room is hexagon-shaped, with a white marble statue of the beloved King sitting on a pedestal against the wall opposite the door. On the floor, there is a design of an old-fashioned, eight-point compass rose. There is a shabby, rusted lever on the left side of the room.
+> use gold medallion
+
+> use gold medallion
+You place the gold medallion onto the compass rose, and the south wind of the compass glows a bright gold.
+The shrine begins to shake, and the sound of bells can be heard from somewhere. A golden light shoots down into the center of the room; and there upon the compass, materializes a glittering golden hammer of obvious power and exquisite beauty.
+> look
+
+> look
+You are in a Shrine.
+You can see a Statue of the beloved King, a blue medallion, an orange medallion, an orange, a purple medallion, a green medallion, a yellow medallion, a red medallion, a silver medallion, a gold medallion and a Gold Hammer.
+You can go out, down or in the Pillar Room.
+This is the Shrine of the beloved King. The room is hexagon-shaped, with a white marble statue of the beloved King sitting on a pedestal against the wall opposite the door. On the floor, there is a design of an old-fashioned, eight-point compass rose. There is a shabby, rusted lever on the left side of the room.
+> take golden hammer
+
+> take golden hammer
+You pick it up.
+> out
+
+> out
+
+You are in a Fountain Meadow.
+You can see a Right Fountain, a Left Fountain, a Small Building, a Statue of the fallen king, a Statue of a mother and her child , a Large Building and a bread.
+You can go southwest, in, northwest, down, south or southeast.
+You come into a Fountain Meadow. On one side of the meadow, there are two fountains just in front of a small ornate building; across from the fountains is a great building of some kind; and there are two statues--one is at the entrance to the meadow, a statue of a serious-faced man, and the other statue is of a mother with her child.
+> southeast
+
+> southeast
+
+You are outside of a Brick Chapel.
+You can see a Chapel Fountain and a bread.
+You can go down, east or northwest.
+This old brick chapel is just beautiful with its lofty bell tower and stained glass windows.
+> east
+
+> east
+
+You are on the Box Street Road.
+You can go northwest, southeast, west, Tooth Doctor Shop, Grand Kingdom Day Spa or northeast.
+A narrow road with tall stately palm trees on either side.
+> go to Grand Kingdom Day Spa
+
+> go to Grand Kingdom Day Spa
+
+You are in a Grand Kingdom Day Spa.
+You can see a Table (on which there is a Vase (containing an Orange Blossom)) and a Spa Attendant.
+You can go out.
+The Grand Kingdom Day Spa is located inside a small white and green house along the Box Street road. The Spa has such an inviting, relaxing environment. Gentle scents of lavender permeate room. You already feel more aromatic just being here.
+You can see a table in the corner of the room, a sign near the entrance, and a shelf along the wall with all sorts of elegant products.
+> buy sleep mist spray
+
+> buy sleep mist spray
+Please choose which 'sleep mist spray' you mean:
+1: Sleep Mist Spray
+2: Focus Mist Spray
+> 1
+You buy it for $80.
+> drop gold ring
+
+> drop gold ring
+Please choose which 'gold ring' you mean:
+1: Gold Ring
+2: Gold Ring
+3: Gold Ring
+4: Gold Ring
+5: Gold Ring
+6: Gold Ring
+7: Gold Ring
+8: Gold Ring
+9: Gold Ring
+10: Gold Ring
+11: Gold Ring
+12: Gold Ring
+13: Gold Ring
+> 1
+You drop it.
+> drop gold ring
+
+> drop gold ring
+Please choose which 'gold ring' you mean:
+1: Gold Ring
+2: Gold Ring
+3: Gold Ring
+4: Gold Ring
+5: Gold Ring
+6: Gold Ring
+7: Gold Ring
+8: Gold Ring
+9: Gold Ring
+10: Gold Ring
+11: Gold Ring
+12: Gold Ring
+> 1
+You drop it.
+> drop gold ring
+
+> drop gold ring
+Please choose which 'gold ring' you mean:
+1: Gold Ring
+2: Gold Ring
+3: Gold Ring
+4: Gold Ring
+5: Gold Ring
+6: Gold Ring
+7: Gold Ring
+8: Gold Ring
+9: Gold Ring
+10: Gold Ring
+11: Gold Ring
+> 1
+You drop it.
+> drop gold ring
+
+> drop gold ring
+Please choose which 'gold ring' you mean:
+1: Gold Ring
+2: Gold Ring
+3: Gold Ring
+4: Gold Ring
+5: Gold Ring
+6: Gold Ring
+7: Gold Ring
+8: Gold Ring
+9: Gold Ring
+10: Gold Ring
+> 1
+You drop it.
+> drop gold ring
+
+> drop gold ring
+Please choose which 'gold ring' you mean:
+1: Gold Ring
+2: Gold Ring
+3: Gold Ring
+4: Gold Ring
+5: Gold Ring
+6: Gold Ring
+7: Gold Ring
+8: Gold Ring
+9: Gold Ring
+> 1
+You drop it.
+> drop gold ring
+
+> drop gold ring
+Please choose which 'gold ring' you mean:
+1: Gold Ring
+2: Gold Ring
+3: Gold Ring
+4: Gold Ring
+5: Gold Ring
+6: Gold Ring
+7: Gold Ring
+8: Gold Ring
+> 1
+You drop it.
+> drop gold ring
+
+> drop gold ring
+Please choose which 'gold ring' you mean:
+1: Gold Ring
+2: Gold Ring
+3: Gold Ring
+4: Gold Ring
+5: Gold Ring
+6: Gold Ring
+7: Gold Ring
+> 1
+You drop it.
+> drop gold ring
+
+> drop gold ring
+Please choose which 'gold ring' you mean:
+1: Gold Ring
+2: Gold Ring
+3: Gold Ring
+4: Gold Ring
+5: Gold Ring
+6: Gold Ring
+> 1
+You drop it.
+> drop silver dagger
+
+> drop silver dagger
+> drop gold necklace
+
+> drop gold necklace
+You drop it.
+> wear mask
+
+> wear mask
+You put on the sleep mask. You cannot see anything.
+> use sleep mist spray
+
+> use sleep mist spray
+Please choose which 'sleep mist spray' you mean:
+1: Sleep Mist Spray
+2: Focus Mist Spray
+3: Sleep Mist Spray
+> 3
+You spray the Sleep Mist Spray.
+You drift off to sleep, and when you awake, four hours have passed.
+> remove mask
+
+> remove mask
+You can't carry any more items.
+> wear mask
+
+> wear mask
+You put on the sleep mask. You cannot see anything.
+You drift off to sleep, and when you awake, an hour has passed.
+> remove mask
+
+> remove mask
+You take it off.
+> wear mask
+
+> wear mask
+You put on the sleep mask. You cannot see anything.
+You drift off to sleep, and when you awake, an hour has passed.
+> remove mask
+
+> remove mask
+You take it off.
+> wear mask
+
+> wear mask
+You put on the sleep mask. You cannot see anything.
+You drift off to sleep, and when you awake, an hour has passed.
+> use sleep mist spray
+
+> use sleep mist spray
+Please choose which 'sleep mist spray' you mean:
+1: Sleep Mist Spray
+2: Focus Mist Spray
+3: Sleep Mist Spray
+> 3
+You spray the Sleep Mist Spray.
+You drift off to sleep, and when you awake, four hours have passed.
+> use sleep mist spray
+
+> use sleep mist spray
+Please choose which 'sleep mist spray' you mean:
+1: Sleep Mist Spray
+2: Focus Mist Spray
+3: Sleep Mist Spray
+> 3
+You spray the Sleep Mist Spray.
+You drift off to sleep, and when you awake, four hours have passed.
+> use sleep mist spray
+
+> use sleep mist spray
+Please choose which 'sleep mist spray' you mean:
+1: Sleep Mist Spray
+2: Focus Mist Spray
+3: Sleep Mist Spray
+> 3
+You spray the Sleep Mist Spray.
+You drift off to sleep, and when you awake, four hours have passed.
+You have used up all of your Sleep Mist Spray.
+> remove mask
+
+> remove mask
+You take it off.
+> out
+
+> out
+
+You are on the Box Street Road.
+You can go northwest, southeast, west, Tooth Doctor Shop, Grand Kingdom Day Spa or northeast.
+A narrow road with tall stately palm trees on either side.
+> west
+
+> west
+
+You are outside of a Brick Chapel.
+You can see a Chapel Fountain and a bread.
+You can go down, east or northwest.
+This old brick chapel is just beautiful with its lofty bell tower and stained glass windows.
+> use gold hammer on lamp
+
+> use gold hammer on lamp
+You smash the lamp into pieces. Inside the broken pieces of the lamp is some mysterious glowing, golden, glittery object.
+> wear mask
+
+> wear mask
+You put on the sleep mask. You cannot see anything.
+> take egg
+
+> take egg
+You pick it up.
+You reach down into the fragments of the broken lamp and find the glowing object. With your sleep mask on, you cannot tell what it is. Besides the glowing light that seeps in around the edges of your mask, you cannot see a thing. The object is not much bigger than your hand, rounder at the bottom than at the top, and unusually heavy for such a small object.
+Cat enters.
+> wait
+
+> wait
+Time passes.
+> wait
+
+> wait
+Time passes.
+> wait
+
+> wait
+Time passes.
+> wait
+
+> wait
+Time passes.
+> wait
+
+> wait
+Time passes.
+> wait
+
+> wait
+Time passes.
+Cat leaves.
+> wait
+
+> wait
+Time passes.
+> wait
+
+> wait
+Time passes.
+> wait
+
+> wait
+Time passes.
+Cat enters.
+> wait
+
+> wait
+Time passes.
+> wait
+
+> wait
+Time passes.
+> wait
+
+> wait
+Time passes.
+Cat leaves.
+> wait
+
+> wait
+Time passes.
+> wait
+
+> wait
+Time passes.
+> wait
+
+> wait
+Time passes.
+> wait
+
+> wait
+Time passes.
+> wait
+
+> wait
+Time passes.
+> wait
+
+> wait
+Time passes.
+> wait
+
+> wait
+Time passes.
+> wait
+
+> wait
+Time passes.
+> wait
+
+> wait
+Time passes.
+> wait
+
+> wait
+Time passes.
+> wait
+
+> wait
+Time passes.
+> wait
+
+> wait
+Time passes.
+> wait
+
+> wait
+Time passes.
+> wait
+
+> wait
+Time passes.
+> wait
+
+> wait
+Time passes.
+> wait
+
+> wait
+Time passes.
+> wait
+
+> wait
+Time passes.
+> wait
+
+> wait
+Time passes.
+> wait
+
+> wait
+Time passes.
+The Black Knight enters the room, from northwest.
+You see the Black Knight coming toward you, ready to fight.
+> break egg
+
+> break egg
+You strike the glowing object with the golden hammer, and the object shatters into a million tiny pieces of dust, blown away with the breeze. As the dust flies, it shines with bright distinct rays, and then disappears from sight.
+You hear a stumbling noise, and a beleaguered voice saying,"What am I doing here? How have I come to this place?"
+You remove your sleep mask to better investigate this strange noise, and you find the Black Knight, kneeling on the ground with his helmet in his hands.
+He looks familiar, so oddly familiar. That's it! You know who he is. He's the Fallen King. You recognize his face from his statue.
+And so many other thoughts and memories come flooding back into your brain. The effects of the Golden Egg must have kept these from you.
+You are the lost prince.
+The beloved king was your father, Abraham... and the Black Knight was the old king, who ruled the kingdom of Red Lands before your father rightfully took the throne. So much makes sense now.
+"Thank you for freeing me," the old king says. "I was lost in my resentment of your father's position, and his just place as king. In my bitterness, and with the lure of the golden egg, I had forgotten all else, except anger and greed. I am a new man without that deceptive treasure, and I will no longer seek the throne. It is your mother's to possess, if she so chooses, and after that, the throne will be yours."
+"What happened to the egg?" you ask.
+"It has been blown into another world, I should imagine," he says. The old king reaches into his pocket. "What is this?" he says, as he retrieves an old folded, wrinkled letter.
+> look
+
+> look
+You are outside of a Brick Chapel.
+You can see a Chapel Fountain, a bread, a Broken Lamp, a Black Knight and a King's Note.
+You can go down, east or northwest.
+This old brick chapel is just beautiful with its lofty bell tower and stained glass windows.
+> take note
+
+> take note
+You pick it up.
+Cat enters.
+> read note
+
+> read note
+The note looks like it was written in your father's own handwriting. It reads,
+"My Dear Son,"
+"If you have found this note, then that means that I was not successful in my quest, but that you were--and that thought makes me hopeful even now, understanding that you will read this after my death; but to know that our kingdom is freed from the golden egg, and that our friend, the old king, has been healed from his jealous trance, those things are good enough a legacy to leave, if one may be so fortunate."
+"This note I carried with me into battle against the old king, and if you have found it, I was slain in my attempts to free him. But now that the golden egg has been destroyed, peace will reign in Red Lands once more. "
+"And if the egg has been destroyed, that means that the fragments of the golden egg have undoubtedly blown into another world. You may seek it there, if you so desire, but beware, seek the treasure with your hands only, and not your heart. Which may free yourself to seek for better things, not made with gold, or fine metalwork. Those are the better things on which to place your affections."
+"My son,"
+"Set your heart on things above, things that will last eternal, beyond this earthly greed. For pure gold is indeed valuable, but a pure heart is even better still."
+"Ask the pilot of the other world where the golden egg may be found. Tell him how you found the egg, and he will help you complete your journey."
+Send a message to the pilot - redlandssky@gmail.com
+The egg has been found, and destroyed, and the kingdom restored. Your quest is complete. If you drop this note in the Amphitheater, your adventure will finish.
+> wear mask
+
+> wear mask
+You put on the sleep mask. You cannot see anything.
+> remove mask
+
+> remove mask
+You take it off.
+What is this that you're holding? You look down and find the Golden Egg!
+ How long have you been holding it?
+ And where did you find it?
+ What is you name? You would think someone might remember his own name, but you find that it escapes you.
+ What were you doing here? Where is this place? The world is swimming, and your mind becomes a blur.
+
+You are in an Amphitheater.
+You can go northeast or southwest.
+This is a seemingly old, abandoned amphitheater with rows of stone benches facing the stage.
+ You awaken in a deserted amphitheater, confused and unsure of how you arrived here.
+> drop note
+
+> drop note
+You drop it.
+You have restored the kingdom of Red Lands. All is at peace.
+You Won!!!
+[state=Finished]

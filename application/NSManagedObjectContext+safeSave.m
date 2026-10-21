@@ -1,5 +1,5 @@
 //
-//  NSManagedObject+safeSave.m
+//  NSManagedObjectContext+safeSave.m
 //  Spatterlight
 //
 //  Created by Petter Sjölund on 2020-10-27.
@@ -7,6 +7,7 @@
 //
 
 #import "NSManagedObjectContext+safeSave.h"
+#import "DebugLog.h"
 
 @implementation NSManagedObjectContext (safeSave)
 
@@ -19,12 +20,17 @@
 }
 
 - (void)saveAndWait:(BOOL)wait {
+    NSManagedObjectContext __weak *weakSelf = self;
     void (^saveBlock)(void) = ^void() {
-        if (self.hasChanges) {
+        NSManagedObjectContext *strongSelf = weakSelf;
+        if (!strongSelf) {
+            return;
+        }
+        if (strongSelf.hasChanges) {
             NSError *error = nil;
             BOOL result = NO;
             @try {
-                result = [self save:&error];
+                result = [strongSelf save:&error];
             } @catch (NSException *exception) {
                 NSLog(@"Exception while saving managed object context");
             } @finally {

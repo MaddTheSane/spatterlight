@@ -8,10 +8,13 @@
 
 #import "Ifid.h"
 #import "Metadata.h"
-#import "Game.h"
 
 
 @implementation Ifid
+
++ (NSFetchRequest<Ifid *> *)fetchRequest {
+	return [NSFetchRequest fetchRequestWithEntityName:@"Ifid"];
+}
 
 @dynamic ifidString;
 @dynamic metadata;

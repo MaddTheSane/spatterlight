@@ -965,67 +965,126 @@ type8 is_blank(type16 line, type16 width)
 	return 1;
 }
 
+/* Extracts and decompresses a version 1-3 (MaPi format) picture.
+   The image data uses Huffman-coded run-length encoding with vertical
+   XOR delta obfuscation — the same scheme used by Infocom's V6 graphics
+   (see bocfel/z6/decompress_amiga.cpp for a closely related implementation).
+
+   Parameters:
+     pic - picture number (index into the graphics offset table)
+     w   - receives the image width in pixels
+     h   - receives the image height in pixels (trimmed of blank rows)
+     pal - receives the 16-entry RGB palette (each entry is a type16)
+
+   Returns a pointer into gfx_buf containing the decompressed pixel data,
+   offset past any leading blank scanlines. Returns 0 on failure.
+
+   The picture's binary layout (at the offset found in gfx_data):
+     +0x02: left edge       +0x04: right edge (width = right - left)
+     +0x06: height
+     +0x1C: 16-word palette (32 bytes)
+     +0x3C: Huffman tree size (number of interior nodes)
+     +0x42: Huffman decode table (tablesize * 2 bytes)
+     After table: compressed bitstream data */
 type8 *ms_extract1(type8 pic, type16 * w, type16 * h, type16 * pal)
 {
-	type8 *decode_table, *data, bit, val, *buffer;
-	type16 tablesize, count;
-	type32 i, j, datasize, upsize, offset;
+	type8 *decode_table, *bitstream, *pic_buffer;
+	type8 bit_position, color_index, tree_node, leaf_value;
+	type16 tree_root, remaining_runs;
+	type32 pixel_index, byte_offset, datasize, pixel_count, pic_offset;
+	type32 i;
 
-	offset = read_l(gfx_data + 4 * pic);
+	/* Look up this picture's offset in the graphics data index table */
+	pic_offset = read_l(gfx_data + 4 * pic);
 #ifdef SAVEMEM
-	if (fseek(gfx_fp, offset, SEEK_SET) < 0)
+	/* In SAVEMEM mode, seek to the picture in the file and read it
+	   into a temporary buffer rather than keeping all graphics in memory */
+	if (fseek(gfx_fp, pic_offset, SEEK_SET) < 0)
 		return 0;
-	datasize = read_l(gfx_data + 4 * (pic + 1)) - offset;
-	if (!(buffer = malloc(datasize)))
+	datasize = read_l(gfx_data + 4 * (pic + 1)) - pic_offset;
+	if (!(pic_buffer = malloc(datasize)))
 		return 0;
-	if (fread(buffer, 1, datasize, gfx_fp) != datasize)
+	if (fread(pic_buffer, 1, datasize, gfx_fp) != datasize)
+	{
+		free(pic_buffer);
 		return 0;
+	}
 #else
-	buffer = gfx_data + offset - 8;
+	/* Otherwise, point directly into the in-memory graphics data.
+	   The -8 accounts for the 8-byte "MaPi" file header. */
+	pic_buffer = gfx_data + pic_offset - 8;
 #endif
 
+	/* Read the 16-entry palette from the picture header */
 	for (i = 0; i < 16; i++)
-		pal[i] = read_w(buffer + 0x1c + 2 * i);
-	w[0] = (type16)(read_w(buffer + 4) - read_w(buffer + 2));
-	h[0] = read_w(buffer + 6);
+		pal[i] = read_w(pic_buffer + 0x1c + 2 * i);
+	w[0] = (type16)(read_w(pic_buffer + 4) - read_w(pic_buffer + 2));
+	h[0] = read_w(pic_buffer + 6);
 
-	tablesize = read_w(buffer + 0x3c);
-	decode_table = buffer + 0x42;
-	data = decode_table + tablesize * 2 + 2;
-	upsize = h[0] * w[0];
+	/* Locate the Huffman decode table and the compressed bitstream that
+	   follows it. Each interior node has two children (2 bytes each). */
+	tree_root = read_w(pic_buffer + 0x3c);
+	decode_table = pic_buffer + 0x42;
+	bitstream = decode_table + tree_root * 2 + 2;
+	pixel_count = h[0] * w[0];
 
-	for (i = 0, j = 0, count = 0, val = 0, bit = 7; i < upsize; i++, count--)
+	if (pixel_count > MAX_PICTURE_SIZE)
 	{
-		if (!count)
+#ifdef SAVEMEM
+		free(pic_buffer);
+#endif
+		return 0;
+	}
+
+	/* Decode the Huffman/RLE bitstream into palette-indexed pixels.
+	   Walk the Huffman tree bit by bit: a 1-bit follows the left child
+	   (decode_table[2*node]), a 0-bit follows the right child
+	   (decode_table[2*node+1]). Leaf nodes have bit 7 set (>= 0x80).
+	   Leaf values >= 0x10 encode a run length (repeat current color),
+	   values < 0x10 set a new color index with an implicit count of 1. */
+	remaining_runs = 0;
+	color_index = 0;
+	bit_position = 7;
+	byte_offset = 0;
+
+	for (pixel_index = 0; pixel_index < pixel_count; pixel_index++, remaining_runs--)
+	{
+		if (!remaining_runs)
 		{
-			count = tablesize;
-			while (count < 0x80)
+			tree_node = (type8)tree_root;
+			while (tree_node < 0x80)
 			{
-				if (data[j] & (1 << bit))
-					count = decode_table[2 * count];
+				if (bitstream[byte_offset] & (1 << bit_position))
+					tree_node = decode_table[2 * tree_node];
 				else
-					count = decode_table[2 * count + 1];
-				if (!bit)
-					j++;
-				bit = (type8)(bit ? bit - 1 : 7);
+					tree_node = decode_table[2 * tree_node + 1];
+				if (!bit_position)
+					byte_offset++;
+				bit_position = (type8)(bit_position ? bit_position - 1 : 7);
 			}
-			count &= 0x7f;
-			if (count >= 0x10)
-				count -= 0x10;
+			leaf_value = tree_node & 0x7f;
+			if (leaf_value >= 0x10)
+				remaining_runs = leaf_value - 0x10;
 			else
 			{
-				val = (type8)count;
-				count = 1;
+				color_index = (type8)leaf_value;
+				remaining_runs = 1;
 			}
 		}
-		gfx_buf[i] = val;
+		gfx_buf[pixel_index] = color_index;
 	}
-	for (j = w[0]; j < upsize; j++)
-		gfx_buf[j] ^= gfx_buf[j - w[0]];
+
+	/* Delta decode: XOR each pixel with the one directly above it.
+	   The first scanline is stored literally. */
+	for (pixel_index = w[0]; pixel_index < pixel_count; pixel_index++)
+		gfx_buf[pixel_index] ^= gfx_buf[pixel_index - w[0]];
 
 #ifdef SAVEMEM
-	free(buffer);
+	free(pic_buffer);
 #endif
+	/* Trim blank (all-zero) scanlines from the bottom and top of the
+	   image, adjusting the height and returning a pointer past any
+	   leading blank rows. */
 	for (; h[0] > 0 && is_blank((type16)(h[0] - 1), w[0]); h[0]--);
 	for (i = 0; h[0] > 0 && is_blank((type16)i, w[0]); h[0]--, i++);
 	return gfx_buf + i * w[0];

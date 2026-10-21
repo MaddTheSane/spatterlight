@@ -37,4 +37,5 @@
 	RecheckForMissing = NO;
 	RecheckFrequency = 30;
 	SaveInGameDirectory = NO;
+	KeepGamesOrganised = NO;
 }

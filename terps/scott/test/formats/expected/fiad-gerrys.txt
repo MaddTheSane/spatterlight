@@ -1,0 +1,14 @@
+game       -
+variant    sys=ti994a type=none subtype=0
+header     items=65 actions=0 words=133 rooms=43 maxcarry=5 start=2 treasures=0 wordlen=4 light=255 messages=97 treasureroom=0
+picture    width=256 height=96
+rooms        44 d089738a
+items        66 b3a45317
+verbs       134 c27ee909
+nouns       134 a8b1be16
+messages     98 e973b1ce
+actions       1 190a55ad
+ti99impl   1627 cf9ce167
+ti99expl   1623 195fe43b
+sysmess      71 5a67f1ac
+titletext   984 83f74d60

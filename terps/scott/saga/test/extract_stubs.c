@@ -1,0 +1,59 @@
+// Link-time stubs for the headless image-blob dumper (extract_images.c).
+// The dumper runs only DetectGame's data-loading path; the C64 decrunch
+// subsystem (C++ unp64) and all the Glk/glkimp rendering + UI live behind these
+// stubs and are never reached while extracting image blobs. Real Glk is provided
+// by cheapglk; only the glkimp-specific extras are stubbed here.
+
+#include <stdint.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+#include "glk.h"
+#include "detect_game.h"
+#include "taylordraw.h"
+
+// --- C64 detection (pulls in the C++ unp64 depacker) — not needed here --------
+// The C64-blob dumper (extract_images_c64) links the real DetectC64 + decrunch
+// pipeline, so it builds this file with -DSAGA_REAL_C64_DECRUNCH to drop the
+// stub. Every other dumper (extract_images / zxextract / titest) takes the stub.
+#ifndef SAGA_REAL_C64_DECRUNCH
+GameIDType DetectC64(uint8_t **sf, size_t *extent, const char *filename) {
+    (void)sf; (void)extent; (void)filename;
+    return UNKNOWN_GAME;
+}
+#endif
+
+// --- glkimp-specific globals (defined by the glkimp lib in the real build) -----
+// Graphics on, a black background, and cheapglk's main.o config globals (which
+// we exclude to keep our own main()) as a 200-line UTF-8 terminal.
+#define GLKIMP_ENABLE_GRAPHICS 1
+#define GLKIMP_GBGCOL 0
+#define GLKIMP_SCREENHEIGHT 200
+#define GLKIMP_UTF8 1
+#include "../../../common_imagetest/glkimp_stubs.c"
+
+// --- glkimp-specific helpers ---------------------------------------------------
+GLK_ATTRIBUTE_NORETURN void Fatal(const char *x) {
+    fprintf(stderr, "Fatal: %s\n", x ? x : "(null)");
+    exit(1);
+}
+int ShowTextInTopWindow(winid_t top, winid_t bottom, const char *text,
+    void (*print)(winid_t win, const char *text)) {
+    (void)top; (void)bottom; (void)text; (void)print; return 0;
+}
+
+// The scene harness (scenetest.c) plays the game for real, so it builds this
+// file with -DSAGA_SCENE_HARNESS and links its own window lookup, the real
+// random number generator and the real Taylor-style picture renderer (Seas of
+// Blood) instead of the stand-ins below.
+#ifndef SAGA_SCENE_HARNESS
+winid_t FindGlkWindowWithRock(glui32 rock) { (void)rock; return NULL; }
+glui32 erkyrath_random(void) { return 0; }
+void set_erkyrath_random(glui32 seed) { (void)seed; }
+
+// --- Taylor renderer (separate interpreter; never called from the scott path) --
+void InitTaylor(const taylor_draw_config *config) { (void)config; }
+int DrawTaylor(int loc, int current_location) { (void)loc; (void)current_location; return 0; }
+#endif

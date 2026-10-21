@@ -4,6 +4,28 @@
 //
 //  Created by Administrator on 2023-07-18.
 //
+//  Implements the custom UI for Infocom's "Journey" (1989), a Z-machine
+//  version 6 game with a unique menu-driven interface. Unlike typical
+//  interactive fiction, Journey uses no text parser. Instead, the screen
+//  is divided into regions:
+//
+//    - A graphics window (left) showing location artwork
+//    - A text buffer window (right) showing narrative prose
+//    - A "command area" (bottom rows) arranged as a 5-column grid:
+//        Column 1: Party-wide commands (e.g. "Proceed", "Look")
+//        Column 2: Party member names with arrows (-->)
+//        Columns 3-5: Individual character commands / objects
+//
+//  The game also supports special input modes for typing Elvish text
+//  and renaming the protagonist ("Tag").
+//
+//  This file replaces much of the original ZIL (Zork Implementation
+//  Language) screen-handling code with native C++ that drives the Glk
+//  windowing system, while still calling back into Z-machine routines
+//  for game logic (via internal_call / pack_routine).
+//
+
+#include <vector>
 
 #include "screen.h"
 #include "zterp.h"
@@ -20,69 +42,128 @@
 
 #include "journey.hpp"
 
-extern Window *curwin;
 
+// Bit flags controlling where a "stamp" (small overlay) image is placed
+// relative to the main location image.
 enum StampBits {
-  kStampRightBit = 1,
-  kStampBottomBit = 2
+  kStampRightBit = 1,   // Align stamp to the right edge of the main image
+  kStampBottomBit = 2   // Align stamp to the bottom edge of the main image
 };
 
-#define JOURNEY_BG_GRID windows[1]
-#define JOURNEY_GRAPHICS_WIN windows[3]
+// Journey uses four Glk windows. These macros provide shorthand access.
+#define JOURNEY_BG_GRID windows[1]       // Full-screen grid window (borders, command area)
+#define JOURNEY_GRAPHICS_WIN windows[3]  // Graphics window (location artwork, left side)
 
-#define THICK_V_LINE 57
-#define THIN_V_LINE 41
-#define H_LINE 39
+// Font 3 character codes used for drawing box-drawing borders in the grid window.
+// These are specific to the Infocom font 3 character set.
+constexpr int THICK_V_LINE = 57; // Thick vertical line (column separator between Name and Commands)
+constexpr int THIN_V_LINE = 41; // Thin vertical line (column separators elsewhere)
+constexpr int H_LINE = 39; // Horizontal line (divider between text area and command area)
+// The pieces of the Amiga screen border
+constexpr int TOP_LEFT_CORNER = 47;
+constexpr int TOP_RIGHT_CORNER = 48;
+constexpr int BOTTOM_LINE = 38;
+constexpr int BOTTOM_LEFT_CORNER = 46;
+constexpr int BOTTOM_RIGHT_CORNER = 49;
+constexpr int RIGHT_BORDER_LINE = 40;
 
-#define MAX_SUBMENU_ITEMS 6
+// Screen widths in characters below which the game switches to shorter texts.
+// The game calls these 8-WIDTH and 12-WIDTH, after the length of the
+// descriptions (DESC8, DESC12) that fit.
+constexpr int WIDTH_8 = 50;
+constexpr int WIDTH_12 = 71;
+
+constexpr int TITLE_PICTURE = 160;
+
+constexpr int MAX_MENU_ITEMS = 10;
+constexpr int MAX_SUBMENU_ITEMS = 6;
 
 
+// Global lookup tables mapping Z-machine global variable indices, routine
+// addresses, object numbers, and attribute/property numbers to symbolic names.
+// These are populated at startup by scanning the game's data tables.
 JourneyGlobals jg;
 JourneyRoutines jr;
 JourneyObjects jo;
 JourneyAttributes ja;
 
-static Window *journey_text_buffer;
+// The text buffer window (window 0 or 2 depending on game version)
+// that displays narrative prose on the right side of the screen.
+static Window *journey_text_buffer(void) {
+    return &windows[ja.buffer_window_index];
+}
 
-static JourneyWords printed_journey_words[4];
+// Tracks "glue words" printed during object selection (e.g. "cast", "at").
+// These are displayed as non-selectable labels in the command area and must
+// be preserved across screen redraws.
+static JourneyWords printed_journey_words[BOCFEL_MAX_JOURNEY_WORDS];
 static int number_of_printed_journey_words = 0;
 
+// Current input mode determines which part of the command area is interactive.
 static inputMode journey_current_input = INPUT_PARTY;
-static uint16_t journey_input_length = 0;
+// Number of characters typed so far during keyboard input (name or Elvish).
+static int16_t journey_input_length = 0;
 
+// Currently highlighted (bold) menu selection, used to restore highlight
+// after a screen redraw. -1 means no selection.
 static int16_t selected_journey_line = -1;
 static int16_t selected_journey_column = -1;
+
+// Position, dimensions, and scale of the most recently drawn location image.
+// Used by journey_draw_stamp_image() to overlay stamp images at the correct
+// coordinates relative to the main artwork.
 static int journey_image_x, journey_image_y, journey_image_width, journey_image_height;
 static float journey_image_scale = 1.0;
-static glui32 screen_width_in_chars, screen_height_in_chars;
-static bool global_border_flag, global_font_3_flag;
-static uint16_t max_length = 0;
-static uint16_t from_command_start_line = 0;
-static uint16_t input_column = 0;
-static uint16_t input_line = 0;
-static uint16_t input_table = 0;
 
-struct JourneyMenu {
-    char name[STRING_BUFFER_SIZE];
-    struct JourneyMenu *submenu;
-    int submenu_entries;
-    int length;
-    int line;
-    int column;
+static glui32 screen_width_in_chars, screen_height_in_chars;
+
+// Platform-dependent display flags derived from the interpreter number setting.
+// border_flag: Whether to draw a decorative border around the entire screen (Amiga only).
+// font_3_flag: Whether Font 3 (box-drawing) characters are available (Amiga and Mac).
+static bool global_border_flag, global_font_3_flag;
+
+// State for in-progress keyboard input (name entry or Elvish typing).
+static uint16_t max_length = 0;                // Maximum allowed input length
+static uint16_t from_command_start_line = 0;   // Row offset from COMMAND_START_LINE
+static uint16_t input_column = 0;              // Current cursor column (1-based)
+static uint16_t input_line = 0;                // Current cursor row (1-based)
+static uint16_t input_table = 0;               // Z-machine address of input buffer
+static int serial_as_int = 0;                  // Game serial number as integer, for version checks
+
+// Describes a single "VoiceOver" menu entry. These are standard macOS UI menus or dialogs that reflect
+// the in-game command area menu text, in order to make the game playable for visually
+// impaired people. When the built-in macOS text-to-speech system VoiceOver is off,
+// these menus are not shown.
+
+// VoiceOver menus are built transiently on each redraw and sent to the front-end via win_menuitem().
+struct JourneyVOMenu {
+    char name[STRING_BUFFER_SIZE];     // Display text of the menu item
+    std::vector<JourneyVOMenu> submenu; // Sub-items (character verbs)
+    int length;                        // String length of name
+    int line;                          // Row within the command area (0-based)
+    int column;                        // Logical column (1=party, 2=name, 3+=commands)
 };
 
 
-void journey_adjust_image(int picnum, uint16_t *x, uint16_t *y, int width, int height, int winwidth, int winheight, float *scale, float pixwidth) {
+// Computes the scale factor and position needed to fit an image within a
+// window while maintaining aspect ratio. The image is centered on whichever
+// axis has leftover space. pixwidth accounts for non-square pixels on some
+// platforms (e.g. Amiga). Results are stored both in the output parameters
+// and in the module-level journey_image_* variables for stamp positioning.
+static void journey_adjust_image(uint16_t *x, uint16_t *y, int width, int height, int winwidth, int winheight, float *scale, float pixwidth) {
 
     journey_image_width = width;
     journey_image_height = height;
     journey_image_scale = (float)winwidth / ((float)width * pixwidth) ;
 
     if (height * journey_image_scale > winheight) {
+        // Image is taller than the window at this scale; fit to height instead
+        // and center horizontally.
         journey_image_scale = (float)winheight / height;
         journey_image_x = (winwidth - width * journey_image_scale * pixwidth) / 2;
         journey_image_y = 0;
     } else {
+        // Image fits vertically; center it vertically within the window.
         journey_image_x = 0;
         journey_image_y = (winheight - height * journey_image_scale) / 2;
     }
@@ -93,14 +174,22 @@ void journey_adjust_image(int picnum, uint16_t *x, uint16_t *y, int width, int h
     *y = journey_image_y;
 }
 
+// Draws a small overlay ("stamp") image on top of the main location artwork.
+// The 'where' parameter controls placement:
+//   - If where > 0, it is treated as a reference image whose dimensions
+//     determine the offset (used for positioning relative to another image).
+//   - If where <= 0, the StampBits flags position the stamp at corners of
+//     the main image (e.g. kStampRightBit | kStampBottomBit = bottom-right).
 static void journey_draw_stamp_image(winid_t win, int16_t picnum, int16_t where, float pixwidth) {
     int stamp_offset_x = 0, stamp_offset_y = 0, width, height;
 
     if (where > 0) {
+        // Use the dimensions of image 'where' as the pixel offset
         get_image_size(where, &width, &height);
         stamp_offset_x = width;
         stamp_offset_y = height;
     } else {
+        // Position relative to the corners of the main image
         get_image_size(picnum, &width, &height);
         if ((where & kStampRightBit) != 0) {
             stamp_offset_x = journey_image_width - width;
@@ -111,12 +200,24 @@ static void journey_draw_stamp_image(winid_t win, int16_t picnum, int16_t where,
         }
     }
 
+    // Convert from image-space coordinates to screen-space by applying
+    // the current scale and adding the main image's origin offset.
     int stamp_x = journey_image_x + stamp_offset_x * journey_image_scale * pixwidth;
     int stamp_y = journey_image_y + stamp_offset_y * journey_image_scale;
 
     draw_inline_image(win, picnum, stamp_x, stamp_y, journey_image_scale, false);
 }
 
+// True when there are no pictures to show: either no graphics files were
+// found, or graphics are turned off in the settings. Both get the same
+// layout, with the text taking over the picture's part of the screen.
+static bool journey_no_graphics(void) {
+    return graphics_type == kGraphicsTypeNoGraphics || v6_graphics_off();
+}
+
+// Draws the Journey title screen image centered on a
+// full-black background. All three visible windows are resized to fill
+// the screen and painted black so no UI chrome shows through.
 static void journey_draw_title_image(void) {
     float scale;
     uint16_t x, y;
@@ -136,10 +237,10 @@ static void journey_draw_title_image(void) {
     JOURNEY_BG_GRID.y_size = gscreenh;
     v6_sizewin(&JOURNEY_BG_GRID);
 
-    win_setbgnd(journey_text_buffer->id->peer, monochrome_black);
-    journey_text_buffer->x_size = gscreenw;
-    journey_text_buffer->y_size = gscreenh;
-    v6_sizewin(journey_text_buffer);
+    win_setbgnd(journey_text_buffer()->id->peer, monochrome_black);
+    journey_text_buffer()->x_size = gscreenw;
+    journey_text_buffer()->y_size = gscreenh;
+    v6_sizewin(journey_text_buffer());
 
     glk_window_set_background_color(win, monochrome_black);
     JOURNEY_GRAPHICS_WIN.x_size = gscreenw;
@@ -149,18 +250,32 @@ static void journey_draw_title_image(void) {
 
     win_setbgnd(-1, monochrome_black);
 
-    get_image_size(160, &width, &height);
-    journey_adjust_image(160, &x, &y, width, height, gscreenw, gscreenh, &scale, pixelwidth);
-    draw_inline_image(win, 160, x, y, scale, false);
+    get_image_size(TITLE_PICTURE, &width, &height);
+    journey_adjust_image(&x, &y, width, height, gscreenw, gscreenh, &scale, pixelwidth);
+    draw_inline_image(win, TITLE_PICTURE, x, y, scale, false);
 }
 
+// Draws a location image, scaling it to fit the graphics window.
+// Picture 44 is remapped to 116 (the same "tavern" image is used
+// for two different locations. This is the only re-used image).
+// If the current window isn't a graphics window, creates or reuses one.
+//
+// Picture 59 is G-BLACK, the dark room drawn by CAVERN-GRAPHIC when you
+// enter the Gate to the Plains without a light. Only the IBM PC build
+// draws it: on every other machine BLACK-PICTURE-BORDER is set and the
+// game just clears the (black) window instead. The MCGA graphics file,
+// and thus the Blorb, do not contain picture 59 (the EGA file does).
+// No stand-in is needed: our graphics window always has a black
+// background, so the cleared window GRAPHIC leaves behind when
+// @picture_data fails already looks the same.
 int journey_draw_picture(int pic, winid_t journey_window) {
-    if (pic == 44) {
-        pic = 116;
+    const int tavern_picture_alias = 44, tavern_picture = 116;
+    if (pic == tavern_picture_alias) {
+        pic = tavern_picture;
     }
 
     int width, height;
-    get_image_size(pic, &width, &height);
+    bool avail = get_image_size(pic, &width, &height);
 
     Window *win = curwin;
     if (win->id && win->id->type != wintype_Graphics) {
@@ -170,9 +285,9 @@ int journey_draw_picture(int pic, winid_t journey_window) {
             journey_window = glk_window_open(JOURNEY_BG_GRID.id, winmethod_Left | winmethod_Fixed, gscreenw / 3, wintype_Graphics, 0);
         }
         if (JOURNEY_GRAPHICS_WIN.id != journey_window) {
-            fprintf(stderr, "windows[3].id != journey_window!\n");
+            fprintf(stderr, "JOURNEY_GRAPHICS_WIN.id != journey_window!\n");
             if (JOURNEY_GRAPHICS_WIN.id != nullptr) {
-                gli_delete_window(windows[3].id);
+                gli_delete_window(JOURNEY_GRAPHICS_WIN.id);
             }
             JOURNEY_GRAPHICS_WIN.id = journey_window;
         }
@@ -181,14 +296,20 @@ int journey_draw_picture(int pic, winid_t journey_window) {
     if (win->id != nullptr) {
         glk_window_clear(win->id);
 
-        float scale;
-        uint16_t x, y;
-        journey_adjust_image(pic, &x, &y, width, height, win->x_size, win->y_size, &scale, pixelwidth);
-        draw_inline_image(win->id, pic, x, y, scale, false);
+        // A missing picture just leaves the window cleared.
+        if (avail) {
+            float scale;
+            uint16_t x, y;
+            journey_adjust_image(&x, &y, width, height, win->x_size, win->y_size, &scale, pixelwidth);
+            draw_inline_image(win->id, pic, x, y, scale, false);
+        }
     }
     return pic;
 }
 
+// Draws a full-width horizontal line at the given row using Font 3 characters.
+// 'character' fills the middle, 'left' and 'right' are the corner/junction pieces.
+// Used for the top border, horizontal divider, and bottom border.
 static void journey_font3_line(int line, int character, int left, int right) {
     glk_set_style(style_BlockQuote);
     glk_window_move_cursor(curwin->id, 0, line - 1);
@@ -201,6 +322,10 @@ static void journey_font3_line(int line, int character, int left, int right) {
 
 static int journey_refresh_character_command_area(int16_t line);
 
+// Calculates where the text buffer window's left edge should be (in character
+// columns) based on the width of the location artwork. Image 2 is used as a
+// reference because it is always present. The offset varies by interpreter
+// to match the original platform's spacing conventions.
 static void journey_setup_windows(void) {
     int offset = 6;
     int text_window_left_edge;
@@ -218,8 +343,7 @@ static void journey_setup_windows(void) {
             options.int_number == INTERP_APPLE_IIGS ||
             options.int_number == INTERP_MSDOS) {
             offset = 3;
-        }
-        if (options.int_number != INTERP_AMIGA) {
+        } else if (options.int_number != INTERP_AMIGA) {
             offset = 5;
         }
         text_window_left_edge = offset + (picture_width + gcellw) / gcellw;
@@ -228,7 +352,9 @@ static void journey_setup_windows(void) {
     set_global(jg.TEXT_WINDOW_LEFT, text_window_left_edge);
 }
 
-static bool qset(uint16_t obj, int16_t bit) { // Test attribute, set it, return test result.
+// Tests a Z-machine object attribute and then sets it. Returns the previous
+// value. Used as a one-shot flag check (e.g. "have we seen this location?").
+static bool qset(uint16_t obj, int16_t bit) {
     if (obj == 0 || bit == 0)
         return false;
     bool result = internal_test_attr(obj, bit);
@@ -238,6 +364,9 @@ static bool qset(uint16_t obj, int16_t bit) { // Test attribute, set it, return 
 
 static void journey_adjust_windows(bool restoring);
 
+// Queries the actual grid window dimensions and propagates them to the
+// Z-machine globals SCREEN_WIDTH and SCREEN_HEIGHT, and to the V6 upper
+// window tracking. Falls back to a pixel-based calculation if Glk reports 0.
 static void update_screen_size(void) {
     glk_window_get_size(JOURNEY_BG_GRID.id, &screen_width_in_chars, &screen_height_in_chars);
     if (screen_width_in_chars == 0 || screen_height_in_chars == 0) {
@@ -253,6 +382,11 @@ static void update_screen_size(void) {
 }
 
 
+// Sets all interpreter-dependent Z-machine globals: display flags, screen
+// dimensions, column positions, and layout metrics. Called on startup, resize,
+// and after restore. The layout is a 5-column grid where column widths are
+// derived by dividing the screen width by 5, with the remainder added to the
+// Name column.
 static void update_internal_globals(void) {
 
     int black_picture_border;
@@ -354,8 +488,10 @@ static void update_internal_globals(void) {
     set_global(jg.COMMAND_OBJECT_COLUMN, command_object_column);
 }
 
+// Returns the 1-based index of a character within the PARTY table,
+// or 0 if not found. "pcm" stands for Party Command Member.
 static int party_pcm(int chr) {
-    uint16_t party_table = get_global(jg.PARTY); // global 0x63 is PARTY table
+    uint16_t party_table = get_global(jg.PARTY);
     uint16_t MAX = user_word(party_table);
     for (int cnt = 1; cnt <= MAX; cnt++) {
         if (word(party_table + cnt * 2) == chr)
@@ -364,6 +500,8 @@ static int party_pcm(int chr) {
     return 0;
 }
 
+// Validates a typed character for name or Elvish input. In name mode only
+// letters are allowed; in Elvish mode spaces and some punctuation are also valid.
 static bool bad_character(uint8_t c, bool elvish) {
     if (c >= 'A' && c <= 'Z')
         return false;
@@ -374,6 +512,8 @@ static bool bad_character(uint8_t c, bool elvish) {
     return true;
 }
 
+// Prints the input cursor character. On platforms with Font 3, an underscore
+// is used; otherwise a space is printed (rendered visible via reverse video).
 static void underscore_or_square() {
     if (global_font_3_flag) {
         glk_put_char('_');
@@ -382,6 +522,9 @@ static void underscore_or_square() {
     }
 }
 
+// Moves the cursor in the background grid window. Coordinates are 1-based
+// (matching the Z-machine convention); this converts to 0-based for Glk.
+// Out-of-bounds positions are clamped with a warning.
 static void journey_move_cursor(int column, int line) {
     if (column < 1)
         column = 0;
@@ -395,36 +538,73 @@ static void journey_move_cursor(int column, int line) {
     JOURNEY_BG_GRID.x = column;
     JOURNEY_BG_GRID.y = line;
 
+    // The size is not known yet when the game goes on printing right after
+    // an autorestore, before anything has laid out the screen.
+    if (screen_width_in_chars == 0 || screen_height_in_chars == 0)
+        glk_window_get_size(JOURNEY_BG_GRID.id, &screen_width_in_chars, &screen_height_in_chars);
+
     if (column > screen_width_in_chars || line > screen_height_in_chars) {
-        fprintf(stderr, "Error! move_v6_cursor() moving cursor out of bounds\n");
+        fprintf(stderr, "journey_move_cursor: %d,%d is outside the %u by %u screen\n", column, line, screen_width_in_chars, screen_height_in_chars);
         if (column > screen_width_in_chars)
-            column = screen_width_in_chars - 1;
+            column = screen_width_in_chars > 0 ? screen_width_in_chars - 1 : 0;
         if (line > screen_height_in_chars)
-            line = screen_height_in_chars - 1;
+            line = screen_height_in_chars > 0 ? screen_height_in_chars - 1 : 0;
     }
 
     glk_window_move_cursor(JOURNEY_BG_GRID.id, column, line);
 }
 
-static int print_tag_route_to_str(char *str) {
-    int name_length = get_global(jg.TAG_NAME_LENGTH);
-    int name_table = get_global(jg.NAME_TBL) + 4;
-    for (int i = 0; i < name_length; i++) {
-        str[i] = zscii_to_unicode[user_byte(name_table++)];
-    }
-    const char *routestring = " route";
-    for (int i = 0; i < 6; i++) {
-        if (name_length + i >= STRING_BUFFER_SIZE) {
-            fprintf(stderr, "Error: Tag name too long!\n");
-            return 0;
-        }
-        str[name_length + i] = routestring[i];
-    }
-    str[name_length + 6] = 0;
-    return name_length + 6;
+// True if obj is the protagonist (who is two objects, TAG and TAG-OBJECT)
+// and the player has given them a name of their own.
+static bool is_tag_with_custom_name(int obj) {
+    return (obj == jo.TAG_OBJECT || obj == jo.TAG) && get_global(jg.TAG_NAME_LENGTH) != 0;
 }
 
-static void create_journey_party_menu(void) {
+// Prints the name the player gave the protagonist, which is stored as
+// raw ZSCII bytes in NAME_TBL. Returns its length.
+static int print_tag_name(void) {
+    int tag_name_length = get_global(jg.TAG_NAME_LENGTH);
+    int name_table = get_global(jg.NAME_TBL) + 2;
+
+    for (int i = 0; i < tag_name_length; i++) {
+        put_char(user_byte(name_table + i));
+    }
+    return tag_name_length;
+}
+
+#pragma mark - VoiceOver menus
+
+// These functions create the "VoiceOver" menus described at JourneyVOMenu.
+
+
+// Builds the display string for the protagonist's travel command, e.g.
+// "Dorian route". The protagonist's name is stored as raw ZSCII bytes
+// in NAME_TBL and the suffix " route" is appended.
+// Used for VoiceOver menus.
+static int print_tag_route_to_str(char *str, size_t capacity) {
+    static const char route_suffix[] = " route";
+
+    MenuString route(str, capacity);
+
+    // The name is whatever the player typed, so cap it to leave room for the
+    // suffix: a long name should lose its tail, not the " route" that says what
+    // the menu item does.
+    int name_length = get_global(jg.TAG_NAME_LENGTH);
+    int max_name_length = route.remaining() - ((int)sizeof(route_suffix) - 1);
+    if (name_length > max_name_length) {
+        fprintf(stderr, "Error: Tag name too long!\n");
+        name_length = max_name_length;
+    }
+
+    route.append_zscii(get_global(jg.NAME_TBL) + 2, name_length);
+    route.append(route_suffix);
+    return route.length();
+}
+
+// Builds the party-wide "Journey Party" command menu (leftmost column in command
+// area) and sends each item to the front-end via win_menuitem(). These are commands
+// like "Proceed", "Look", "Tag route", etc. that apply to the whole party.
+static void create_journey_party_vo_menu(void) {
     int object;
 
     char str[STRING_BUFFER_SIZE];
@@ -441,7 +621,7 @@ static void create_journey_party_menu(void) {
         object = user_word(table + 2 * i);
         if (object == jo.TAG_ROUTE_COMMAND // TAG-ROUTE-COMMAND
             && get_global(jg.TAG_NAME_LENGTH) != 0) {
-            stringlength = print_tag_route_to_str(str);
+            stringlength = print_tag_route_to_str(str, sizeof(str));
         } else {
             stringlength = print_zstr_to_cstr(user_word(object), str);
         }
@@ -451,34 +631,44 @@ static void create_journey_party_menu(void) {
     }
 }
 
-static void create_submenu(JourneyMenu *m, int object, int objectindex) {
+// Populates the VoiceOver submenu (verb list) for a single party member. Each
+// character can have up to 3 verbs stored in CHARACTER_INPUT_TBL.
+// If the character has the SHADOW attribute, their verbs are appended
+// to the preceding character's submenu (giving that character >3 verbs).
+static void create_submenu(JourneyVOMenu *m, int object, int objectindex) {
     uint16_t command_table = word(get_global(jg.CHARACTER_INPUT_TBL) + objectindex * 2);
     if (!internal_test_attr(object, ja.SHADOW)) {
-        m->submenu_entries = 0;
+        m->submenu.clear();
     }
     for (int i = 0; i <= 2; i++) {
         uint16_t command = user_word(command_table + i * 2);
         uint16_t str = word(command);
         if (str != 0 && count_characters_in_zstring(str) > 1) {
-            if (m->submenu == nullptr) {
-                m->submenu = (struct JourneyMenu *)malloc(sizeof(struct JourneyMenu) * MAX_SUBMENU_ITEMS);
-            }
-            struct JourneyMenu *submenu = &(m->submenu[m->submenu_entries]);
-            submenu->length = print_zstr_to_cstr(str, submenu->name);
-            submenu->line = m->line;
-            m->submenu_entries++;
-            if (m->submenu_entries > MAX_SUBMENU_ITEMS) {
-                fprintf(stderr, "Error! Too manu submenu items\n");
+            // The list is not emptied for SHADOW characters, so it
+            // accumulates across calls and can reach the cap.
+            if (m->submenu.size() >= MAX_SUBMENU_ITEMS) {
+                fprintf(stderr, "Error! Too many submenu items\n");
                 return;
             }
+            m->submenu.emplace_back();
+            JourneyVOMenu *submenu = &m->submenu.back();
+            submenu->length = print_zstr_to_cstr(str, submenu->name);
+            submenu->line = m->line;
             submenu->column = m->column + i;
         }
     }
 }
 
-static void journey_create_menu(JourneyMenuType type, bool is_second_noun) {
 
-    struct JourneyMenu menu[10];
+// Builds either a party member menu (kJMenuTypeMembers) or an object list
+// menu (kJMenuTypeObjects) and sends items to the front-end. For member
+// menus, submenus with individual verbs are also created. For object menus,
+// "glue words" (printed_journey_words) are included as non-selectable labels.
+// is_second_noun is true when building the secondary target list (e.g. the
+// target of "CAST GLOW ON ___").
+static void journey_create_vo_menu(JourneyMenuType type, bool is_second_noun) {
+
+    JourneyVOMenu menu[MAX_MENU_ITEMS] = {};
 
     int table, table_count;
     if (type == kJMenuTypeObjects) {
@@ -489,7 +679,7 @@ static void journey_create_menu(JourneyMenuType type, bool is_second_noun) {
         table_count = 5;
     }
 
-    struct JourneyMenu *m;
+    JourneyVOMenu *m;
 
     bool subgroup = (get_global(jg.SUBGROUP_MODE) == 1 && type != kJMenuTypeObjects);
     int menu_counter = 0;
@@ -498,23 +688,25 @@ static void journey_create_menu(JourneyMenuType type, bool is_second_noun) {
         uint16_t object = word(table + 2 * i);
         if (object != 0 && (!(subgroup && !internal_test_attr(object, ja.SUBGROUP)) || internal_test_attr(object, ja.SHADOW))) {
 
+            // Stop before indexing past the end of menu[]. break (not return)
+            // so the items collected so far are still sent below.
+            if (menu_counter >= MAX_MENU_ITEMS)
+                break;
+
             m = &menu[menu_counter];
 
-            int TAG_NAME_LENGTH = get_global(jg.TAG_NAME_LENGTH);
-            int NAME_TBL = get_global(jg.NAME_TBL) + 2;
-
-            if ((object == jo.TAG_OBJECT || object == jo.TAG) && TAG_NAME_LENGTH != 0) {
-                for (uint16_t j = 0; j < TAG_NAME_LENGTH; j++) {
-                    m->name[j] = user_byte(NAME_TBL++);
-                }
-                m->name[TAG_NAME_LENGTH] = 0;
-                m->length = TAG_NAME_LENGTH;
+            if (is_tag_with_custom_name(object)) {
+                // The name is whatever the player typed (and whatever a
+                // saved game says its length is), so it is cut to fit.
+                MenuString name(m->name, sizeof(m->name));
+                name.append_zscii(get_global(jg.NAME_TBL) + 2, get_global(jg.TAG_NAME_LENGTH));
+                m->length = name.length();
             } else {
                 uint16_t str = internal_get_prop(object, ja.SDESC);
                 m->length = print_zstr_to_cstr(str, m->name);
             }
 
-            m->submenu = nullptr;
+            m->submenu.clear();
 
             if (m->length > 1) {
                 m->line = (i - 1) % 5;
@@ -523,7 +715,7 @@ static void journey_create_menu(JourneyMenuType type, bool is_second_noun) {
                     // Hack to add "shadow" menus to the previous submenu
                     // instead of creating a new one.
                     // This assumes that the shadow menu is always the last one.
-                    if (internal_test_attr(object, ja.SHADOW)) {
+                    if (internal_test_attr(object, ja.SHADOW) && menu_counter > 0) {
                         menu_counter--;
                         menu[menu_counter].line++;
                     }
@@ -532,8 +724,6 @@ static void journey_create_menu(JourneyMenuType type, bool is_second_noun) {
                     m->column = 3 + ((menu_counter > 4 || is_second_noun) ? 1 : 0);
                 }
                 menu_counter++;
-                if (menu_counter > 10)
-                    return;
             }
         }
     }
@@ -554,40 +744,36 @@ static void journey_create_menu(JourneyMenuType type, bool is_second_noun) {
         m = &menu[i];
         win_menuitem(type, m->column, m->line, (i == menu_counter - 1), m->name, m->length);
 
-        if (m->submenu != nullptr) {
-            for (int j = 0; j < m->submenu_entries; j++) {
-                struct JourneyMenu *submenu = &(m->submenu[j]);
-                win_menuitem(kJMenuTypeVerbs, submenu->column, submenu->line, (j == m->submenu_entries - 1), submenu->name, submenu->length);
-            }
-            free(m->submenu);
-            m->submenu = nullptr;
+        for (size_t j = 0; j < m->submenu.size(); j++) {
+            const JourneyVOMenu &submenu = m->submenu[j];
+            win_menuitem(kJMenuTypeVerbs, submenu.column, submenu.line, (j == m->submenu.size() - 1), const_cast<char *>(submenu.name), submenu.length);
         }
     }
 }
 
-#pragma mark Input
+#pragma mark - Input
 
+// Draws a text input cursor at the current input position.
+// On Font 3 platforms the cursor is a reverse-video underscore;
+// on non-Font 3 platforms it is a reverse-video space.
 static void journey_draw_cursor(void) {
     if (input_column > screen_width_in_chars - 1)
         return;
     journey_move_cursor(input_column, input_line);
 
-    if (global_font_3_flag)
-        garglk_set_reversevideo(1);
-    else
-        garglk_set_reversevideo(0);
-
+    garglk_set_reversevideo(global_font_3_flag ? 1 : 0);
     underscore_or_square();
-
-    if (global_font_3_flag)
-        garglk_set_reversevideo(0);
-    else
-        garglk_set_reversevideo(1);
-
+    garglk_set_reversevideo(global_font_3_flag ? 0 : 1);
 
     journey_move_cursor(input_column, input_line);
 }
 
+// Main keyboard input loop for name entry and Elvish text. Renders an
+// underscore/space input field, reads characters one at a time, handles
+// backspace, validates input via bad_character(), auto-capitalizes the
+// first letter (in name mode), and stores characters into the Z-machine
+// buffer at 'table'. Returns the number of characters entered.
+// If elvish is true, the field is erased after Enter is pressed.
 static uint16_t journey_read_keyboard_line(int x, int y, uint16_t table, int max, bool elvish, uint8_t *kbd) {
 
     input_column = x + journey_input_length;
@@ -622,7 +808,8 @@ static uint16_t journey_read_keyboard_line(int x, int y, uint16_t table, int max
             garglk_set_reversevideo(0);
         }
         if (character == 0x7f || character == ZSCII_BACKSPACE || character == ZSCII_LEFT) { // DELETE-KEY ,BACK-SPACE ,LEFT-ARROW
-            if (journey_input_length == 0) {
+            if (journey_input_length <= 0) {
+                journey_input_length = 0;
                 win_beep(1);
                 continue;
             } else {
@@ -673,14 +860,23 @@ static uint16_t journey_read_keyboard_line(int x, int y, uint16_t table, int max
         }
     }
 
-    set_current_window(journey_text_buffer);
+    set_current_window(journey_text_buffer());
     journey_current_input = INPUT_PARTY;
     return journey_input_length;
 }
 
 
+// Returns the Z-string address for a command verb. Later game releases
+// (serial >= 890522) include abbreviated command strings at offset +10
+// in the command table entry, used when columns are narrow (<13 chars).
 static int GET_COMMAND(int cmd) {
-    if (header.release > 50) {
+
+    // Later releases have a separate table with abbreviated commands.
+    // This seems to have been introduced in release 51, serial 890522.
+    // (It is easier to do it this way than checking the release number
+    // directly because of release 142, serial 890205.)
+
+    if (serial_as_int >= 890522) {
         if (get_global(jg.COMMAND_WIDTH) < 13) {
             int STR = user_word(cmd + 10);
             if (STR)
@@ -690,18 +886,23 @@ static int GET_COMMAND(int cmd) {
     return user_word(cmd);
 }
 
+// Decodes and prints a command verb string. Returns the character count.
 static int PRINT_COMMAND(int cmd) {
     return print_handler(unpack_string(GET_COMMAND(cmd)), nullptr);
 }
 
+// Returns the most appropriate description string for an object based on
+// the current screen width. Narrower screens use shorter descriptions
+// (DESC8 for <50 cols, DESC12 for <71 cols) to avoid overflow. Falls
+// back to SDESC (short description) if no width-specific variant exists.
 static int GET_DESC(int obj) {
     int string;
-    if (screen_width_in_chars < 0x32) {
+    if (screen_width_in_chars < WIDTH_8) {
         string = internal_get_prop(obj, ja.DESC8);
         if (string)
             return string;
     }
-    if (screen_width_in_chars < 0x47) {
+    if (screen_width_in_chars < WIDTH_12) {
         string = internal_get_prop(obj, ja.DESC12);
         if (string)
             return string;
@@ -710,15 +911,13 @@ static int GET_DESC(int obj) {
 }
 
 
+// Prints an object's description at the current cursor position. If the
+// object is the protagonist (TAG or TAG_OBJECT) and has a custom name,
+// prints that name from the NAME_TBL instead. If 'cmd' is true, always
+// uses the short description regardless of screen width.
 static int PRINT_DESC(int obj, bool cmd) {
-    int name_table = get_global(jg.NAME_TBL) + 2;
-    int tag_name_length = get_global(jg.TAG_NAME_LENGTH);
-
-    if ((obj == jo.TAG_OBJECT || obj == jo.TAG) && tag_name_length != 0) {
-        for (uint16_t j = 0; j < tag_name_length; j++) {
-            put_char(user_byte(name_table++));
-        }
-        return tag_name_length;
+    if (is_tag_with_custom_name(obj)) {
+        return print_tag_name();
     }
 
     uint16_t str;
@@ -731,6 +930,29 @@ static int PRINT_DESC(int obj, bool cmd) {
     return count_characters_in_zstring(str);
 }
 
+// True if column is in the rightmost of the command columns.
+static bool is_rightmost_column(int column) {
+    return column > screen_width_in_chars * 0.7;
+}
+
+// The number of spaces it takes to erase a command cell is different in
+// the rightmost column: one more without Font 3 (there is no separator to
+// the right of it), one less on Amiga (where the screen border is).
+static int adjust_erase_width(int column, int num_spaces) {
+    if (is_rightmost_column(column)) {
+        if (!global_font_3_flag) {
+            num_spaces++;
+        } else if (options.int_number == INTERP_AMIGA) {
+            num_spaces--;
+        }
+    }
+    return num_spaces;
+}
+
+// Clears a command cell in the grid by overwriting it with spaces, then
+// redraws the column separator (vertical line or reverse-video space) at
+// the right edge. Accounts for platform-specific adjustments (MS-DOS
+// shifts left by one, Amiga uses fewer spaces at the right edge, etc.).
 static void journey_erase_command_chars(int line, int column, int num_spaces) {
     if (options.int_number == INTERP_MSDOS) {
         journey_move_cursor(column - 1, line);
@@ -738,15 +960,8 @@ static void journey_erase_command_chars(int line, int column, int num_spaces) {
         journey_move_cursor(column, line);
     }
 
-    bool in_rightmost_column = (column > screen_width_in_chars * 0.7);
-
-    if (in_rightmost_column) {
-        if (!global_font_3_flag) {
-            num_spaces++;
-        } else if (options.int_number == INTERP_AMIGA) {
-            num_spaces--;
-        }
-    }
+    bool in_rightmost_column = is_rightmost_column(column);
+    num_spaces = adjust_erase_width(column, num_spaces);
 
     for (int i = 0; i < num_spaces; i++)
         glk_put_char_stream(JOURNEY_BG_GRID.id->str, UNICODE_SPACE);
@@ -768,9 +983,9 @@ static void journey_erase_command_chars(int line, int column, int num_spaces) {
 }
 
 
-#define LONG_ARROW_WIDTH 3
-#define SHORT_ARROW_WIDTH 2
-#define NO_ARROW_WIDTH 1
+constexpr int LONG_ARROW_WIDTH = 3;
+constexpr int SHORT_ARROW_WIDTH = 2;
+constexpr int NO_ARROW_WIDTH = 1;
 
 static void journey_print_character_commands(bool clear) {
     // Prints the character names and arrows, and their commands in the three rightmost columns.
@@ -779,14 +994,14 @@ static void journey_print_character_commands(bool clear) {
     if (clear)
         number_of_printed_journey_words = 0;
 
-    int line = get_global(jg.COMMAND_START_LINE); // COMMAND-START-LINE
+    int line = get_global(jg.COMMAND_START_LINE);
     int partytable, character, position;
     if (get_global(jg.UPDATE_FLAG) == 1 && !clear) {
-        internal_call(pack_routine(jr.FILL_CHARACTER_TBL));
+        call_routine(jr.FILL_CHARACTER_TBL);
     }
 
     if (!clear)
-        journey_create_menu(kJMenuTypeMembers, false);
+        journey_create_vo_menu(kJMenuTypeMembers, false);
 
     partytable = get_global(jg.PARTY);
 
@@ -838,7 +1053,7 @@ static void journey_print_character_commands(bool clear) {
             bool subgroup_attribute = internal_test_attr(character, ja.SUBGROUP); // attribute 0x2a is SUBGROUP flag
             // if the SHADOW_BIT attribute of a character is set, the character name is hidden
             // and its commands "belong" to the visible character above.
-            // This is used to give Praxis more than three commands in the mines.
+            // This is used to give Praxix more than three commands in the mines.
             bool shadow_attribute = internal_test_attr(character, ja.SHADOW); // attribute 0x17 is SHADOW flag
 
             bool should_print_command = true;
@@ -859,35 +1074,37 @@ static void journey_print_character_commands(bool clear) {
                 if (should_print_command && PRINT_COMMAND(word(verbs_table + j * 2)) > 2) {
                     number_of_printed_verbs_and_objects++;
                 }
-
                 position += commandwidth;
             }
         }
-
         line++;
     }
 
-
     if (get_global(jg.SMART_DEFAULT_FLAG) == 1) { // SMART-DEFAULT-FLAG
         set_global(jg.SMART_DEFAULT_FLAG, 0);
-        internal_call(pack_routine(jr.SMART_DEFAULT)); //    SMART_DEFAULT();
+        call_routine(jr.SMART_DEFAULT); //    SMART_DEFAULT();
     }
 
     // Delete the Individual Commands menu when the columns to the right are empty
     // (and also update party menu)
     if (number_of_printed_party_members == 0 && number_of_printed_verbs_and_objects == 0) {
         win_menuitem(kJMenuTypeDeleteMembers, 0, 0, false, nullptr, STRING_BUFFER_SIZE);
-        create_journey_party_menu();
+        create_journey_party_vo_menu();
     }
 
-    set_current_window(&windows[ja.buffer_window_index]);
+    set_current_window(journey_text_buffer());
 }
 
-bool journey_read_elvish(int actor) {
+// Handles the text input mode. Clears existing commands, displays
+// "says..." next to the character's name, then reads free-form text input.
+// The entered text is tokenized and parsed by the Z-machine's "Elvish" parser.
+// Returns true if valid input was entered, false if the player pressed Enter
+// with no text.
+static bool journey_read_text_input(int actor) {
     journey_print_character_commands(true); // <CLEAR-FIELDS>
 
-    user_store_byte(get_global(jg.E_LEXV), 0x14); // <PUTB ,E-LEXV 0 20>
-    user_store_byte(get_global(jg.E_INBUF), 0x32); // <PUTB ,E-INBUF 0 50>
+    user_store_byte(get_global(jg.E_LEXV), 20); // <PUTB ,E-LEXV 0 20>
+    user_store_byte(get_global(jg.E_INBUF), 50); // <PUTB ,E-INBUF 0 50>
 
     int line = get_global(jg.COMMAND_START_LINE) + party_pcm(actor) - 1;
 
@@ -903,32 +1120,30 @@ bool journey_read_elvish(int actor) {
 
     journey_input_length = 0;
 
-    journey_refresh_character_command_area(get_global(jg.COMMAND_START_LINE) - 1); // <REFRESH-CHARACTER-COMMAND-AREA <- ,COMMAND-START-LINE 1>>
-
-    set_global(jg.UPDATE_FLAG, 1); // <SETG UPDATE-FLAG T>
+    journey_refresh_character_command_area(get_global(jg.COMMAND_START_LINE) - 1);
+    set_global(jg.UPDATE_FLAG, 1);
 
     if (offset == 0)
         return false;
 
-    internal_call_with_arg(pack_routine(jr.MASSAGE_ELVISH), offset);  // <MASSAGE-ELVISH .OFF>
-    set_global(jg.E_TEMP_LEN, offset); // <SETG E-TEMP-LEN .OFF>
+    call_routine(jr.MASSAGE_ELVISH, {offset});
+    set_global(jg.E_TEMP_LEN, offset);
 
     tokenize(get_global(jg.E_INBUF),get_global(jg.E_LEXV), 0, false);
-    if (user_byte(get_global(jg.E_LEXV) + 1) == 0) // <ZERO? <GETB ,E-LEXV 1>>
+    if (user_byte(get_global(jg.E_LEXV) + 1) == 0)
         return false;
-    if (actor == jo.PRAXIX || actor == jo.BERGON) // PRAXIX ,BERGON
+    if (actor == jo.PRAXIX || actor == jo.BERGON)
         return true;
-    internal_call(pack_routine(jr.PARSE_ELVISH)); // <PARSE-ELVISH>
+    call_routine(jr.PARSE_ELVISH);
     return true;
 }
 
-void journey_change_name() {
-    int MAX;
-    if (screen_width_in_chars < 50) // 8-WIDTH
-        MAX = 5;
-    else
-        MAX = 8;
-    
+// Handles the protagonist renaming flow. Reads a name from the keyboard,
+// checks it against a list of reserved/illegal names, and if valid, updates
+// the TAG object's properties and the encoded Z-string representation.
+static void journey_change_name(void) {
+    int MAX = (screen_width_in_chars < WIDTH_8) ? 5 : 8;
+
     int COL = get_global(jg.NAME_COLUMN); // NAME-COLUMN
     int LN = get_global(jg.COMMAND_START_LINE) + party_pcm(jo.TAG) - 1; // <SET LN <- <+ ,COMMAND-START-LINE <PARTY-PCM ,TAG>> 1>
     uint16_t table = get_global(jg.NAME_TBL) + 2;
@@ -940,11 +1155,11 @@ void journey_change_name() {
 
     if (offset == 0) {
         set_global(jg.UPDATE_FLAG, 1); // <SETG UPDATE-FLAG T>
-    } else if (internal_call_with_arg(pack_routine(jr.ILLEGAL_NAME), offset) == 1) { // ILLEGAL-NAME
+    } else if (call_routine(jr.ILLEGAL_NAME, {offset}) == 1) { // ILLEGAL-NAME
         glk_put_string(const_cast<char*>("[The name you have chosen is reserved. Please try again.]"));
     } else {
         // Do the change
-        internal_call(pack_routine(jr.REMOVE_TRAVEL_COMMAND));
+        call_routine(jr.REMOVE_TRAVEL_COMMAND);
 
         public_encode_text(table, offset, get_global(jg.TAG_NAME)); //  <ZWSTR ,NAME-TBL .OFF 2 ,TAG-NAME>
 
@@ -956,7 +1171,11 @@ void journey_change_name() {
     }
 }
 
-void journey_init_screen(void) {
+// Draws the static screen chrome: top border (Amiga only), vertical
+// divider between graphics and text, horizontal divider above the command
+// area, bottom border (Amiga only), and the "The Party" / "Individual
+// Commands" column headers. Called on startup, resize, and restore.
+static void journey_init_screen(void) {
     Window *lastwin = curwin;
     set_current_window(&JOURNEY_BG_GRID);
     glk_window_clear(JOURNEY_BG_GRID.id);
@@ -966,6 +1185,7 @@ void journey_init_screen(void) {
     glk_set_style(style_Normal);
     garglk_set_reversevideo(0);
 
+    serial_as_int = atoi((const char *)header.serial);
 
     journey_setup_windows();
     int text_window_left_edge = get_global(jg.TEXT_WINDOW_LEFT);
@@ -973,7 +1193,7 @@ void journey_init_screen(void) {
 
     // Draw a line at the top with a centered "JOURNEY"
     if (global_border_flag) {
-        journey_font3_line(1, H_LINE, 47, 48);
+        journey_font3_line(1, H_LINE, TOP_LEFT_CORNER, TOP_RIGHT_CORNER);
         int x = screen_width_in_chars / 2 - 2;
         journey_move_cursor(x, 1);
         glk_put_string(const_cast<char*>("JOURNEY"));
@@ -1006,15 +1226,15 @@ void journey_init_screen(void) {
             journey_move_cursor(text_window_left_edge - 1, line);
             glk_put_char(THIN_V_LINE);
             journey_move_cursor(screen_width_in_chars, line);
-            glk_put_char(40);
+            glk_put_char(RIGHT_BORDER_LINE);
             glk_set_style(style_Normal);
         }
-    };
+    }
 
     // Draw horizontal line above "command area"
     if (global_font_3_flag) {
         if (global_border_flag) {
-            journey_font3_line(line, H_LINE, THIN_V_LINE, 40);
+            journey_font3_line(line, H_LINE, THIN_V_LINE, RIGHT_BORDER_LINE);
         } else {
             journey_font3_line(line, H_LINE, H_LINE, H_LINE);
         }
@@ -1028,7 +1248,7 @@ void journey_init_screen(void) {
 
     // Draw bottom border line
     if (global_border_flag) {
-        journey_font3_line(screen_height_in_chars, 38, 46, 49);
+        journey_font3_line(screen_height_in_chars, BOTTOM_LINE, BOTTOM_LEFT_CORNER, BOTTOM_RIGHT_CORNER);
     }
 
     if (!global_font_3_flag) {
@@ -1058,42 +1278,45 @@ void journey_init_screen(void) {
     set_current_window(lastwin);
 }
 
-void TAG_ROUTE_PRINT(void) {
-    int tag_name_length = get_global(jg.TAG_NAME_LENGTH);
-    int name_table = get_global(jg.NAME_TBL) + 4;
-
-    for (uint16_t j = 0; j < tag_name_length; j++) {
-        put_char(user_byte(name_table++));
-    }
-    if (screen_width_in_chars < 71 || tag_name_length > 6) {
+// Prints the protagonist's "travel route" command.
+// Uses abbreviated "Rt" suffix when the screen is narrow or the name is long.
+static void TAG_ROUTE_PRINT(void) {
+    int tag_name_length = print_tag_name();
+    if (screen_width_in_chars < WIDTH_12 || tag_name_length > 6) {
         glk_put_string(const_cast<char*>(" Rt"));
     } else {
         glk_put_string(const_cast<char*>(" Route"));
     }
 }
 
+// Z-machine entry point for refreshing the character commands display.
+// Variable 1 controls whether to clear existing commands first.
 void PRINT_CHARACTER_COMMANDS(void) {
     if (journey_current_input == INPUT_OBJECT || journey_current_input == INPUT_SPECIAL) {
         journey_current_input = INPUT_PARTY;
         number_of_printed_journey_words = 0;
     }
-    journey_print_character_commands(variable(1) == 1 ? true : false);
+    journey_print_character_commands(variable(1) == 1);
 }
 
 
+// Z-machine entry point for Elvish input. Variable 1 is the actor (defaults
+// to Tag). Stores 1 in variable 1 on success, 0 on empty input.
 void READ_ELVISH(void) {
     journey_current_input = INPUT_ELVISH;
     // actor (journey_read_elvish argument) is set to Tag by default
-    store_variable(1, (journey_read_elvish(variable(1)) ? 1 : 0));
+    store_variable(1, (journey_read_text_input(variable(1)) ? 1 : 0));
 }
 
+// Z-machine entry point for the protagonist renaming flow.
 void CHANGE_NAME(void) {
     journey_current_input = INPUT_NAME;
     journey_change_name();
 }
 
-// It would be nice if this could be merged with journey_erase_command_chars() somehow
-
+// Z-machine entry point for erasing a single command cell. Similar to
+// journey_erase_command_chars() but operates on the current window's
+// cursor position and uses variable(1) to determine the width.
 void ERASE_COMMAND(void) {
     int pix = variable(1);
     glk_window_move_cursor(curwin->id, curwin->x, curwin->y);
@@ -1107,13 +1330,7 @@ void ERASE_COMMAND(void) {
         num_spaces--;
     }
 
-    if (curwin->x > screen_width_in_chars * 0.7) {
-        if (!global_font_3_flag) {
-            num_spaces++;
-        } else if (options.int_number == INTERP_AMIGA) {
-            num_spaces--;
-        }
-    }
+    num_spaces = adjust_erase_width(curwin->x, num_spaces);
 
     for (int i = 0; i < num_spaces; i++)
         glk_put_char(UNICODE_SPACE);
@@ -1121,10 +1338,12 @@ void ERASE_COMMAND(void) {
     glk_window_move_cursor(curwin->id, curwin->x, curwin->y);
 }
 
+// Prints one or more columns in the command area.
+// If 'party' is true, prints the party commands (leftmost column).
+// Otherwise prints object lists in the right-side columns.
+// is_second_noun is true when printing a secondary target list (e.g.
+// the target of "CAST GLOW ON ___"), which shifts items one column right.
 static void journey_print_columns(bool party, bool is_second_noun) {
-
-//  is_second_noun is true for things like requesting the target of a spell,
-//  It means we should print a selectable list of objects in the rightmost column.
 
     int column, table, object;
     int line = get_global(jg.COMMAND_START_LINE);
@@ -1138,7 +1357,7 @@ static void journey_print_columns(bool party, bool is_second_noun) {
     } else  {
         column = get_global(jg.COMMAND_OBJECT_COLUMN) + (is_second_noun ? command_width : 0);
         table = get_global(jg.O_TABLE) + (is_second_noun ? 10 : 0);
-        journey_create_menu(kJMenuTypeObjects, is_second_noun);
+        journey_create_vo_menu(kJMenuTypeObjects, is_second_noun);
     }
 
     int table_count = user_word(table);
@@ -1167,18 +1386,24 @@ static void journey_print_columns(bool party, bool is_second_noun) {
     journey_refresh_character_command_area(get_global(jg.COMMAND_START_LINE) - 1);
 }
 
+// Z-machine entry point for printing command columns. Variable 1 selects
+// party mode, variable 2 selects "special" (second noun) mode.
 void PRINT_COLUMNS(void) {
     if (variable(1) == 1) {
         journey_current_input = INPUT_PARTY;
-        create_journey_party_menu();
+        create_journey_party_vo_menu();
     } else if (variable(2) == 1) {
         journey_current_input = INPUT_SPECIAL;
     } else {
         journey_current_input = INPUT_OBJECT;
     }
-    journey_print_columns(variable(1), variable(2));
+    journey_print_columns(variable(1) != 0, variable(2) != 0);
 }
 
+// Redraws the vertical column separators in the command area (bottom 5 rows).
+// Called after content changes to ensure the grid lines remain intact.
+// Uses either Font 3 box-drawing characters or reverse-video spaces depending
+// on the platform. Also draws the right border on Amiga.
 static int journey_refresh_character_command_area(int16_t line) {
 
     update_internal_globals();
@@ -1233,7 +1458,7 @@ static int journey_refresh_character_command_area(int16_t line) {
         if (global_border_flag) {
             glk_set_style(style_BlockQuote);
             journey_move_cursor(screen_width_in_chars, line);
-            glk_put_char(40); // Draw right border char (40)
+            glk_put_char(RIGHT_BORDER_LINE);
             glk_set_style(style_Normal);
         }
     }
@@ -1244,11 +1469,15 @@ static int journey_refresh_character_command_area(int16_t line) {
     return line;
 }
 
+// Z-machine entry point for refreshing the command area grid lines.
 void REFRESH_CHARACTER_COMMAND_AREA(void) {
     int line = variable(1);
     journey_refresh_character_command_area(line);
 }
 
+// After a screen resize during active text input (name or Elvish), redraws
+// the partially-entered text at its new position. Reads characters back from
+// the Z-machine input buffer and fills the remaining field with cursor chars.
 static void journey_reprint_partial_input(int x, int y, int length_so_far, int max_length, int16_t table_address) {
     journey_move_cursor(x, y);
     glk_set_style(style_Normal);
@@ -1276,6 +1505,11 @@ static void journey_reprint_partial_input(int x, int y, int length_so_far, int m
 }
 
 
+// Computes and applies the pixel-level size and position of the graphics
+// window and text buffer window based on the current screen dimensions
+// and the TEXT_WINDOW_LEFT column. The graphics window occupies the left
+// portion of the screen; the text buffer fills the right side above the
+// command area.
 static void journey_resize_graphics_and_buffer_windows(void) {
 
     int text_window_left = get_global(jg.TEXT_WINDOW_LEFT);
@@ -1293,21 +1527,23 @@ static void journey_resize_graphics_and_buffer_windows(void) {
 
     JOURNEY_GRAPHICS_WIN.x_size = (float)(text_window_left - 2) * gcellw - JOURNEY_GRAPHICS_WIN.x_origin + ggridmarginx + (global_font_3_flag ? 0 : 2);
 
-    if (journey_text_buffer == nullptr) {
-        journey_text_buffer = &windows[ja.buffer_window_index];
+    if (journey_no_graphics()) {
+        JOURNEY_GRAPHICS_WIN.x_size = 0;
+        JOURNEY_GRAPHICS_WIN.x_origin -= gcellw;
+        text_window_left = 0;
     }
 
     int command_start_line = screen_height_in_chars - 4 - (global_border_flag ? 1 : 0);
 
     uint16_t x_size = (screen_width_in_chars - text_window_left + 1) * gcellw;
-    uint16_t y_size = (command_start_line - 2) * gcellh - global_font_3_flag;
+    uint16_t y_size = (command_start_line - 2) * gcellh - (global_font_3_flag ? 1 : 0);
 
     if (global_border_flag) {
-        x_size -= gcellw;
+        x_size -= gcellw * (journey_no_graphics() ? 4 : 1);
         y_size -= gcellh;
     }
 
-    v6_define_window(journey_text_buffer, JOURNEY_GRAPHICS_WIN.x_origin + JOURNEY_GRAPHICS_WIN.x_size + gcellw + (global_font_3_flag ? 3 : 0), JOURNEY_GRAPHICS_WIN.y_origin, x_size, y_size);
+    v6_define_window(journey_text_buffer(), JOURNEY_GRAPHICS_WIN.x_origin + JOURNEY_GRAPHICS_WIN.x_size + gcellw + (global_font_3_flag ? 3 : 0), JOURNEY_GRAPHICS_WIN.y_origin, x_size, y_size);
 
     JOURNEY_GRAPHICS_WIN.y_size = y_size;
 
@@ -1316,8 +1552,14 @@ static void journey_resize_graphics_and_buffer_windows(void) {
     v6_sizewin(&JOURNEY_GRAPHICS_WIN);
 }
 
-#pragma mark adjust_journey_windows
+#pragma mark - Window Layout
 
+// Master layout routine: rebuilds the entire Journey UI after a resize or
+// restore. Redraws borders, column separators, party commands, character
+// commands, restores menu highlights, repositions the graphics and text
+// buffer windows, redraws the location image, and restores any in-progress
+// text input cursor. The 'restoring' flag suppresses highlight restoration
+// (since the Z-machine state may not yet be fully consistent).
 static void journey_adjust_windows(bool restoring) {
     // Window 0: Text buffer (in later versions) Receives most keypresses.
     // Window 1: Fullscreen grid window
@@ -1369,42 +1611,40 @@ static void journey_adjust_windows(bool restoring) {
         }
 
         // reset bit 2 in LOWCORE FLAGS, no screen redraw needed
-        store_word(0x10, word(0x10) & ~FLAGS2_STATUS);
+        store_word(0x10, word(0x10) & ~FLAGS2_REDRAW);
 
         if (!restoring && screenmode != MODE_CREDITS) {
-            int16_t saved_line = selected_journey_line;
-            int16_t saved_column = selected_journey_column;
-
             if (selected_journey_column <= 0) { // call BOLD-PARTY-CURSOR
-                internal_call_with_2_args(pack_routine(jr.BOLD_PARTY_CURSOR), selected_journey_line, 0);
+                call_routine(jr.BOLD_PARTY_CURSOR, {(uint16_t)selected_journey_line, 0});
             } else if (journey_current_input == INPUT_PARTY) { // call BOLD-CURSOR
-                internal_call_with_2_args(pack_routine(jr.BOLD_CURSOR), selected_journey_line, selected_journey_column);
-
+                call_routine(jr.BOLD_CURSOR, {(uint16_t)selected_journey_line, (uint16_t)selected_journey_column});
             } else if (journey_current_input != INPUT_ELVISH) { // call BOLD-OBJECT-CURSOR
+                // Calling BOLD_CURSOR will change selection, so we must stash it here
+                int16_t stashed_selected_journey_column = selected_journey_column;
+                int16_t stashed_selected_journey_line = selected_journey_line;
+                
                 int numwords = number_of_printed_journey_words;
-
                 for (int i = 0; i < numwords; i++) {
                     JourneyWords *word = &printed_journey_words[i];
-                    uint16_t args[3] = {word->pcm, word->pcf, word->str};
-                    internal_call_with_args(pack_routine(jr.BOLD_CURSOR), 3, args);
+                    std::vector<uint16_t> args = {word->pcm, word->pcf, word->str};
+                    call_routine(jr.BOLD_CURSOR, args);
                 }
-                internal_call_with_2_args(pack_routine(jr.BOLD_OBJECT_CURSOR), saved_line, saved_column); // BOLD-OBJECT-CURSOR(PCM, PCF)
+                selected_journey_column = stashed_selected_journey_column;
+                selected_journey_line = stashed_selected_journey_line;
+                call_routine(jr.BOLD_OBJECT_CURSOR, {(uint16_t)selected_journey_line, (uint16_t)selected_journey_column}); // BOLD-OBJECT-CURSOR(PCM, PCF)
             }
-
-            selected_journey_line = saved_line;
-            selected_journey_column = saved_column;
         }
     }
     journey_resize_graphics_and_buffer_windows();
 
     // Redraw image(s)
     // (unless we have no graphics)
-    if (JOURNEY_GRAPHICS_WIN.id != nullptr) {
-        internal_call(pack_routine(jr.GRAPHIC));
+    if (JOURNEY_GRAPHICS_WIN.id != nullptr && !journey_no_graphics()) {
+        call_routine(jr.GRAPHIC);
 
         uint16_t HERE = get_global(jg.HERE);
         if (HERE == 216) // Control Room
-            internal_call(pack_routine(jr.COMPLETE_DIAL_GRAPHICS));
+            call_routine(jr.COMPLETE_DIAL_GRAPHICS);
     }
 
     if (journey_current_input == INPUT_NAME || journey_current_input == INPUT_ELVISH) {
@@ -1423,7 +1663,10 @@ static void journey_adjust_windows(bool restoring) {
     }
 }
 
-void redraw_vertical_lines_if_needed(void) {
+// On MS-DOS (which lacks Font 3), some operations can accidentally erase
+// vertical column separators. This redraws them when needed. Skipped on
+// other platforms and during Elvish input (where the columns are cleared).
+static void redraw_vertical_lines_if_needed(void) {
     if (options.int_number != INTERP_MSDOS ||
         journey_current_input == INPUT_ELVISH ||
         (jg.NAME_WIDTH_PIX != 0 && jg.COMMAND_WIDTH_PIX != 0))
@@ -1431,11 +1674,14 @@ void redraw_vertical_lines_if_needed(void) {
     journey_refresh_character_command_area(screen_height_in_chars - 5 - global_border_flag);
 }
 
+// Z-machine entry point: records the currently highlighted menu item position
+// and the associated "glue word" (verb/preposition) for later redraw.
+// Up to BOCFEL_MAX_JOURNEY_WORDS glue words can be tracked simultaneously.
 void BOLD_CURSOR(void) {
     selected_journey_line = variable(1);
     selected_journey_column = variable(2);
 
-    if (number_of_printed_journey_words < 4) {
+    if (number_of_printed_journey_words < BOCFEL_MAX_JOURNEY_WORDS) {
         JourneyWords *word = &printed_journey_words[number_of_printed_journey_words++];
         word->pcm = variable(1);
         word->pcf = variable(2);
@@ -1444,22 +1690,28 @@ void BOLD_CURSOR(void) {
     redraw_vertical_lines_if_needed();
 }
 
+// Z-machine entry point: records the highlighted party command position.
 void BOLD_PARTY_CURSOR(void) {
     selected_journey_line = variable(1);
     selected_journey_column = variable(2);
     redraw_vertical_lines_if_needed();
 }
 
+// Z-machine entry point: records the highlighted object selection position.
 void BOLD_OBJECT_CURSOR(void) {
     selected_journey_line = variable(1);
     selected_journey_column = variable(2);
     redraw_vertical_lines_if_needed();
 }
 
+// Called after the game's intro sequence completes to transition from
+// the credits/slideshow screen mode to normal gameplay.
 void after_INTRO(void) {
     screenmode = MODE_NORMAL;
 }
 
+// Z-machine entry point for drawing stamp images. Variable 1 is the picture
+// number, optional variable 2 is the placement (see StampBits / reference image).
 void GRAPHIC_STAMP(void) {
     int16_t picnum, where = 0;
     if (znargs > 0 && JOURNEY_GRAPHICS_WIN.id != nullptr) {
@@ -1471,38 +1723,51 @@ void GRAPHIC_STAMP(void) {
 }
 
 
+// Z-machine entry point, replacing the game's own REFRESH-SCREEN. Draws
+// nothing itself: it only zeroes the routine's first local variable (not a
+// no-op, despite appearances). The actual screen refresh is handled by
+// journey_adjust_windows() on resize events.
 void REFRESH_SCREEN(void) {
     store_variable(1, 0);
 }
 
+// Z-machine entry point for initial screen setup. On the first call (game
+// start or restart), displays the title image and waits for a keypress
+// before transitioning to the credits screen. On subsequent calls (e.g.
+// after UNDO), just redraws the screen borders.
 void INIT_SCREEN(void) {
     // We check if START-LOC has the SEEN flag set
     // This will be false at the start of the game
     // and on restart.
     if (!qset(jo.START_LOC, ja.SEEN) && screenmode == MODE_INITIAL_QUESTION) {
         // Show title image and wait for key press
-        if (journey_text_buffer == NULL)
-            journey_text_buffer = &windows[ja.buffer_window_index];
-        win_setbgnd(journey_text_buffer->id->peer, monochrome_black);
-        glk_window_clear(journey_text_buffer->id);
-        screenmode = MODE_SLIDESHOW;
-        // We do a fake resize event to draw the title image
-        journey_update_on_resize();
-        glk_request_mouse_event(JOURNEY_GRAPHICS_WIN.id);
-        glk_request_char_event(curwin->id);
-        internal_read_char();
+        if (!journey_no_graphics()) {
+            win_setbgnd(journey_text_buffer()->id->peer, monochrome_black);
+            glk_window_clear(journey_text_buffer()->id);
+            screenmode = MODE_SLIDESHOW;
+            // We do a fake resize event to draw the title image
+            journey_update_on_resize();
+            glk_request_mouse_event(JOURNEY_GRAPHICS_WIN.id);
+            glk_request_char_event(curwin->id);
+            internal_read_char();
+        } else {
+            journey_update_on_resize();
+        }
         screenmode = MODE_CREDITS;
         win_setbgnd(JOURNEY_BG_GRID.id->peer, zcolor_Default);
-        win_setbgnd(journey_text_buffer->id->peer, zcolor_Default);
+        win_setbgnd(journey_text_buffer()->id->peer, zcolor_Default);
+        glk_window_clear(journey_text_buffer()->id);
 
         glk_window_set_background_color(JOURNEY_GRAPHICS_WIN.id, monochrome_black);
         glk_window_clear(JOURNEY_GRAPHICS_WIN.id);
         journey_adjust_windows(false);
-    } else if (screenmode != MODE_CREDITS){
+    } else if (screenmode != MODE_CREDITS) {
         journey_init_screen();
     }
 }
 
+// Z-machine entry point: prints a "***" divider in the text buffer to
+// separate narrative sections, and also writes it to the transcript.
 void DIVIDER(void) {
     glk_set_style(style_Note);
     glk_put_string(const_cast<char*>("\n\n***\n\n"));
@@ -1518,6 +1783,10 @@ void DIVIDER(void) {
     glk_set_style(style_Normal);
 }
 
+// Z-machine entry point: prints centered text with special styling.
+// The word "JOURNEY" gets the User1 style, which we have set to
+// centered bold; all other text uses the Note style, centered non-bold.
+// Used during the credits/intro sequence.
 void WCENTER(void) {
     int16_t stringnum = variable(1);
     char str[1024];
@@ -1531,6 +1800,10 @@ void WCENTER(void) {
     glk_set_style(style_Normal);
 }
 
+// Called when the application window is resized. Dispatches to the
+// appropriate handler based on the current screen mode: initial question
+// (just resize the text buffer), slideshow (redraw title image), or
+// normal gameplay (full layout rebuild via journey_adjust_windows).
 void journey_update_on_resize(void) {
     // Window 0: Text buffer (in later versions)
     // Window 1: Fullscreen grid window
@@ -1544,11 +1817,9 @@ void journey_update_on_resize(void) {
     set_global(jg.CHRV, 1); // GLOBAL CHRV
 
     if (screenmode == MODE_INITIAL_QUESTION) {
-        if (journey_text_buffer == nullptr)
-            journey_text_buffer = &windows[ja.buffer_window_index];
-        journey_text_buffer->x_size = gscreenw;
-        journey_text_buffer->y_size = gscreenh;
-        v6_sizewin(journey_text_buffer);
+        journey_text_buffer()->x_size = gscreenw;
+        journey_text_buffer()->y_size = gscreenh;
+        v6_sizewin(journey_text_buffer());
         JOURNEY_GRAPHICS_WIN.x_size = 0;
         JOURNEY_GRAPHICS_WIN.y_size = 0;
         v6_sizewin(&JOURNEY_GRAPHICS_WIN);
@@ -1562,9 +1833,12 @@ void journey_update_on_resize(void) {
     }
 }
 
-#pragma mark Restoring
+#pragma mark - Save/Restore State
 
-void stash_journey_state(library_state_data *dat) {
+// Saves Journey-specific state into the autosave data structure so it
+// can be restored later. This includes the highlighted menu position,
+// current input mode, partially-typed text length, and glue words.
+void journey_stash_state(library_state_data *dat) {
     if (!dat)
         return;
 
@@ -1580,7 +1854,8 @@ void stash_journey_state(library_state_data *dat) {
     }
 }
 
-void recover_journey_state(library_state_data *dat) {
+// Restores Journey-specific UI state from autosave data.
+void journey_recover_state(library_state_data *dat) {
     if (!dat)
         return;
     selected_journey_line = dat->selected_journey_line;
@@ -1588,6 +1863,10 @@ void recover_journey_state(library_state_data *dat) {
     journey_current_input = dat->current_input_mode;
     journey_input_length = dat->current_input_length;
     number_of_printed_journey_words = dat->number_of_journey_words;
+    if (number_of_printed_journey_words < 0)
+        number_of_printed_journey_words = 0;
+    if (number_of_printed_journey_words > BOCFEL_MAX_JOURNEY_WORDS)
+        number_of_printed_journey_words = BOCFEL_MAX_JOURNEY_WORDS;
     for (int i = 0; i < number_of_printed_journey_words; i++) {
         printed_journey_words[i].str = dat->journey_words[i].str;
         printed_journey_words[i].pcf = dat->journey_words[i].pcf;
@@ -1595,7 +1874,9 @@ void recover_journey_state(library_state_data *dat) {
     }
 }
 
-void journey_update_after_restore() {
+// Performs a full UI rebuild after a save/restore operation. Clears all
+// front-end menus, resets to normal mode, and redraws everything from scratch.
+void journey_update_after_restore(void) {
     win_menuitem(kJMenuTypeDeleteAll, 0, 0, false, nullptr, STRING_BUFFER_SIZE);
     // Why is this needed? If set, we won't show title image in INIT_SCREEN(),
     // but when does this cause problems?
@@ -1612,6 +1893,10 @@ void journey_update_after_restore() {
     journey_adjust_windows(true);
 }
 
+// Handles edge cases when autorestoring into the middle of a read_char call.
+// If we restored into the title slideshow, resets to the initial question so
+// the title image sequence replays. If we restored into active text input
+// (name or Elvish), returns true to signal the caller to re-enter the input loop.
 bool journey_autorestore_internal_read_char_hacks(void) {
     update_screen_size();
     if (screenmode == MODE_SLIDESHOW) {
@@ -1630,8 +1915,9 @@ bool journey_autorestore_internal_read_char_hacks(void) {
     return false;
 }
 
-// Try to make the save file Frotz compatible.
-// Still haven't worked out quite how to do this.
+// Temporarily sets Z-machine globals to values that Frotz expects when
+// reading Journey save files. Frotz assumes an 80x25 text-mode screen
+// with 8x16 character cells. These are restored by journey_post_save_hacks().
 void journey_pre_save_hacks(void) {
     set_global(jg.CHRH, 0x08);
     set_global(jg.CHRV, 0x10);
@@ -1643,7 +1929,8 @@ void journey_pre_save_hacks(void) {
     set_global(jg.SCREEN_WIDTH, 0x50);
 }
 
-// Try to make save files from Frotz compatible.
+// Restores Z-machine globals to their actual values after saving, undoing
+// the Frotz-compatibility adjustments made by journey_pre_save_hacks().
 void journey_post_save_hacks(void) {
     if (jg.INTERPRETER != 0)
         set_global(jg.INTERPRETER, options.int_number);
@@ -1651,6 +1938,3 @@ void journey_post_save_hacks(void) {
     set_global(jg.CHRV, 1);
     update_internal_globals();
 }
-
-void COMPLETE_DIAL_GRAPHICS(void) {}
-void TELL_AMOUNTS(void) {}

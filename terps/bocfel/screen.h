@@ -4,7 +4,9 @@
 #define ZTERP_SCREEN_H
 
 #include <bitset>
+#include <chrono>
 #include <string>
+#include <utility>
 
 #ifdef ZTERP_GLK
 extern "C" {
@@ -14,6 +16,7 @@ extern "C" {
 
 #include "iff.h"
 #include "io.h"
+#include "stack.h"
 #include "types.h"
 #include "util.h"
 
@@ -32,7 +35,7 @@ struct Color {
     enum class Mode { ANSI, True } mode;
     uint16_t value;
 
-    explicit Color() : mode(Mode::ANSI), value(1) {
+    Color() : mode(Mode::ANSI), value(1) {
     }
 
     Color(Mode mode_, uint16_t value_) : mode(mode_), value(value_) {
@@ -52,9 +55,11 @@ void init_screen(bool first_run);
 
 bool create_mainwin();
 void create_graphicswin();
-bool create_statuswin();
-bool create_upperwin();
-void get_screen_size(unsigned int &width, unsigned int &height);
+void create_statuswin();
+bool have_statuswin();
+void create_upperwin();
+bool have_upperwin();
+std::pair<unsigned int, unsigned int> get_screen_size();
 void close_upper_window();
 
 uint32_t screen_convert_color(uint16_t color);
@@ -81,12 +86,16 @@ void screen_flush();
 
 #ifdef ZTERP_GLK
 
+void screen_clean_up_glk_streams();
+void screen_recover_glk_windows();
+void screen_recover_glk_streams();
+
 #ifdef GLK_MODULE_GARGLKTEXT
 void update_color(int which, unsigned long color);
 #endif
 
 #ifdef ZTERP_GLK_BLORB
-void screen_load_scale_info(const std::string &blorb_file);
+void screen_load_scale_info();
 #endif
 
 #endif
@@ -105,14 +114,6 @@ enum : int {
     ISTREAM_FILE     = 1,
 };
 
-// Window attributes.
-enum : uint16_t {
-    WINATTR_WRAPPING_BIT =      (1 << 0),
-    WINATTR_SCROLLING_BIT =     (1 << 1),
-    WINATTR_TRANSCRIPTING_BIT = (1 << 2),
-    WINATTR_BUFFERING_BIT =     (1 << 3)
-};
-
 void screen_set_header_bit(bool set);
 
 bool output_stream(int16_t number, uint16_t table);
@@ -124,7 +125,7 @@ void put_char(uint8_t c);
 std::string screen_format_time(long hours, long minutes);
 void screen_read_scrn(IO &io, uint32_t size);
 IFF::TypeID screen_write_scrn(IO &io);
-void screen_read_bfhs(IO &io, bool autosave);
+void screen_read_bfhs(IO &io, SaveType savetype);
 IFF::TypeID screen_write_bfhs(IO &io);
 void screen_read_bfts(IO &io, uint32_t size);
 IFF::TypeID screen_write_bfts(IO &io);
@@ -139,6 +140,8 @@ void zprint();
 void znew_line();
 void zprint_ret();
 void zerase_window();
+void zwindow_size();
+void zmove_window();
 void zerase_line();
 void zset_cursor();
 void zget_cursor();
@@ -161,12 +164,21 @@ void zcheck_unicode();
 void zdraw_picture();
 void zpicture_data();
 void zget_wind_prop();
-void zwindow_style();
 void zprint_form();
 void zmake_menu();
 void zbuffer_screen();
 
 #ifdef SPATTERLIGHT
+
+// Window attributes.
+enum : uint16_t {
+    WINATTR_WRAPPING_BIT =      (1 << 0),
+    WINATTR_SCROLLING_BIT =     (1 << 1),
+    WINATTR_TRANSCRIPTING_BIT = (1 << 2),
+    WINATTR_BUFFERING_BIT =     (1 << 3)
+};
+
+void zwindow_style();
 extern GraphicsType graphics_type;
 
 extern winid_t current_graphics_buf_win;
@@ -189,15 +201,19 @@ struct Window {
     uint16_t index;
     uint16_t last_click_x;
     uint16_t last_click_y;
+    std::chrono::steady_clock::time_point last_click_time;
     uint16_t attribute;
 };
 
 extern std::array<Window, 8> windows;
+extern Window *mainwin, *curwin;
+extern bool pending_flowbreak;
 
 extern glui32 current_picture;
 extern glui32 user_selected_foreground;
 extern glui32 user_selected_background;
 extern bool graphics_type_changed;
+extern bool graphics_setting_changed;
 
 uint8_t internal_read_char(void);
 int count_characters_in_zstring(uint16_t str);
@@ -220,9 +236,14 @@ void update_v6_colours(void);
 void window_change(void);
 void set_current_window(Window *window);
 void transcribe(uint32_t c);
+int count_characters_in_object(uint16_t obj);
+void update_monochrome_colours(void);
+double perceived_brightness(glui32 col);
+glui32 brightest(glui32 col1, glui32 col2);
 
 #endif
 
 void zjourney_dial();
+void zshogun_menu();
 
 #endif

@@ -1,0 +1,155 @@
+easy
+nnamen tutem selronden flar darg
+x old oak table
+get all from table
+down
+x shelves
+get all from shelves
+up
+put oil in lantern
+light lantern
+out
+east
+attack wolf
+attack wolf
+take tonerith stone
+w
+west
+north
+north
+take dusteron stone
+east
+push tree
+north
+north
+nw
+nw
+e
+x large stone table
+get all from large stone table
+turn ring
+w
+w
+w
+x holes in the wall
+get all from holes in the wall
+e
+e
+attack narfild
+nw
+nw
+e
+sw
+give food to tarin
+ne
+dig
+se
+take longmore stone
+se
+se
+se
+sw
+take pot
+take ornate key
+fill pot with water
+ne
+e
+e
+e
+open desk
+take jacket
+take coins
+wear jacket
+w
+n
+buy metal helmet
+wear metal helmet
+s
+sw
+sw
+nw
+sw
+attack bridgekeeper
+attack bridgekeeper
+ne
+se
+ne
+ne
+s
+put water in pan
+n
+se
+open cupboard
+x cupboard
+get all from cupboard
+wear elven armour
+nw
+w
+s
+se
+attack goblin
+take kedarn stone
+nw
+n
+w
+nw
+nw
+attack monster
+ne
+unlock chest
+open chest
+x chest
+get all from chest
+wear longmore chest plate
+sw
+nw
+e
+e
+attack eagle
+w
+w
+nw
+ne
+ne
+e
+se
+take nelone stone
+e
+e
+give stones to larnt
+e
+e
+ne
+attack narn
+nw
+ne
+n
+say the password
+open door
+n
+attack larnt
+n
+x long table
+get all from long table
+s
+e
+touch ball
+s
+w
+u
+unlock chest
+open chest
+x chest
+get all from chest
+d
+e
+n
+unlock door
+open door
+n
+drink gourd
+north
+north
+attack urgorn
+attack urgorn
+attack urgorn

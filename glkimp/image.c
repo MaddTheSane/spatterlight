@@ -17,13 +17,12 @@ static int loadimage(int image)
 
     if (!giblorb_is_resource_map())
     {
-        int namelength = image / 10 + 6;
-        snprintf(filename, namelength + gli_parentdirlength, "%s/PIC%d", gli_parentdir, image);
-        fprintf(stderr, "loadimage %s in %s\n", filename, gli_parentdir);
-        
+        snprintf(filename, sizeof(filename), "%s/PIC%d", gli_parentdir, image);
+        gli_debug_log("loadimage %s in %s\n", filename, gli_parentdir);
+
         file = fopen(filename, "rb");
         if (!file) {
-            snprintf(filename, namelength + gli_parentdirlength + 5, "%s.jpg", filename);
+            snprintf(filename, sizeof(filename), "%s/PIC%d.jpg", gli_parentdir, image);
             file = fopen(filename, "rb");
             if (!file)
                 return FALSE;
@@ -69,13 +68,13 @@ glui32 glk_image_draw_scaled(winid_t win, glui32 image,
         gli_strict_warning("image_draw_scaled: invalid ref");
         return FALSE;
     }
-    
+
     if (!loadimage(image))
     {
         return FALSE;
     }
-    
-    win_drawimage(win->peer, val1, val2, width, height);
+
+    win_drawimage(win->peer, val1, val2, width, height, 0, 0);
     return TRUE;
 }
 
@@ -86,8 +85,49 @@ glui32 glk_image_draw(winid_t win, glui32 image, glsi32 val1, glsi32 val2)
         gli_strict_warning("image_draw: invalid ref");
         return FALSE;
     }
-    
+
     return glk_image_draw_scaled(win, image, val1, val2, 0, 0);
+}
+
+/* Glk 0.7.6 (GLK_MODULE_IMAGE2): draw with explicit scaling rules. The rule
+ * and its raw width/height/maxwidth arguments travel to the app, which
+ * resolves them against the current window width -- and re-resolves on every
+ * re-layout, so imagerule_WidthRatio and maxwidth track buffer-window
+ * resizes dynamically, as the spec requires. In graphics windows the size is
+ * computed once at draw time and maxwidth is ignored. */
+glui32 glk_image_draw_scaled_ext(winid_t win, glui32 image,
+                                 glsi32 val1, glsi32 val2, glui32 width, glui32 height,
+                                 glui32 imagerule, glui32 maxwidth)
+{
+    glui32 widthrule = imagerule & imagerule_WidthMask;
+    glui32 heightrule = imagerule & imagerule_HeightMask;
+
+    if (!win)
+    {
+        gli_strict_warning("image_draw_scaled_ext: invalid ref");
+        return FALSE;
+    }
+
+    if (widthrule == 0 || heightrule == 0 ||
+        imagerule & ~(glui32)(imagerule_WidthMask | imagerule_HeightMask))
+    {
+        gli_strict_warning("image_draw_scaled_ext: invalid imagerule");
+        return FALSE;
+    }
+
+    /* "If width or height is zero, nothing is drawn." (Fixed rules only:
+       Orig ignores the argument, and a zero ratio is legal if pointless.) */
+    if ((widthrule == imagerule_WidthFixed && width == 0) ||
+        (heightrule == imagerule_HeightFixed && height == 0))
+        return FALSE;
+
+    if (!loadimage(image))
+    {
+        return FALSE;
+    }
+
+    win_drawimage(win->peer, val1, val2, width, height, imagerule, maxwidth);
+    return TRUE;
 }
 
 glui32 glk_image_get_info(glui32 image, glui32 *width, glui32 *height)
@@ -97,7 +137,7 @@ glui32 glk_image_get_info(glui32 image, glui32 *width, glui32 *height)
     
     if (!loadimage(image))
     {
-        fprintf(stderr, "glk_image_get_info: loadimage(%d) FAILED\n", image);
+        gli_debug_log("glk_image_get_info: loadimage(%d) FAILED\n", image);
         return FALSE;
     }
     
@@ -110,7 +150,7 @@ void glk_window_flow_break(winid_t win)
 {
     if (!win)
     {
-        gli_strict_warning("window_erase_rect: invalid ref");
+        gli_strict_warning("window_flow_break: invalid ref");
         return;
     }
     if (win->type != wintype_TextBuffer)
@@ -121,57 +161,45 @@ void glk_window_flow_break(winid_t win)
     win_flowbreak(win->peer);
 }
 
-void glk_window_erase_rect(winid_t win,
-                           glsi32 left, glsi32 top, glui32 width, glui32 height)
+/* FALSE, with a warning, unless win is a graphics window */
+static int gli_check_graphics_window(winid_t win, const char *caller)
 {
+    char msg[80];
     if (!win)
     {
-        gli_strict_warning("window_erase_rect: invalid ref");
-        return;
+        snprintf(msg, sizeof msg, "%s: invalid ref", caller);
+        gli_strict_warning(msg);
+        return FALSE;
     }
     if (win->type != wintype_Graphics)
     {
-        gli_strict_warning("window_erase_rect: not a graphics window");
-        return;
+        snprintf(msg, sizeof msg, "%s: not a graphics window", caller);
+        gli_strict_warning(msg);
+        return FALSE;
     }
+    return TRUE;
+}
+
+void glk_window_erase_rect(winid_t win,
+                           glsi32 left, glsi32 top, glui32 width, glui32 height)
+{
+    if (!gli_check_graphics_window(win, "window_erase_rect"))
+        return;
     win_fillrect(win->peer, win->background, left, top, width, height);
 }
 
 void glk_window_fill_rect(winid_t win, glui32 color,
                           glsi32 left, glsi32 top, glui32 width, glui32 height)
 {
-    if (!win)
-    {
-        gli_strict_warning("window_fill_rect: invalid ref");
+    if (!gli_check_graphics_window(win, "window_fill_rect"))
         return;
-    }
-    if (win->type != wintype_Graphics)
-    {
-        gli_strict_warning("window_fill_rect: not a graphics window");
-        return;
-    }
-#ifdef DEBUG
-    //    fprintf(stderr, "win_fillrect called with color %d\n", color);
-#endif
     win_fillrect(win->peer, color, left, top, width, height);
 }
 
 void glk_window_set_background_color(winid_t win, glui32 color)
 {
-    if (!win)
-    {
-        gli_strict_warning("window_set_background_color: invalid ref");
+    if (!gli_check_graphics_window(win, "window_set_background_color"))
         return;
-    }
-    
-    if (win->type != wintype_Graphics)
-    {
-        gli_strict_warning("window_set_background_color: not a graphics window");
-        return;
-    }
-#ifdef DEBUG
-    //    fprintf (stderr, "glk_window_set_background_color called with color %d\n", color);
-#endif
     win->background = color;
     win_setbgnd(win->peer, color);
 }

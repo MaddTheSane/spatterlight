@@ -1,8 +1,5 @@
 #include "glkimp.h"
-
-
-int gli_screenwidth = 80;
-int gli_screenheight = 24;
+#include "fileref.h"
 
 #if GIDEBUG_LIBRARY_SUPPORT
 int gli_debugger = FALSE;
@@ -51,6 +48,9 @@ int main(int argc, char **argv)
 
     gli_initialize_misc();
 
+    /* Remove what killed or crashed interpreters left in the temp folder */
+    gli_sweep_abandoned_tempdirs();
+
     win_hello();
 
     inittime = TRUE;
@@ -58,7 +58,7 @@ int main(int argc, char **argv)
     garglk_set_program_name("Unknown");
 
     if (!glkunix_startup_code(&startdata))
-	return 1;
+        return 1;
     inittime = FALSE;
     
     glk_main();

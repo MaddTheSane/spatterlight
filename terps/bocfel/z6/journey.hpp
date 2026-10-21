@@ -8,7 +8,7 @@
 #ifndef journey_hpp
 #define journey_hpp
 
-#include <stdio.h>
+#include <cstdint>
 
 extern "C" {
 #include "glk.h"
@@ -16,7 +16,6 @@ extern "C" {
 #include "spatterlight-autosave.h"
 }
 
-void journey_adjust_image(int picnum, uint16_t *x, uint16_t *y, int width, int height, int winwidth, int winheight, float *scale, float pixelwidth);
 int journey_draw_picture(int pic, winid_t journey_window);
 
 void journey_update_on_resize(void);
@@ -36,10 +35,8 @@ void GRAPHIC_STAMP(void);
 void READ_ELVISH(void);
 void CHANGE_NAME(void);
 void ERASE_COMMAND(void);
-void COMPLETE_DIAL_GRAPHICS(void);
-void TELL_AMOUNTS(void);
 
-typedef struct JourneyGlobals {
+struct JourneyGlobals {
     uint8_t COMMAND_START_LINE; // G0e•
     uint8_t NAME_COLUMN; // Ga3•
     uint8_t PARTY_COMMAND_COLUMN; // Gb4•
@@ -85,11 +82,11 @@ typedef struct JourneyGlobals {
     uint8_t UPDATE_FLAG; // G79•
     uint8_t SMART_DEFAULT_FLAG; // G40•
     uint8_t SUBGROUP_MODE; // G80•
-} JourneyGlobals;
+};
 
 extern JourneyGlobals jg;
 
-typedef struct JourneyRoutines {
+struct JourneyRoutines {
     uint32_t FILL_CHARACTER_TBL; // 0x4bf8•
     uint32_t SMART_DEFAULT; // 0x64bc•
     uint32_t MASSAGE_ELVISH; // 0x7b5c•
@@ -103,11 +100,11 @@ typedef struct JourneyRoutines {
 
     uint32_t GRAPHIC; // 0x49fc•
     uint32_t COMPLETE_DIAL_GRAPHICS; // 0x307a4•
-} JourneyRoutines;
+};
 
 extern JourneyRoutines jr;
 
-typedef struct JourneyObjects {
+struct JourneyObjects {
     uint16_t START_LOC; // 0xa0•
     uint16_t TAG_OBJECT; // 0x1a3•
     uint16_t TAG_ROUTE_COMMAND; // 0x3ea7•
@@ -115,11 +112,11 @@ typedef struct JourneyObjects {
     uint16_t PRAXIX; // 0x4f•
     uint16_t BERGON; // 0x0196•
 
-} JourneyObjects;
+};
 
 extern JourneyObjects jo;
 
-typedef struct JourneyAttributes {
+struct JourneyAttributes {
     uint8_t SEEN; // 0x2e•
     uint8_t KBD; // 0x39•
     uint8_t SHADOW; // 0x17•
@@ -128,13 +125,13 @@ typedef struct JourneyAttributes {
     uint8_t DESC12; // 0x29•
     uint8_t DESC8; // 0x2b•
     uint8_t buffer_window_index;
-} JourneyAttributes;
+};
 
 extern JourneyAttributes ja;
 
 
-void stash_journey_state(library_state_data *dat);
-void recover_journey_state(library_state_data *dat);
+void journey_stash_state(library_state_data *dat);
+void journey_recover_state(library_state_data *dat);
 
 void journey_update_after_restore(void);
 bool journey_autorestore_internal_read_char_hacks(void);

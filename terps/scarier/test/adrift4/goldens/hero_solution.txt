@@ -1,0 +1,191 @@
+2
+3
+1
+wait
+wait
+wait
+wait
+wait
+wait
+ask smelly for help
+swing
+x washing machine
+get hoover
+look under bed
+clean under bed
+look under bed
+read newspaper
+read newspaper
+x fridge
+open fridge
+get all from fridge
+move fridge
+look behind fridge
+x ticket
+s
+9
+sw
+x noticeboard
+clean floor
+s
+ask duty sergeant about kid
+ask duty sergeant about kid
+2
+wait
+se
+wait
+wait
+wait
+wait
+pray
+nw
+nw
+show id to vendor
+se
+e
+s
+3
+in
+throw sandwich in vat
+wait
+wait
+undo
+undo
+undo
+undo
+undo
+undo
+get jeans
+wear jeans
+read article
+s
+4
+show horror id
+show customers id
+get eraser
+wait
+wait
+wait
+wait
+wait
+wait
+wait
+s
+s
+s
+open your eyes
+get net
+pour milk on mr horror
+talk to mr horror
+talk to mr horror
+talk to mr horror
+talk to mr horror
+talk to mr horror
+wink at mr horror
+s
+3
+in
+throw sandwich in vat
+wait
+wait
+wait
+wait
+wait
+wait
+wait
+wait
+wait
+wait
+wait
+stroke cat
+throw net over cat
+ask cat about crossing lady
+ask cat about paper boys
+e
+out
+e
+get toy soldier
+s
+6
+read bible
+in
+show id to customers
+read bible
+show id to muggle
+out
+give soldier to alice
+give ticket to alice
+w
+s
+5
+show id to ladies
+ask ladies about gardener
+talk to ladies
+2
+1
+talk to ladies
+3
+1
+3
+s
+show id to bartender
+ask erik about lady
+n
+n
+s
+9
+se
+nw
+ne
+show id to lady
+e
+s
+5
+s
+show id to singer
+give carrot to singer
+give eraser to singer
+n
+n
+s
+7
+read bible
+w
+knock on door
+get cowboy outfit
+get cowboy outfit
+e
+e
+s
+8
+show citizens id
+show officers id
+read bible
+n
+throw soap at the smell
+s
+2
+in
+look under bench
+get knitting
+nw
+show id
+read bible
+s
+5
+give knitting to ladies
+n
+n
+s
+12
+show id to steve
+open grill
+3
+b
+3
+c
+2
+a3
+2
+a9
+statusline

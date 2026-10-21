@@ -1,0 +1,57 @@
+1
+north
+in
+wait
+wait
+out
+east
+in
+out
+south
+south
+south
+in
+take RPG
+out
+north
+east
+north
+move bushes
+take boat
+south
+southeast
+take high caliber bullet
+drop boat
+sit in boat
+e
+n
+stab soldier
+take dead soldier
+in
+ex hay
+take sniper rifle
+take documents
+take maps
+load sniper rifle
+out
+south
+sit in boat
+west
+northwest
+north
+north
+look through scope
+north
+fire at sniper
+east
+north
+northwest
+north
+southwest
+fire rpg at SA-13
+northeast
+turn on radio
+contact sar
+north
+load pen flare
+fire pen flare

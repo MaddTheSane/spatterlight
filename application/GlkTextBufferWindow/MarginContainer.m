@@ -12,8 +12,25 @@
 #import "BufferTextView.h"
 #include "glk.h"
 
+// How many characters past a margin image its effect on layout can reach.
+// Flow breaks and later images further away than this are not examined,
+// which keeps re-layout of a long scrollback fast. MarginFlowBreakTests fails
+// without these cutoffs.
+static const NSUInteger kFlowBreakReach = 1000;
+
+// A line fragment squeezed narrower than this by margin images is pushed
+// down below them instead. A slightly arbitrary cutoff width.
+static const CGFloat kMinLineFragmentWidth = 50;
+
 @interface MarginContainer () <NSSecureCoding> {
     NSMutableArray<FlowBreak *> *flowbreaks;
+    // Character index of the line fragment currently being laid out, or
+    // NSNotFound when it is unknown.
+    NSUInteger layoutCharIndex;
+    // End of the paragraph that line fragment belongs to. A flow break
+    // anywhere on the line pushes the whole line down, and the line can't
+    // extend past its paragraph.
+    NSUInteger layoutParagraphEnd;
 }
 @end
 
@@ -30,21 +47,30 @@
 
 - (instancetype)initWithContainerSize:(NSSize)size {
     self = [super initWithContainerSize:size];
-
-    _marginImages = [[NSMutableArray alloc] init];
-    flowbreaks = [[NSMutableArray alloc] init];
-
+    if (self) {
+        layoutCharIndex = NSNotFound;
+        layoutParagraphEnd = NSNotFound;
+        _marginImages = [[NSMutableArray alloc] init];
+        flowbreaks = [[NSMutableArray alloc] init];
+    }
     return self;
 }
 
 - (instancetype)initWithCoder:(NSCoder *)decoder {
     self = [super initWithCoder:decoder];
     if (self) {
-        _marginImages = [decoder decodeObjectOfClass:[NSMutableArray class] forKey:@"marginImages"];
+        layoutCharIndex = NSNotFound;
+        layoutParagraphEnd = NSNotFound;
+        // The arrays come back immutable (or missing, from a damaged
+        // archive), and both are appended to later. (decodeArrayOfObjectsOfClass:
+        // would be neater, but needs macOS 11.)
+        NSArray *images = [decoder decodeObjectOfClasses:[NSSet setWithObjects:[NSArray class], [MarginImage class], nil] forKey:@"marginImages"];
+        _marginImages = images ? images.mutableCopy : [[NSMutableArray alloc] init];
         for (MarginImage *img in _marginImages) {
             img.container = self;
         }
-        flowbreaks = [decoder decodeObjectOfClass:[NSMutableArray class] forKey:@"flowbreaks"];
+        NSArray *breaks = [decoder decodeObjectOfClasses:[NSSet setWithObjects:[NSArray class], [FlowBreak class], nil] forKey:@"flowbreaks"];
+        flowbreaks = breaks ? breaks.mutableCopy : [[NSMutableArray alloc] init];
     }
 
     return self;
@@ -62,7 +88,41 @@
     [self.layoutManager textContainerChangedGeometry:self];
 }
 
+// A flow break only pushes text below margin images anchored before it, so
+// breaks older than the oldest surviving image can never have any effect.
+- (void)pruneInertFlowBreaks {
+    if (!flowbreaks.count)
+        return;
+    if (!_marginImages.count) {
+        [flowbreaks removeAllObjects];
+        return;
+    }
+    // Margin images are appended in pos order, so the first is the oldest.
+    NSUInteger oldest = _marginImages.firstObject.pos;
+    NSIndexSet *inert = [flowbreaks indexesOfObjectsPassingTest:^BOOL(FlowBreak *f, NSUInteger idx, BOOL *stop) {
+        return f.pos < oldest;
+    }];
+    [flowbreaks removeObjectsAtIndexes:inert];
+}
+
+// When the container changes size (as it does on every step of a live
+// resize), the text rewraps and the anchors of the margin images move. Forget
+// their cached bounds, so that they are recalculated during the re-layout
+// that follows instead of staying where they were at the old width.
+- (void)setSize:(NSSize)size {
+    if (!NSEqualSizes(size, self.size)) {
+        for (MarginImage *i in _marginImages)
+            [i uncacheBounds];
+
+        for (FlowBreak *f in flowbreaks)
+            [f uncacheBounds];
+    }
+    super.size = size;
+}
+
 - (void)invalidateLayout:(id)sender {
+    [self pruneInertFlowBreaks];
+
     for (MarginImage *i in _marginImages)
         [i uncacheBounds];
 
@@ -81,28 +141,80 @@
                                                   linkId:linkid
                                                       at:pos
                                                   sender:self];
+    BOOL wasSimple = (_marginImages.count == 0);
     [_marginImages addObject:mi];
-    [self.layoutManager textContainerChangedGeometry:self];
+    if (wasSimple) {
+        // The container just stopped being a simple rectangle
+        [self.layoutManager textContainerChangedGeometry:self];
+    } else {
+        [self invalidateLayoutFrom:pos];
+    }
+}
+
+// A new margin image or flow break can only affect text at or after its
+// anchor, so there is no need to throw away the layout of everything above it.
+- (void)invalidateLayoutFrom:(NSUInteger)pos {
+    NSLayoutManager *layout = self.layoutManager;
+    NSUInteger length = layout.textStorage.length;
+    if (pos < length)
+        [layout invalidateLayoutForCharacterRange:NSMakeRange(pos, length - pos)
+                             actualCharacterRange:NULL];
 }
 
 - (void)flowBreakAt:(NSUInteger)pos {
     FlowBreak *f = [[FlowBreak alloc] initWithPos:pos];
     [flowbreaks addObject:f];
-    [self.layoutManager textContainerChangedGeometry:self];
+    [self invalidateLayoutFrom:pos];
 }
 
 - (BOOL)isSimpleRectangularTextContainer {
     return _marginImages.count == 0;
 }
 
+// The typesetter calls this variant, which in NSTextContainer forwards to the
+// sweepDirection: one below. Remember which character the line starts at, so
+// that we can skip margin images and flow breaks anchored further down. They
+// sit below this line and can't intersect it, and asking for their bounds
+// would force a nested layout all the way to their anchors, which makes a
+// re-layout of a long scrollback many times slower.
+// A margin image is always anchored at the start of a line, but a flow break
+// may follow text on its line. We don't know yet where this line will end, so
+// flow breaks are only skipped when they are past the end of the paragraph.
+- (NSRect)lineFragmentRectForProposedRect:(NSRect)proposedRect
+                                  atIndex:(NSUInteger)characterIndex
+                         writingDirection:(NSWritingDirection)baseWritingDirection
+                            remainingRect:(NSRect *)remainingRect {
+    NSUInteger savedIndex = layoutCharIndex;
+    NSUInteger savedParagraphEnd = layoutParagraphEnd;
+    layoutCharIndex = characterIndex;
+    layoutParagraphEnd = NSNotFound;
+    if (flowbreaks.count) {
+        NSString *string = self.layoutManager.textStorage.string;
+        if (characterIndex < string.length)
+            layoutParagraphEnd = NSMaxRange([string paragraphRangeForRange:NSMakeRange(characterIndex, 0)]);
+    }
+    NSRect rect = [super lineFragmentRectForProposedRect:proposedRect
+                                                 atIndex:characterIndex
+                                        writingDirection:baseWritingDirection
+                                           remainingRect:remainingRect];
+    layoutCharIndex = savedIndex;
+    layoutParagraphEnd = savedParagraphEnd;
+    return rect;
+}
+
+// Fit the line fragment around the margin images. The outer loop repeats
+// until a full pass over the images finds no overlap. For each overlapping
+// image, the inner loop narrows the fragment past the image, and whenever
+// that leaves it too narrow (kMinLineFragmentWidth), moves it below the last
+// image it collided with at its original width, and tries again. The
+// fragment only ever moves right, gets narrower, or moves down.
 - (NSRect)lineFragmentRectForProposedRect:(NSRect)proposed
                            sweepDirection:(NSLineSweepDirection)sweepdir
                         movementDirection:(NSLineMovementDirection)movementdir
                             remainingRect:(NSRect *)remaining {
     NSRect bounds;
     NSRect rect;
-    MarginImage *image, *lastleft, *lastright;
-    FlowBreak *f;
+    MarginImage *lastleft, *lastright;
 
     rect = [super lineFragmentRectForProposedRect:proposed
                                    sweepDirection:sweepdir
@@ -119,13 +231,24 @@
         overlapped = NO;
         lastleft = lastright = nil;
 
-        NSEnumerator *enumerator = [_marginImages reverseObjectEnumerator];
-        while (image = [enumerator nextObject]) {
-            // I'm not quite sure why, but this prevents the flowbreaks from
-            // jumping to incorrect positions when resizing the window
-            for (f in flowbreaks)
+        for (MarginImage *image in _marginImages.reverseObjectEnumerator) {
+            if (layoutCharIndex != NSNotFound && image.pos > layoutCharIndex)
+                continue;
+
+            // Measure the flow breaks that follow this image before placing
+            // the line. A flow break finds its position by forcing layout up
+            // to its anchor and then invalidating that line again, and this
+            // has to happen up front. If it is left to adjustForBreaks:, which
+            // only runs once the line is found to overlap an image, that
+            // nested layout happens halfway through placing the line. Lines
+            // then end up at the wrong height, beside an image they should be
+            // below or on top of the lines above. MarginFlowBreakTests fails
+            // without this loop.
+            for (FlowBreak *f in flowbreaks)
                 if (f.pos > image.pos) {
-                    if (f.pos - image.pos > 1000)
+                    if (f.pos - image.pos > kFlowBreakReach)
+                        break;
+                    if (layoutParagraphEnd != NSNotFound && f.pos >= layoutParagraphEnd)
                         break;
                     [f boundsWithLayout:self.layoutManager];
                 }
@@ -143,7 +266,7 @@
                 // check if the image still intersects
 
                 while (overlapped2) // = while (NSIntersectsRect(bounds,
-                                    // newrect) || newrect.size.width < 50)
+                                    // newrect) || newrect.size.width <= kMinLineFragmentWidth)
                 {
                     overlapped2 = NO;
 
@@ -165,11 +288,10 @@
                             lastright = image;
                         }
                     }
-                    if (newrect.size.width <= 50) {
+                    if (newrect.size.width <= kMinLineFragmentWidth) {
                         overlapped2 = YES;
                         // If the rect has now become too narrow, push it down
-                        // and restore original width 50 is a slightly arbitrary
-                        // cutoff width
+                        // and restore original width
                         newrect.size.width = rect.size.width; // Original width
                         newrect.origin.x = rect.origin.x;
                         if (lastleft && lastright) {
@@ -195,28 +317,23 @@
 }
 
 - (NSRect)adjustForBreaks:(NSRect)rect {
-    FlowBreak *f;
     NSRect flowrect;
-    MarginImage *img2;
 
-    NSEnumerator *breakenumerator = [flowbreaks reverseObjectEnumerator];
-    while (f = [breakenumerator nextObject]) {
+    for (FlowBreak *f in flowbreaks.reverseObjectEnumerator) {
+        if (layoutParagraphEnd != NSNotFound && f.pos >= layoutParagraphEnd)
+            continue;
         if (_marginImages.count == 1) {
-            if (f.pos - _marginImages.firstObject.pos > 1000)
+            if (f.pos - _marginImages.firstObject.pos > kFlowBreakReach)
                 continue;
         }
         flowrect = [f boundsWithLayout:self.layoutManager];
 
         if (NSIntersectsRect(flowrect, rect)) {
-//            NSLog(@"MarginContainer: looking for an image that intersects "
-//                  @"flowbreak %ld (%@)",
-//                  [flowbreaks indexOfObject:f], NSStringFromRect(flowrect));
-
             CGFloat lowest = 0;
 
-            for (img2 in _marginImages)
-                // Moving below the lowest image drawn before the flowbreak
-                // Flowbreaks are not supposed to affect images drawn after it
+            for (MarginImage *img2 in _marginImages)
+                // Moving below the lowest image drawn before the flowbreak.
+                // A flowbreak does not affect images drawn after it.
                 if (img2.pos < f.pos && NSMaxY(img2.bounds) > lowest &&
                     NSMaxY(img2.bounds) > rect.origin.y) {
                     lowest = NSMaxY(img2.bounds) + 1;
@@ -232,9 +349,10 @@
 
 - (void)unoverlap:(MarginImage *)image {
     // Skip if we only have one image, or none, or bounds are empty
-    if (_marginImages.count < 2
-        || NSIsEmptyRect(image.bounds)
-        || [_marginImages indexOfObject:image] == NSNotFound)
+    if (_marginImages.count < 2 || NSIsEmptyRect(image.bounds))
+        return;
+    NSUInteger index = [_marginImages indexOfObject:image];
+    if (index == NSNotFound)
         return;
 
     NSTextView *textview = self.textView;
@@ -257,8 +375,15 @@
         adjustedBounds.origin.x = rightMargin - adjustedBounds.size.width;
     }
 
-    for (NSInteger i = (NSInteger)[_marginImages indexOfObject:image] - 1; i >= 0; i--) {
+    for (NSInteger i = (NSInteger)index - 1; i >= 0; i--) {
         MarginImage *img2 = _marginImages[(NSUInteger)i];
+
+        // Margin images are appended in pos order and unoverlap only ever moves
+        // the current image down, never up - so once we're kFlowBreakReach character
+        // positions past img2 there's no way a downward push could reach it.
+        // Mirrors the flowbreak cutoff in lineFragmentRectForProposedRect:.
+        if (image.pos - img2.pos > kFlowBreakReach)
+            break;
 
         // If overlapping, shift in opposite alignment direction
         if (NSIntersectsRect(img2.bounds, adjustedBounds)) {
@@ -311,35 +436,13 @@
     NSSize inset = textview.textContainerInset;
     NSSize size;
     NSRect bounds;
-    CGFloat extendneeded = 0;
 
-    MarginImage *image;
-    NSEnumerator *enumerator = [_marginImages reverseObjectEnumerator];
-    while (image = [enumerator nextObject]) {
-        [image boundsWithLayout:self.layoutManager];
-
+    for (MarginImage *image in _marginImages.reverseObjectEnumerator) {
         bounds = image.bounds;
 
         if (!NSIsEmptyRect(bounds)) {
             bounds.origin.x += inset.width;
             bounds.origin.y += inset.height;
-
-            // Check if we need to add padding to increase textview height to
-            // accommodate for low image
-            if (textview.frame.size.height <= NSMaxY(bounds)) {
-                textview.bottomPadding =
-                    NSMaxY(bounds) - textview.frame.size.height + inset.height;
-                extendneeded = textview.bottomPadding;
-                [textview setFrameSize:textview.frame.size];
-            }
-            // Check if padding is still needed
-            else if (textview.frame.size.height - textview.bottomPadding <=
-                     NSMaxY(bounds)) {
-                CGFloat bottom =
-                    NSMaxY(bounds) - textview.frame.size.height + inset.height;
-                if (extendneeded < bottom)
-                    extendneeded = bottom;
-            }
 
             if ([textview needsToDrawRect:bounds]) {
                 size = image.image.size;
@@ -354,15 +457,16 @@
         }
     }
 
-    // Remove bottom padding if it is not needed any more
-    textview.bottomPadding = extendneeded;
+    // The padding for a low image is normally settled when layout completes,
+    // before any scrolling is worked out. Image bounds can also change in a
+    // layout pass that does not reach the end of the container, so catch
+    // that here. The frame can't be resized in the middle of drawing.
+    [textview bottomPaddingNeedsUpdate];
 }
 
 - (NSUInteger)findHyperlinkAt:(NSPoint)point {
     for (MarginImage *image in _marginImages) {
         if ([self.textView mouse:point inRect:image.bounds]) {
-            NSLog(@"Clicked on image %ld with linkid %ld",
-                  [_marginImages indexOfObject:image], image.linkid);
             return image.linkid;
         }
     }
@@ -378,8 +482,47 @@
     return nil;
 }
 
+- (void)shiftAnchorsAfterTrimOf:(NSUInteger)cut {
+    if (cut == 0)
+        return;
+
+    NSMutableArray<MarginImage *> *keptImages =
+        [NSMutableArray arrayWithCapacity:_marginImages.count];
+    for (MarginImage *img in _marginImages) {
+        if (img.pos < cut)
+            continue; // anchor character was trimmed away
+        img.pos -= cut;
+        [img uncacheBounds];
+        [keptImages addObject:img];
+    }
+    _marginImages = keptImages;
+
+    NSMutableArray<FlowBreak *> *keptBreaks =
+        [NSMutableArray arrayWithCapacity:flowbreaks.count];
+    for (FlowBreak *f in flowbreaks) {
+        if (f.pos < cut)
+            continue;
+        f.pos -= cut;
+        [f uncacheBounds];
+        [keptBreaks addObject:f];
+    }
+    flowbreaks = keptBreaks;
+
+    [self.layoutManager textContainerChangedGeometry:self];
+}
+
 - (BOOL)hasMarginImages {
     return (_marginImages.count > 0);
+}
+
+- (CGFloat)marginImagesBottom {
+    CGFloat bottom = 0;
+    for (MarginImage *image in _marginImages) {
+        NSRect bounds = image.bounds;
+        if (!NSIsEmptyRect(bounds) && NSMaxY(bounds) > bottom)
+            bottom = NSMaxY(bounds);
+    }
+    return bottom;
 }
 
 @end

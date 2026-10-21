@@ -1,0 +1,67 @@
+stand
+look under bed
+open dresser
+get socks
+s
+w
+attack drunk
+attack drunk
+attack drunk
+attack drunk
+get key
+s
+s
+unlock vault
+123456789
+5764
+n
+w
+w
+ring bell
+wait
+wait
+buy blaster
+get blaster
+e
+e
+e
+fight jenkins
+drop sword
+shoot jenkins with blaster
+ride ferry
+e
+n
+e
+look through arch
+wait
+wait
+talk king
+yes
+s
+e
+n
+n
+w
+u
+ape
+are
+ore
+owe
+owl
+d
+e
+s
+e
+e
+dig
+d
+show sock to rabbit
+u
+w
+s
+s
+w
+w
+rope cliff
+u
+score

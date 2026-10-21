@@ -6,7 +6,34 @@
 #include "glk.h"
 #include "protocol.h"
 
+#include <errno.h>
 #include <unistd.h>
+
+#import "DebugLog.h"
+
+// What writeEvent: sends is struct message and struct settings_struct from
+// protocol.h, read by the interpreter processes (glkimp). Change the wire
+// format only together with protocol.h.
+_Static_assert(sizeof(struct settings_struct) <= 4096,
+               "settings_struct must fit in the writeEvent: buffer");
+
+// Writes all of buf, retrying on EINTR and short writes. Gives up quietly
+// on any other error (EPIPE when the interpreter has gone away).
+static BOOL writeAll(int fd, const void *buf, size_t len) {
+    const char *p = buf;
+    while (len) {
+        ssize_t n = write(fd, p, len);
+        if (n < 0) {
+            if (errno == EINTR)
+                continue;
+            NSLog(@"GlkEvent: write failed: %s", strerror(errno));
+            return NO;
+        }
+        p += n;
+        len -= (size_t)n;
+    }
+    return YES;
+}
 
 @interface GlkEvent () <NSSecureCoding> {
     NSInteger win;
@@ -16,32 +43,6 @@
 @end
 
 @implementation GlkEvent
-
-+ (BOOL) supportsSecureCoding {
-    return YES;
-}
-
-- (instancetype)initWithCoder:(NSCoder *)decoder {
-    self = [super init];
-    if (self) {
-    _type = [decoder decodeIntegerForKey:@"type"];
-    win = [decoder decodeIntegerForKey:@"win"];
-    _val1 = [decoder decodeIntegerForKey:@"val1"];
-    _val2 = [decoder decodeIntegerForKey:@"val2"];
-    ln = [decoder decodeObjectOfClass:[NSString class] forKey:@"ln"];
-    _forced = [decoder decodeBoolForKey:@"forced"];
-    }
-    return self;
-}
-
-- (void)encodeWithCoder:(NSCoder *)encoder {
-    [encoder encodeInteger:_type forKey:@"type"];
-    [encoder encodeInteger:win forKey:@"win"];
-    [encoder encodeInteger:_val1 forKey:@"val1"];
-    [encoder encodeInteger:_val2 forKey:@"val2"];
-    [encoder encodeObject:ln forKey:@"ln"];
-    [encoder encodeBool:_forced forKey:@"forced"];
-}
 
 unsigned chartokeycode(unsigned ch) {
     switch (ch) {
@@ -184,6 +185,14 @@ unsigned chartokeycode(unsigned ch) {
     return self;
 }
 
+- (instancetype)initAutosaveEvent {
+    self = [super init];
+    if (self) {
+        _type = EVTAUTOSAVE;
+    }
+    return self;
+}
+
 - (instancetype)initSoundNotify:(NSInteger)notify withSound:(NSInteger)sound {
     self = [super init];
     if (self) {
@@ -214,11 +223,11 @@ unsigned chartokeycode(unsigned ch) {
 }
 
 - (void)writeEvent:(int)fd {
-    struct message reply;
+    // Zeroed so that unused fields (a4/a5 for most events) and struct
+    // padding don't send stack garbage to the interpreter.
+    struct message reply = {0};
     char buf[4096];
     struct settings_struct *settings = (void*)buf;
-
-    reply.len = 0;
 
     if (ln) {
         reply.len = ln.length * 2;
@@ -239,6 +248,7 @@ unsigned chartokeycode(unsigned ch) {
     }
 
     if (_type == EVTARRANGE) {
+        memset(settings, 0, sizeof(struct settings_struct));
 
         settings->screen_width = (int)_val1;
         settings->screen_height = (int)_val2;
@@ -269,6 +279,7 @@ unsigned chartokeycode(unsigned ch) {
         settings->z6_graphics = (int)theme.z6GraphicsType;
         settings->z6_colorize = (int)theme.z6Colorize1Bit;
         settings->zmachine_no_err_win = (int)theme.zMachineNoErrWin;
+        settings->comprehend_graphics = (int)theme.comprehendGraphicsType;
         settings->voiceover_on = (int)[NSWorkspace sharedWorkspace].voiceOverEnabled;
 
         settings->force_arrange = _forced;
@@ -276,9 +287,8 @@ unsigned chartokeycode(unsigned ch) {
         reply.len = sizeof(struct settings_struct);
     }
 
-    write(fd, &reply, sizeof(struct message));
-    if (reply.len)
-        write(fd, buf, (size_t)reply.len);
+    if (writeAll(fd, &reply, sizeof(struct message)) && reply.len)
+        writeAll(fd, buf, (size_t)reply.len);
 }
 
 @end

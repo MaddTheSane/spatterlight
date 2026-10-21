@@ -25,8 +25,14 @@ typedef NS_ENUM(NSUInteger, kModeType) {
     kLightMode
 };
 
+// Notifications posted when theme settings change. The object is the
+// affected Theme (nil for ColorModeChanged).
+extern NSNotificationName const kPreferencesChangedNotification;
+extern NSNotificationName const kDefaultSizeChangedNotification;
+extern NSNotificationName const kBorderChangedNotification;
+extern NSNotificationName const kColorModeChangedNotification;
 
-@class Theme, Game, CoreDataManager, GlkHelperView, GlkController, GlkTextBufferWindow, ThemeArrayController, TableViewController, DummyTextView, ParagraphPopOver, NSPersistentContainer;
+@class Theme, Game, CoreDataManager, GlkHelperView, GlkController, GlkTextBufferWindow, TableViewController, DummyTextView, NSPersistentContainer;
 
 @interface Preferences : NSWindowController <NSWindowDelegate, NSControlTextEditingDelegate, NSToolbarDelegate>
 
@@ -34,13 +40,9 @@ typedef NS_ENUM(NSUInteger, kModeType) {
 
 @property (NS_NONATOMIC_IOSONLY, readonly, strong) Theme *cloneThemeIfNotEditable;
 
-#pragma mark Themes menu
+#pragma mark Themes
 
-@property (strong) IBOutlet NSButton *btnAdjustSize;
-
-#pragma mark Action menu
-
-- (void)restoreThemeSelection:(id)sender;
+- (void)restoreThemeSelection:(Theme *)aTheme;
 
 + (void)zoomIn;
 + (void)zoomOut;
@@ -50,19 +52,18 @@ typedef NS_ENUM(NSUInteger, kModeType) {
 
 #pragma mark Global accessors
 
-+ (kZoomDirectionType)zoomDirection;
+@property (class, readonly) kZoomDirectionType zoomDirection;
 
-+ (Theme *)currentTheme;
+// The theme the panel shows and edits; the default theme if there is none
+@property (class, readonly) Theme *currentTheme;
 
-+ (Preferences *)instance;
+// The preferences window controller, once its window has loaded
+@property (class, readonly) Preferences *instance;
 
 + (void)changeCurrentGlkController:(GlkController *)ctrl;
 - (void)updatePrefsPanel;
 
 + (kModeType)currentSystemMode;
-
-@property BOOL previewShown;
-@property (strong) IBOutlet NSView *sampleTextBorderView;
 
 @property (nonatomic) Theme *defaultTheme ;
 @property Theme *darkTheme;
@@ -80,108 +81,14 @@ typedef NS_ENUM(NSUInteger, kModeType) {
 
 @property BOOL inMagnification;
 
-@property (weak) IBOutlet ThemeArrayController *arrayController;
-@property (weak) IBOutlet NSScrollView *scrollView;
-
-@property (weak) IBOutlet NSTextFieldCell *themesHeader;
-@property (weak) IBOutlet NSTextFieldCell *detailsHeader;
-@property (weak) IBOutlet NSTextFieldCell *miscHeader;
-@property (weak) IBOutlet NSTextFieldCell *vOHeader;
-@property (weak) IBOutlet NSTextFieldCell *zcodeHeader;
-@property (weak) IBOutlet NSTextFieldCell *stylesHeader;
-
-@property (weak) IBOutlet NSButton *btnOneThemeForAll;
-
-@property (weak) IBOutlet NSPopUpButton *actionButton;
-
-@property (weak) IBOutlet NSButton *btnAdd;
-@property (weak) IBOutlet NSButton *btnRemove;
-@property (weak) IBOutlet NSBox *divider;
-
-@property (strong) IBOutlet NSMenuItem *lightModeMenuItem;
-@property (strong) IBOutlet NSMenuItem *darkModeMenuItem;
-
-@property (weak) IBOutlet NSButton *btnOverwriteStyles;
-@property (weak) IBOutlet NSButton *swapGridColBtn;
-@property (weak) IBOutlet NSButton *swapBufColBtn;
-
-@property (weak) IBOutlet NSPopUpButton *vOMenuButton;
-@property (weak) IBOutlet NSPopUpButton *vOImagesButton;
-@property (weak) IBOutlet NSButton *btnVOSpeakCommands;
-@property (weak) IBOutlet NSSlider *vODelaySlider;
-@property (weak) IBOutlet NSButton *vODelayCheckbox;
-@property (weak) IBOutlet NSTextField *vODelayTextField;
-
-@property (weak) IBOutlet NSPopUpButton *beepHighMenu;
-@property (weak) IBOutlet NSPopUpButton *beepLowMenu;
-@property (weak) IBOutlet NSPopUpButton *zterpMenu;
-@property (weak) IBOutlet NSPopUpButton *bZArrowsMenu;
-@property (weak) IBOutlet NSTextField *zVersionTextField;
-@property (weak) IBOutlet NSTextField *bZVerticalTextField;
-@property (weak) IBOutlet NSStepper *bZVerticalStepper;
-
-@property (weak) IBOutlet NSButton *btnAutosave;
-@property (weak) IBOutlet NSButton *btnSmoothScroll;
-@property (weak) IBOutlet NSButton *btnAutosaveOnTimer;
-
-@property (weak) IBOutlet NSSlider *timerSlider;
-@property (weak) IBOutlet NSTextField *timerTextField;
-
-@property (weak) IBOutlet NSMenuItem *standardZArrowsMenuItem;
-@property (weak) IBOutlet NSMenuItem *compromiseZArrowsMenuItem;
-@property (weak) IBOutlet NSMenuItem *strictZArrowsMenuItem;
-@property (weak) IBOutlet NSPopUpButton *windowTypePopup;
-@property (weak) IBOutlet NSPopUpButton *styleNamePopup;
-@property (weak) IBOutlet NSButton *quoteBoxCheckBox;
-
-@property (weak) IBOutlet NSPopUpButton *z6GraphicsPopup;
-@property (weak) IBOutlet NSButton *z6ColorizeCheckBox;
-@property (weak) IBOutlet NSButton *z6Sim16ColoursCheckBox;
-
-@property (weak) IBOutlet NSButton *btnNoHacks;
-@property (weak) IBOutlet NSButton *btnDeterminism;
-@property (weak) IBOutlet NSPopUpButton *errorHandlingPopup;
-@property (weak) IBOutlet NSPopUpButton *imageReplacePopup;
-@property (weak) IBOutlet NSPopUpButton *coverImagePopup;
-
-@property (weak) IBOutlet NSButton *btnAutoBorderColor;
+// Outlets used outside the Preferences implementation
 @property (weak) IBOutlet NSColorWell *borderColorWell;
-@property (weak) IBOutlet NSButton *btnShowBezels;
-
-@property (weak) IBOutlet NSButton *btnUnderlineLinksGrid;
-@property (weak) IBOutlet NSButton *btnUnderlineLinksBuffer;
-
-@property (weak) IBOutlet NSButton *libraryAtStartCheckbox;
 @property (weak) IBOutlet NSButton *addToLibraryCheckbox;
-@property (weak) IBOutlet NSButton *recheckMissingCheckbox;
-@property (weak) IBOutlet NSTextField *recheckFrequencyTextfield;
-@property (weak) IBOutlet NSButton *saveInGameDirCheckbox;
 
-@property (weak) IBOutlet NSPopUpButton *palettePopup;
-@property (weak) IBOutlet NSPopUpButton *inventoryPopup;
-@property (weak) IBOutlet NSButton *delaysCheckbox;
-@property (weak) IBOutlet NSButton *slowDrawCheckbox;
-@property (strong) IBOutlet NSButton *hardDarkCheckbox;
-@property (strong) IBOutlet NSButton *hardLightCheckbox;
-@property (strong) IBOutlet NSButton *scottAdamsFlickerCheckbox;
-@property (strong) IBOutlet NSButton *zMachineNoErrWinCheckbox;
-
-@property DummyTextView *dummyTextView;
+// The text view the font panel targets while the panel edits a theme style
+@property (nonatomic, readonly) DummyTextView *dummyTextView;
 
 - (void)changeAttributes:(id)sender;
 - (void)changeDocumentBackgroundColor:(id)sender;
-
-@property (strong) IBOutlet NSPopover *marginsPopover;
-
-@property (weak) IBOutlet NSTextField *marginHorizontalGridTextField;
-@property (weak) IBOutlet NSStepper *marginHorizontalGridStepper;
-@property (weak) IBOutlet NSTextField *marginVerticalGridTextField;
-@property (weak) IBOutlet NSStepper *marginVerticalGridStepper;
-@property (weak) IBOutlet NSTextField *marginHorizontalBufferTextField;
-@property (weak) IBOutlet NSStepper *marginHorizontalBufferStepper;
-@property (weak) IBOutlet NSTextField *marginVerticalBufferTextField;
-@property (weak) IBOutlet NSStepper *marginVerticalBufferStepper;
-
-@property ParagraphPopOver *paragraphPopover;
 
 @end

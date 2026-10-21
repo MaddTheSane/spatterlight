@@ -1,0 +1,29 @@
+open desk
+take trench coat
+wear trench coat
+n
+e
+e
+give money to shoeshiner
+ask shoeshiner about donny
+read letter
+w
+n
+e
+search body
+w
+w
+open desk
+read paper
+e
+s
+w
+n
+ask bartender about paper
+s
+w
+take note
+read note
+confront daisy
+quit
+y

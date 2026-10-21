@@ -11,12 +11,26 @@
 #import <BlorbFramework/Blorb.h>
 
 #import "Game.h"
-#import "Metadata.h"
 #import "Image.h"
-
-#include "babel_handler.h"
+#import "Metadata.h"
+#import "NSString+Categories.h"
+#import "ReadOnlyStore.h"
 
 @implementation ThumbnailProvider
+
+// App-level categories are only available if their .m file is compiled into
+// this extension target. A missing one otherwise shows up as an unrecognized
+// selector deep inside thumbnail generation, so check the ones we use at
+// launch. If this fires, add the named file to the SpatterlightThumbnailer
+// target's Compile Sources build phase.
++ (void)initialize {
+    if (self != [ThumbnailProvider class])
+        return;
+
+    [ReadOnlyStore checkCategoryMethods:@[
+        @[NSString.class, @"signatureFromFile", @"NSString+Categories.m"]
+    ] target:@"SpatterlightThumbnailer"];
+}
 
 #pragma mark - Core Data stack
 
@@ -25,37 +39,13 @@
 - (NSPersistentContainer *)persistentContainer {
     @synchronized (self) {
         if (_persistentContainer == nil) {
-            _persistentContainer = [[NSPersistentContainer alloc] initWithName:@"Spatterlight"];
-
-            NSString *groupIdentifier =
-            [[NSBundle mainBundle] objectForInfoDictionaryKey:@"GroupIdentifier"];
-
-            NSURL *url = [[NSFileManager defaultManager] containerURLForSecurityApplicationGroupIdentifier:groupIdentifier];
-
-            url = [url URLByAppendingPathComponent:@"Spatterlight.storedata" isDirectory:NO];
-
-            NSPersistentStoreDescription *description = [[NSPersistentStoreDescription alloc] initWithURL:url];
-
-            description.readOnly = YES;
-            description.shouldMigrateStoreAutomatically = NO;
-
-            _persistentContainer.persistentStoreDescriptions = @[ description ];
-
-            NSLog(@"persistentContainer url path:%@", url.path);
-
-            [_persistentContainer loadPersistentStoresWithCompletionHandler:^(NSPersistentStoreDescription *aDescription, NSError *error) {
-                if (error != nil) {
-                    NSLog(@"Failed to load Core Data stack: %@", error);
-                }
-            }];
+            _persistentContainer = [ReadOnlyStore persistentContainerWithLogName:@"SpatterlightThumbnailer"];
         }
     }
     return _persistentContainer;
 }
 
 - (void)provideThumbnailForFileRequest:(QLFileThumbnailRequest *)request completionHandler:(void (^)(QLThumbnailReply * _Nullable, NSError * _Nullable))handler  API_AVAILABLE(macos(10.15)) {
-
-    // There are three ways to provide a thumbnail through a QLThumbnailReply. Only one of them should be used.
 
     NSData __block *imgdata = nil;
     NSImage __block *image;
@@ -64,8 +54,12 @@
     NSSize __block newImageSize;
     NSSize __block contextSize;
 
-
     NSError *error;
+
+    // Blorb parsing doesn't touch Core Data, so keep it outside the
+    // context's perform block. A malformed file only means no embedded
+    // cover, and we fall back to the database lookup.
+    imgdata = [Blorb coverImageDataAtURL:url];
 
     NSManagedObjectContext *context = self.persistentContainer.newBackgroundContext;
 
@@ -79,41 +73,14 @@
 
         NSError *blockerror = nil;
 
-        if ([Blorb isBlorbURL:url]) {
-            Blorb *blorb = [[Blorb alloc] initWithData:[NSData dataWithContentsOfURL:url]];
-            imgdata = [blorb coverImageData];
-        }
-
         if (!imgdata) {
 
-            NSArray *fetchedObjects;
-
-            NSFetchRequest *fetchRequest = [[NSFetchRequest alloc] init];
-
-            fetchRequest.entity = [NSEntityDescription entityForName:@"Game" inManagedObjectContext:context];
-            fetchRequest.predicate = [NSPredicate predicateWithFormat:@"path like[c] %@", url.path];
-
-            fetchedObjects = [context executeFetchRequest:fetchRequest error:&blockerror];
-            if (fetchedObjects == nil) {
-                NSLog(@"ThumbnailProvider: %@",blockerror);
+            Game *game = [ReadOnlyStore gameForURL:url inContext:context hashTag:NULL error:&blockerror];
+            if (blockerror) {
                 handler(nil, blockerror);
                 return;
             }
-
-            if (!fetchedObjects.count) {
-                NSString *ifid = [self ifidFromFile:url.path];
-                if (ifid.length) {
-                    fetchRequest.predicate = [NSPredicate predicateWithFormat:@"ifid like[c] %@", ifid];
-                    fetchedObjects = [context executeFetchRequest:fetchRequest error:&blockerror];
-                }
-            }
-
-
-            if (fetchedObjects.count) {
-                Game *game = fetchedObjects[0];
-                if (!imgdata)
-                    imgdata = (NSData *)game.metadata.cover.data;
-            }
+            imgdata = (NSData *)game.metadata.cover.data;
         }
 
         if (!imgdata || imgdata.length == 0) {
@@ -143,10 +110,8 @@
         if (isnan(contextSize.width))
             contextSize.width = maximumSize.width;
 
-        // First way: Draw the thumbnail into the current context, set up with AppKit's coordinate system.
         if (@available(macOS 10.15, *)) {
             handler([QLThumbnailReply replyWithContextSize:contextSize currentContextDrawingBlock:^BOOL {
-                // Draw the thumbnail here.
 
                 // draw the image centered
                 [image drawInRect:NSMakeRect(0,
@@ -154,52 +119,10 @@
                                              newImageSize.width,
                                              newImageSize.height)];
 
-                // Return YES if the thumbnail was successfully drawn inside this block.
                 return YES;
             }], nil);
         }
     }];
-    /*
-
-     // Second way: Draw the thumbnail into a context passed to your block, set up with Core Graphics's coordinate system.
-     handler([QLThumbnailReply replyWithContextSize:request.maximumSize drawingBlock:^BOOL(CGContextRef  _Nonnull context) {
-     // Draw the thumbnail here.
-
-     // Return YES if the thumbnail was successfully drawn inside this block.
-     return YES;
-     }], nil);
-
-     // Third way: Set an image file URL.
-     handler([QLThumbnailReply replyWithImageFileURL:[NSBundle.mainBundle URLForResource:@"fileThumbnail" withExtension:@"jpg"]], nil);
-
-     */
-}
-
-- (NSString *)ifidFromFile:(NSString *)path {
-    void *context = get_babel_ctx();
-    if (context == nil)
-        return nil;
-    char *format = babel_init_ctx((char*)path.fileSystemRepresentation, context);
-    if (!format || !babel_get_authoritative_ctx(context))
-    {
-        babel_release_ctx(context);
-        free(context);
-        return nil;
-    }
-
-    char buf[TREATY_MINIMUM_EXTENT];
-
-    int rv = babel_treaty_ctx(GET_STORY_FILE_IFID_SEL, buf, sizeof buf, context);
-    if (rv <= 0)
-    {
-        babel_release_ctx(context);
-        free(context);
-        return nil;
-    }
-
-    babel_release_ctx(context);
-    free(context);
-    return @(buf);
 }
 
 @end

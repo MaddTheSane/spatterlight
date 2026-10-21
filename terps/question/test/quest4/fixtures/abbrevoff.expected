@@ -1,0 +1,21 @@
+
+Abbrevoff
+
+You are in Lab.
+There is Man in a black suit and heavy oak door here.
+
+> x oak
+I can't see that here.
+
+> x door
+I can't see that here.
+
+> x heavy oak door
+A heavy oak door.
+
+> x man
+There's nothing special about the man.
+
+> x suit
+I can't see that here.
+[runner] turns=5 leftover=0 running=true

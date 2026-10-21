@@ -1,13 +1,11 @@
 //
 //  BezelWindow.h
-//  BezelTest
+//  Spatterlight
 //
 //  Created by Administrator on 2021-06-29.
 //
 
 #import <Cocoa/Cocoa.h>
-
-@class BezelParameters;
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -15,7 +13,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (instancetype)initWithContentRect:(NSRect)contentRect;
 
-- (void)showAndFadeOutWithDelay:(CGFloat)delay duration:(CGFloat)duration;
+- (void)showAndFadeOutWithDelay:(CGFloat)delay duration:(CGFloat)duration completion:(nullable dispatch_block_t)completion;
 
 @end
 

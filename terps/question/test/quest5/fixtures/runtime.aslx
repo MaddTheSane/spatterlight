@@ -1,0 +1,56 @@
+<!--Fixture for the milestone-2 script/expression runtime test.-->
+<asl version="550">
+  <template name="Greeting">hello</template>
+  <dynamictemplate name="Weigh">"weighs " + object.weight</dynamictemplate>
+  <type name="container">
+    <capacity type="int">10</capacity>
+    <displayverbs type="simplestringlist">Look; Take</displayverbs>
+  </type>
+  <type name="openable">
+    <inherit name="container" />
+    <displayverbs type="listextend">Open; Close</displayverbs>
+  </type>
+  <object name="room">
+    <object name="player">
+      <score type="int">0</score>
+      <greet type="script">msg ("player waves")</greet>
+    </object>
+    <object name="box">
+      <inherit name="container" />
+      <weight type="int">4</weight>
+    </object>
+  </object>
+  <object name="chest">
+    <inherit name="openable" />
+    <displayverbs type="listextend">Lock</displayverbs>
+  </object>
+  <function name="AddScore" parameters="amount" type="int">
+    player.score = player.score + amount
+    return (player.score)
+  </function>
+  <function name="Describe" parameters="obj">
+    msg ("The " + obj + " weighs " + obj.weight)
+  </function>
+  <function name="SumTo" parameters="n" type="int">
+    total = 0
+    for (i, 1, n) {
+      total = total + i
+    }
+    return (total)
+  </function>
+  <function name="Classify" parameters="k" type="string">
+    if (k &lt; 0) {
+      return ("negative")
+    }
+    else if (k = 0) {
+      return ("zero")
+    }
+    else {
+      return ("positive")
+    }
+  </function>
+  <!-- [Greeting] is substituted at load time to the template's text. -->
+  <function name="Templated" type="string">
+    return ("[Greeting] world")
+  </function>
+</asl>

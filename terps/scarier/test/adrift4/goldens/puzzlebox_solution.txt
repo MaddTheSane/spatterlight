@@ -1,0 +1,107 @@
+# The Puzzle Box (Richard Otter, ORGComp 2007) -- ten combination locks, all
+# randomised at load, so this route only holds at SCR_SEED=1.  Re-derive it
+# with `python3 harness/puzzlebox_solve.py <seed>` after any engine change
+# that re-threads the RNG; the script reads each lock's target/current
+# variable pair out of SCR_TRACE_VARS and turns the dials the difference.
+#
+# `look` is load-bearing: the box is randomised on the first real turn.  So
+# are `x weathercock`, `x animal` and `x ceiling` -- the red button refuses to
+# work until the matching clue in the oil painting has been examined.
+1
+look
+push switch 1
+push switch 3
+pull switch 4
+push switch 5
+push button
+move hour hand
+move hour hand
+move hour hand
+move minute hand
+move minute hand
+move minute hand
+move minute hand
+move minute hand
+move minute hand
+move minute hand
+push button
+turn dial 1
+turn dial 1
+turn dial 1
+turn dial 1
+turn dial 1
+turn dial 2
+turn dial 2
+turn dial 4
+turn dial 4
+turn dial 4
+turn dial 6
+turn dial 6
+turn dial 6
+turn dial 6
+turn dial 7
+push button
+x weathercock
+turn pointer
+push button
+push colesworth button
+push donningworth button
+push stanby button
+push button
+turn dial 2
+turn dial 2
+turn dial 2
+turn dial 2
+turn dial 5
+push button
+x animal
+turn dial
+turn dial
+turn dial
+turn dial
+turn dial
+push button
+x ceiling
+turn dial
+turn dial
+turn dial
+turn dial
+push button
+turn dial 1
+turn dial 1
+turn dial 1
+turn dial 1
+turn dial 2
+turn dial 2
+turn dial 2
+turn dial 2
+turn dial 2
+turn dial 3
+turn dial 3
+turn dial 3
+turn dial 3
+turn dial 3
+turn dial 3
+turn dial 4
+turn dial 4
+turn dial 4
+turn dial 5
+turn dial 5
+turn dial 5
+turn dial 5
+turn dial 5
+turn dial 5
+push button
+turn dial 2
+turn dial 2
+turn dial 2
+turn dial 2
+turn dial 2
+turn dial 2
+turn dial 3
+turn dial 3
+turn dial 3
+turn dial 3
+turn dial 3
+turn dial 3
+push button

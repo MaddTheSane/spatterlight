@@ -5,11 +5,13 @@
 //  Created by Administrator on 2021-09-15.
 //
 
+#import <Cocoa/Cocoa.h>
+
 #import "FolderAccess.h"
-#import "Constants.h"
+#import "DebugLog.h"
 
 
-@interface FolderAccess () {
+@interface FolderAccess () <NSSecureCoding> {
     NSInteger accessCount;
     NSURL *controlURL;
 }
@@ -20,6 +22,8 @@
 @end
 
 @implementation FolderAccess
+
+static NSMutableDictionary<NSURL *, FolderAccess *> *globalBookmarks;
 
 + (BOOL) supportsSecureCoding {
     return YES;
@@ -87,21 +91,8 @@
         } else {
             [FolderAccess grantAccessToFolder:bookmarkURL];
             if ([FolderAccess needsPermissionForURL:bookmarkURL]) {
-
-                NSOpenPanel *openPanel = [NSOpenPanel openPanel];
-                openPanel.message = NSLocalizedString(@"Spatterlight would like to access files in this folder", nil);
-                openPanel.prompt = NSLocalizedString(@"Authorize", nil);
-                openPanel.canChooseFiles = NO;
-                openPanel.canChooseDirectories = YES;
-                openPanel.canCreateDirectories = NO;
-                openPanel.directoryURL = bookmarkURL;
-                NSModalResponse result = [openPanel runModal];
-                if (result == NSModalResponseOK) {
-                    NSURL *blockURL = openPanel.URL;
-                    [FolderAccess storeBookmark:blockURL];
-                    [FolderAccess saveBookmarks];
-                    block();
-                }
+                // Runs the block only if the user authorizes the folder
+                [FolderAccess forceAccessDialogToURL:bookmarkURL andThenRunBlock:block];
                 return;
             }
         }
@@ -125,7 +116,6 @@
         [FolderAccess saveBookmarks];
         block();
     }
-    return;
 }
 
 + (NSURL *)grantAccessToFile:(NSURL *)url {
@@ -147,7 +137,8 @@
 
     NSString *homeString = NSHomeDirectory();
     NSArray *pathComponents = homeString.pathComponents;
-    pathComponents = [pathComponents subarrayWithRange:NSMakeRange(0, 3)];
+    // "/", "Users", name: the user's home root, outside any sandbox container
+    pathComponents = [pathComponents subarrayWithRange:NSMakeRange(0, MIN(3, pathComponents.count))];
     homeString = [NSString pathWithComponents:pathComponents];
 
     NSURL *homeURL = [NSURL fileURLWithPath:homeString isDirectory:YES]; // To get user home root
@@ -174,7 +165,7 @@
 + (NSString *)getVolumeNameForURL:(NSURL *)url {
     NSError *error = nil;
 
-    id value;
+    id value = nil;
     BOOL result = [url getResourceValue:&value
                                  forKey:NSURLVolumeNameKey
                                   error:&error];
@@ -189,14 +180,18 @@
     NSURL *best = nil;
     if (!url)
         return nil;
-    NSUInteger shortest = url.path.length;
+    NSString *path = url.path;
+    NSUInteger shortest = path.length;
     for (NSURL *key in globalBookmarks.allKeys) {
-        if (key.path.length <= shortest) {
-            NSString *urlString = [url.path substringToIndex:key.path.length];
-            if ([urlString isEqualToString:key.path]) {
-                best = key;
-                shortest = key.path.length;
-            }
+        NSString *keyPath = key.path;
+        if (keyPath.length > shortest)
+            continue;
+        // Match whole path components only: /a/Games is not an
+        // ancestor of /a/GamesOld/x.
+        NSString *prefix = [keyPath hasSuffix:@"/"] ? keyPath : [keyPath stringByAppendingString:@"/"];
+        if ([path isEqualToString:keyPath] || [path hasPrefix:prefix]) {
+            best = key;
+            shortest = keyPath.length;
         }
     }
     return best;
@@ -211,25 +206,54 @@
     return nil;
 }
 
-+ (NSString *)bookmarkPath {
-    // bookmarks saved in group directory
++ (NSURL *)sharedContainerURL {
     NSString *groupIdentifier =
     [[NSBundle mainBundle] objectForInfoDictionaryKey:@"GroupIdentifier"];
+    NSURL *container = groupIdentifier.length ?
+    [[NSFileManager defaultManager] containerURLForSecurityApplicationGroupIdentifier:groupIdentifier] : nil;
+    if (container)
+        return container;
 
-    NSURL *url = [[NSFileManager defaultManager] containerURLForSecurityApplicationGroupIdentifier:groupIdentifier];
+    NSError *error = nil;
+    NSURL *appSupport = [[NSFileManager defaultManager]
+                         URLForDirectory:NSApplicationSupportDirectory
+                         inDomain:NSUserDomainMask
+                         appropriateForURL:nil
+                         create:YES
+                         error:&error];
+    if (!appSupport)
+        NSLog(@"sharedContainerURL: Could not find Application Support directory! %@", error);
+    return [appSupport URLByAppendingPathComponent:@"Spatterlight" isDirectory:YES];
+}
 
-    url = [url URLByAppendingPathComponent:@"Bookmarks.dict" isDirectory:NO];
-    return url.path;
++ (NSString *)bookmarkPath {
+    // bookmarks saved in group directory
+    return [[FolderAccess sharedContainerURL] URLByAppendingPathComponent:@"Bookmarks.dict" isDirectory:NO].path;
 }
 
 + (void)loadBookmarks {
     NSString *path = [FolderAccess bookmarkPath];
-    globalBookmarks = [NSKeyedUnarchiver unarchiveObjectWithFile:path];
+    NSData *data = [NSData dataWithContentsOfFile:path];
+    if (!data) {
+        globalBookmarks = nil;
+        return;
+    }
+    NSError *error = nil;
+    NSSet *classes = [NSSet setWithObjects:[NSMutableDictionary class], [NSDictionary class], [NSURL class], [FolderAccess class], nil];
+    NSDictionary *dict = [NSKeyedUnarchiver unarchivedObjectOfClasses:classes fromData:data error:&error];
+    if (error)
+        NSLog(@"loadBookmarks: error: %@", error);
+    globalBookmarks = [dict isKindOfClass:[NSDictionary class]] ? [dict mutableCopy] : nil;
 }
 
 + (void)saveBookmarks {
+    if (!globalBookmarks)
+        return;
     NSString *path = [FolderAccess bookmarkPath];
-    [NSKeyedArchiver archiveRootObject:globalBookmarks toFile:path];
+    NSError *error = nil;
+    NSData *data = [NSKeyedArchiver archivedDataWithRootObject:globalBookmarks requiringSecureCoding:YES error:&error];
+    if (!data || ![data writeToFile:path options:NSDataWritingAtomic error:&error])
+        NSLog(@"saveBookmarks: error: %@", error);
 }
 
 
@@ -250,33 +274,29 @@
     globalBookmarks[url] = newAccess;
 }
 
-+ (NSURL *)restoreURL:(NSURL *)url {
-    FolderAccess *storedAccess = globalBookmarks[url];
-    if (!storedAccess) {
-        NSLog(@"No stored data for URL %@", url.path);
-        return nil;
-    }
-    [storedAccess resetCountIfNotReadable:url];
-    NSURL *storedURL = [storedAccess askToAccess];
-    if (![storedURL isEqual:url]) {
-        if (!storedURL)
-            NSLog(@"storedURL is nil! Could not access %@!", url.path);
++ (NSArray<NSURL *> *)bookmarkedFolders {
+    return globalBookmarks.allKeys ?: @[];
+}
 
-        NSLog(@"Bookmark is stale! File has moved from %@ to %@!", url.path, storedURL.path);
-        globalBookmarks[url] = nil;
-        if (storedURL)
-            globalBookmarks[storedURL] = storedAccess;
-    }
-    return storedURL;
++ (NSURL *)restoreURL:(NSURL *)url {
+    return [FolderAccess restoreURL:url force:NO];
 }
 
 + (NSURL *)forceRestoreURL:(NSURL *)url {
+    return [FolderAccess restoreURL:url force:YES];
+}
+
+// force: start counting accesses from zero even if the folder is readable.
++ (NSURL *)restoreURL:(NSURL *)url force:(BOOL)force {
     FolderAccess *storedAccess = globalBookmarks[url];
     if (!storedAccess) {
         NSLog(@"No stored data for URL %@", url.path);
         return nil;
     }
-    [storedAccess forceResetCount];
+    if (force)
+        [storedAccess forceResetCount];
+    else
+        [storedAccess resetCountIfNotReadable:url];
     NSURL *storedURL = [storedAccess askToAccess];
     if (![storedURL isEqual:url]) {
         if (!storedURL)
@@ -296,7 +316,7 @@
 
 - (void)resetCountIfNotReadable:(NSURL *)url {
     if (accessCount != 0 && [FolderAccess needsPermissionForURL:url]) {
-        NSLog(@"Secure url %@: Access count was %ld but path was not readable!", url.path, accessCount);
+        NSLog(@"Secure url %@: Access count was %ld but path was not readable!", url.path, (long)accessCount);
         accessCount = 0;
     }
 }
@@ -310,7 +330,7 @@
     } else {
         url = controlURL;
         if ([FolderAccess needsPermissionForURL:url]) {
-            NSLog(@"askToAccess: already accessing %@ (accessCount = %ld) but the file there is NOT readable!", url.path, accessCount);
+            NSLog(@"askToAccess: already accessing %@ (accessCount = %ld) but the file there is NOT readable!", url.path, (long)accessCount);
         }
     }
     accessCount++;
@@ -327,7 +347,6 @@
         NSLog(@"FolderAccess restoreBookmark error: %@", error);
 
     if  (restoredUrl) {
-        _active = YES;
         if (isStale) {
             [FolderAccess storeBookmark:restoredUrl];
             [FolderAccess saveBookmarks];
@@ -335,6 +354,7 @@
         if (![restoredUrl startAccessingSecurityScopedResource]) {
             NSLog(@"Couldn't access: %@", restoredUrl.path);
         } else {
+            _active = YES;
             return restoredUrl;
         }
     }
@@ -365,7 +385,9 @@
     [storedAccess askToEndAccess:url];
 }
 
+// Logs only, so release builds skip the loop too.
 + (void)listActiveSecurityBookmarks {
+#ifdef DEBUG
     NSLog(@"Active security bookmarks:");
     BOOL found = NO;
     for (NSURL *key in globalBookmarks.allKeys) {
@@ -377,6 +399,7 @@
     }
     if (!found)
         NSLog(@"None");
+#endif
 }
 
 @end

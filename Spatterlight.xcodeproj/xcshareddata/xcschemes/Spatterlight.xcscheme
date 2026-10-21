@@ -37,6 +37,72 @@
                BlueprintName = "UITests"
                ReferencedContainer = "container:Spatterlight.xcodeproj">
             </BuildableReference>
+            <SkippedTests>
+               <Test
+                  Identifier = "UITests/testAGiliTy">
+               </Test>
+               <Test
+                  Identifier = "UITests/testAdrift">
+               </Test>
+               <Test
+                  Identifier = "UITests/testAdriftPKGirl">
+               </Test>
+               <Test
+                  Identifier = "UITests/testAdvSys">
+               </Test>
+               <Test
+                  Identifier = "UITests/testAlan2">
+               </Test>
+               <Test
+                  Identifier = "UITests/testAlan3">
+               </Test>
+               <Test
+                  Identifier = "UITests/testCzech">
+               </Test>
+               <Test
+                  Identifier = "UITests/testHugo">
+               </Test>
+               <Test
+                  Identifier = "UITests/testJacl">
+               </Test>
+               <Test
+                  Identifier = "UITests/testLevel9">
+               </Test>
+               <Test
+                  Identifier = "UITests/testMagnetic">
+               </Test>
+               <Test
+                  Identifier = "UITests/testPlus">
+               </Test>
+               <Test
+                  Identifier = "UITests/testPraxix">
+               </Test>
+               <Test
+                  Identifier = "UITests/testScott">
+               </Test>
+               <Test
+                  Identifier = "UITests/testTADS2">
+               </Test>
+               <Test
+                  Identifier = "UITests/testTADS3">
+               </Test>
+               <Test
+                  Identifier = "UITests/testTaylor">
+               </Test>
+               <Test
+                  Identifier = "UITests/testTerpEtude">
+               </Test>
+            </SkippedTests>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "C3983D862F62CE4600717789"
+               BuildableName = "SpatterlightTests.xctest"
+               BlueprintName = "SpatterlightTests"
+               ReferencedContainer = "container:Spatterlight.xcodeproj">
+            </BuildableReference>
          </TestableReference>
       </Testables>
    </TestAction>
@@ -68,7 +134,11 @@
             isEnabled = "NO">
          </CommandLineArgument>
          <CommandLineArgument
-            argument = "-com.apple.CoreData.Logging.stderr 0"
+            argument = "-com.apple.CoreData.MigrationDebug 1"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "-com.apple.CoreData.Logging.stderr 1"
             isEnabled = "NO">
          </CommandLineArgument>
       </CommandLineArguments>
@@ -81,19 +151,19 @@
       </EnvironmentVariables>
       <AdditionalOptions>
          <AdditionalOption
-            key = "NSZombieEnabled"
-            value = "YES"
+            key = "MallocScribble"
+            value = ""
             isEnabled = "YES">
          </AdditionalOption>
          <AdditionalOption
-            key = "MallocScribble"
-            value = ""
+            key = "NSZombieEnabled"
+            value = "YES"
             isEnabled = "YES">
          </AdditionalOption>
       </AdditionalOptions>
    </LaunchAction>
    <ProfileAction
-      buildConfiguration = "Release"
+      buildConfiguration = "Debug"
       shouldUseLaunchSchemeArgsEnv = "YES"
       savedToolIdentifier = ""
       useCustomWorkingDirectory = "NO"

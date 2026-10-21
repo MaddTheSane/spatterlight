@@ -1,0 +1,49 @@
+feed        59 commands
+runner      59 turns echoed
+scarier     61 turns, feed[0] is scarier turn 2
+
+RULE 2 -- every feed command was echoed.
+
+turn 11  w
+  run400   You move west. Space ship port This room is huge. You can hear the humming of a force field which is stopping you from floating into outer space. This place is used to dock space ships and pods. It doesn't look like any of your freinds made it here though. Also here is a dead man. a blue alien is here. You can only move east. Adam shoots the blue alien with the lazer rifle. The blue alien hits Adam.
+  scarier  You move west. Space ship port This room is huge. You can hear the humming of a force field which is stopping you from floating into outer space. This place is used to dock space ships and pods. It doesn't look like any of your freinds made it here though. Also here is a dead man. A blue alien is here. You can only move east. Adam shoots the blue alien with the lazer rifle. The blue alien hits Adam.
+
+turn 32  e
+  run400   You move east. Staff office This office looks as if it was the scene of a ransacking. There is a desk here that has been toppled over, papers and compter components lie scattered over the floor. There is a small panel on the wall. a red alien is here. You can only move west. Adam shoots the red alien with the lazer rifle. The red alien hits you.
+  scarier  You move east. Staff office This office looks as if it was the scene of a ransacking. There is a desk here that has been toppled over, papers and compter components lie scattered over the floor. There is a small panel on the wall. A red alien is here. You can only move west. Adam shoots the red alien with the lazer rifle. The red alien hits you.
+
+turn 35  flip switch
+  run400   You can't do that here!
+  scarier  You flip the switch but cannot hear anything.
+
+turn 37  n
+  run400   You move north. Corridor This small corridor is a t-bone junction. It leads south to the recieving area, east to an inner cooridor and west to the electronics room. Slime drips from the cieling. The eastern door is broken. Sparks spray from the edges and you can just see between the doors but there is not enough space to squeeze through. You can only move south.
+  scarier  You move north. Corridor This small corridor is a t-bone junction. It leads south to the recieving area, east to an inner cooridor and west to the electronics room. Slime drips from the cieling. The eastern door is broken. Sparks spray from the edges and you can just see between the doors but there is not enough space to squeeze through. You can move south and west.
+
+turn 38  w
+  run400   You can only move south.
+  scarier  You move west. Electronics room This room is very small. It reminds you of a cleaners cupboard. There is a fuse box mounted on the wall. You can only move east.
+
+turn 39  open door
+  run400   You can't do that here!
+  scarier  You swing the little fuse box door open and gape inside. There are more broken wires in here than you have ever seen! There are two wires in here you could 'twist together' and maybe make a curcit.
+
+turn 40  twist wires together
+  run400   You can't do that here!
+  scarier  You take hold of the two wires and twist the ends together. A small spark makes you jump and you hear a generator powering up.
+
+turn 41  e
+  run400   You can only move south.
+  scarier  You move east. Corridor This small corridor is a t-bone junction. It leads south to the recieving area, east to an inner cooridor and west to the electronics room. Slime drips from the cieling. The eastern door seems to be working now, even though sparks still continually spray from the edges of the door. You can move east, south and west.
+
+turn 42  e
+  run400   You can only move south.
+  scarier  You move east. Inner corridor This corridor leads deeper and deeper into the ship. There is a neon sign over head flashing: "Unclean! Unclean! Please procede to Alien Search Recieving Room for directions!" You can move north and west.
+
+turn 43  n
+  run400   You can only move south.
+  scarier  You move north. Alien search recieving room This room is like a receptionists room. There is a desk and a wall panel here. Four doors lead out of here: one to the north reading 'Stairs to Sector B', the southern one has no label, the western one says 'Shower Room' and the eastern room is labeled 'Customs'. You can move east, south and west.
+
+... stopping after 10 differing turns
+(the openings differ too -- banner, graphics notice or the
+ Runner's own startup lines; usually not an engine difference)

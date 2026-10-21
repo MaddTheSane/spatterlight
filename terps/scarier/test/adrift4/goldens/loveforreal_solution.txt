@@ -1,0 +1,98 @@
+Petter
+male
+open wardrobe
+get clothes
+wear clothes
+lie on bed
+open door
+out
+u
+n
+open wallet
+get credit cards
+buy drink
+s
+look
+look
+se
+e
+e
+se
+in
+talk to server
+out
+nw
+ne
+in
+give beer to farmer
+out
+get corn
+sw
+e
+e
+give corn to old woman
+w
+w
+n
+in
+give ring to shopkeeper
+get food
+out
+s
+s
+in
+give food to merchant
+out
+n
+w
+w
+s
+sw
+give coins to ferryman
+w
+get on camel
+sw
+sw
+w
+get off camel
+sw
+in
+s
+examine table
+get knife
+get cup
+n
+out
+ne
+kill camel with knife
+sw
+in
+s
+sacrifice camel
+sacrifice blood
+nw
+in
+w
+get vase
+fill vase with water
+water flowers
+sit on bench
+talk to princess
+se
+get lantern
+pray to re now
+in
+s
+open coffin
+wait
+wait
+wait
+return
+open wardrobe
+get clothes
+wear clothes
+open door
+out
+u
+s
+warn captain

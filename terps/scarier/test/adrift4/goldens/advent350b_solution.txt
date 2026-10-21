@@ -1,0 +1,359 @@
+e
+get all
+get water
+w
+s
+s
+s
+unlock grate
+d
+w
+get cage
+w
+light lamp
+get rod
+w
+w
+drop rod
+get bird
+get rod
+w
+d
+n
+free bird
+drop cage
+drop rod
+s
+get jewelry
+n
+get axe
+w
+get coins
+e
+n
+get silver
+n
+plugh
+drop jewelry
+drop coins
+drop silver
+plugh
+s
+s
+e
+s
+get gold
+n
+n
+n
+n
+s
+s
+w
+w
+w
+e
+s
+e
+s
+n
+get chest
+get all
+out
+throw axe at dwarf
+get axe
+n
+d
+e
+e
+xyzzy
+drop chest
+plugh
+plugh
+drop gold
+look
+plugh
+s
+s
+get rod
+e
+w
+wave rod
+w
+get diamonds
+e
+e
+n
+n
+n
+plugh
+drop diamonds
+drop rod
+plugh
+s
+s
+sw
+w
+attack dragon
+yes
+get rug
+e
+e
+n
+n
+plugh
+drop rug
+plugh
+s
+d
+w
+d
+w
+w
+w
+w
+d
+water plant
+u
+e
+e
+ne
+e
+u
+e
+u
+n
+plugh
+get water
+plugh
+s
+d
+w
+d
+w
+w
+w
+w
+d
+water plant
+u
+e
+d
+get oil
+u
+w
+d
+climb plant
+w
+get eggs
+n
+oil door
+n
+get trident
+s
+s
+s
+d
+u
+e
+e
+ne
+e
+n
+unlock clam with trident
+d
+d
+get pearl
+u
+u
+s
+u
+e
+u
+n
+plugh
+drop eggs
+drop pearl
+drop trident
+plugh
+s
+d
+w
+d
+w
+w
+e
+get pillow
+w
+nw
+nw
+nw
+nw
+get vase
+n
+w
+drop keys
+drop food
+drop bottle
+drop axe
+drop pillow
+drop vase
+drop lamp
+e
+get emerald
+drop emerald
+w
+get lamp
+get keys
+get food
+get axe
+get vase
+get pillow
+nw
+s
+se
+ne
+e
+u
+e
+u
+n
+plugh
+drop pillow
+drop vase
+plugh
+plover
+get emerald
+plover
+plugh
+drop emerald
+get eggs
+plugh
+look
+s
+d
+w
+d
+w
+w
+w
+w
+d
+climb plant
+w
+n
+n
+w
+d
+sw
+u
+ne
+throw eggs
+ne
+ne
+e
+ne
+s
+d
+s
+e
+feed food to bear
+unlock chain
+get chain
+get bear
+w
+w
+u
+ne
+e
+get spices
+w
+s
+w
+w
+sw
+free bear
+sw
+d
+d
+se
+se
+w
+w
+d
+climb plant
+w
+fee
+fie
+foe
+foo
+get eggs
+s
+e
+u
+e
+e
+ne
+e
+u
+e
+u
+n
+plugh
+drop chain
+drop spices
+drop eggs
+plugh
+plover
+ne
+get pyramid
+s
+plover
+plugh
+drop pyramid
+plugh
+s
+d
+w
+d
+e
+get magazines
+e
+drop magazines
+turn lamp off
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+sw
+get dynamite
+ne
+drop dynamite
+sw
+blast

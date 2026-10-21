@@ -66,22 +66,9 @@ GLK_ATTRIBUTE_NORETURN void glk_exit(void)
     gli_close_all_file_streams();
     win_flush();
 
-    if (gli_program_info != NULL)
-        free(gli_program_info);
-    if (gli_game_path != NULL)
-        free(gli_game_path);
-    if (gli_story_name != NULL)
-        free(gli_story_name);
-    if (gli_story_title != NULL)
-        free(gli_story_title);
-    if (gli_program_name != NULL)
-        free(gli_program_name);
-    if (gli_workdir != NULL)
-        free(gli_workdir);
-    if (autosavedir != NULL)
-        free(autosavedir);
-    if (gli_parentdir != NULL)
-        free(gli_parentdir);
+    /* An autosave carries the contents of the temp files it uses, so the
+       temp directory can go even when the session will be autorestored. */
+    gli_cleanup_tempdir();
 
     close(0);
     close(1);
@@ -170,14 +157,8 @@ char *gli_story_title = NULL;
 
 static void malloc_and_set_string(char **variable, const char *string)
 {
-    size_t length = strlen(string);
-
-    if (*variable != NULL)
-        free(*variable);
-
-    *variable = malloc(length + 1);
-    strncpy(*variable, string, length);
-    (*variable)[length] = 0;
+    free(*variable);
+    *variable = string ? strdup(string) : NULL;
 }
 
 void garglk_set_program_name(const char *name)

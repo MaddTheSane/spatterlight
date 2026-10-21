@@ -12,11 +12,16 @@
 #import <BlorbFramework/BlorbFramework.h>
 
 #import "Game.h"
-#import "Metadata.h"
 #import "Image.h"
-#import "Ifid.h"
+#import "Metadata.h"
 
-#import "NSData+Categories.h"
+#import "FileSignature.h"
+#import "NSString+Categories.h"
+#import "ReadOnlyStore.h"
+#import "IFictionMetadata.h"
+#import "IFStory.h"
+#import "IFIdentification.h"
+#import "IFBibliographic.h"
 
 #import "iFictionPreviewController.h"
 #import "PreviewViewController.h"
@@ -43,10 +48,36 @@
 
 @implementation PreviewViewController
 
+// App-level categories are only available if their .m file is compiled into
+// this extension target. A missing one otherwise shows up as an unrecognized
+// selector deep inside a preview (see the 1.4.6 -[NSData sha256String] crash;
+// hashing now goes through FileSignature, which BlorbFramework provides), so
+// check the ones we still use at launch. If this fires, add the named file to
+// the SpatterlightQuickLook target's Compile Sources build phase.
++ (void)initialize {
+    if (self != [PreviewViewController class])
+        return;
+
+    [ReadOnlyStore checkCategoryMethods:@[
+        @[NSString.class, @"signatureFromFile", @"NSString+Categories.m"],
+        @[NSFont.class, @"fontToFitWidth:sampleText:", @"NSFont+Categories.m"]
+    ] target:@"SpatterlightQuickLook"];
+}
+
+// Bold, 20 points, for the title line.
++ (NSMutableDictionary *)titleAttributes {
+    return [self attributesWithFont:[NSFont systemFontOfSize:20 weight:NSFontWeightBold]];
+}
+
++ (NSMutableDictionary *)attributesWithFont:(NSFont *)font {
+    return [@{ NSFontAttributeName: font,
+               NSForegroundColorAttributeName: [NSColor controlTextColor] } mutableCopy];
+}
+
 + (NSImage *)iconFromURL:(NSURL *)url {
     NSImage *icon = [[NSWorkspace sharedWorkspace] iconForFile:url.path];
     NSData *imageData = icon.TIFFRepresentation;
-    NSString *sha256 = [imageData sha256String];
+    NSString *sha256 = [FileSignature sha256StringFromData:imageData];
     if ([sha256 isEqualToString:@"4D5665BE8E0382BFFB7500F86A69117080A036B9698DC2395F3A86F9DCE7170E"] || [sha256 isEqualToString:@"48FA6B493F338A1A14423CEBCC1012C2EB9548E983A9BB6DF44A7EE5A855D2AE"]) {
         return [NSImage imageNamed:@"house"];
     }
@@ -79,34 +110,14 @@
 - (NSPersistentContainer *)persistentContainer {
     @synchronized (self) {
         if (_persistentContainer == nil) {
-            _persistentContainer = [[NSPersistentContainer alloc] initWithName:@"Spatterlight"];
-
-            NSString *groupIdentifier =
-            [[NSBundle mainBundle] objectForInfoDictionaryKey:@"GroupIdentifier"];
-
-            NSURL *url = [[NSFileManager defaultManager] containerURLForSecurityApplicationGroupIdentifier:groupIdentifier];
-
-            url = [url URLByAppendingPathComponent:@"Spatterlight.storedata" isDirectory:NO];
-
-            NSPersistentStoreDescription *description = [[NSPersistentStoreDescription alloc] initWithURL:url];
-
-            description.readOnly = YES;
-            description.shouldMigrateStoreAutomatically = NO;
-
-            _persistentContainer.persistentStoreDescriptions = @[ description ];
-
-            [_persistentContainer loadPersistentStoresWithCompletionHandler:^(NSPersistentStoreDescription *aDescription, NSError *error) {
-                if (error != nil) {
-                    NSLog(@"Failed to load Core Data stack: %@", error);
-                }
-            }];
+            _persistentContainer = [ReadOnlyStore persistentContainerWithLogName:@"Spatterlight Quick Look"];
         }
     }
     return _persistentContainer;
 }
 
 - (void)preparePreviewOfSearchableItemWithIdentifier:(NSString *)identifier queryString:(NSString *)queryString completionHandler:(void (^)(NSError * _Nullable))handler {
-    _ifid = nil;
+    _hashTag = nil;
 
     NSManagedObjectContext *context = self.persistentContainer.newBackgroundContext;
     if (!context) {
@@ -161,14 +172,14 @@
 
         if ([object isKindOfClass:[Metadata class]]) {
             metadata = (Metadata *)object;
-            game = metadata.games.anyObject;
+            game = metadata.game;
         } else if ([object isKindOfClass:[Game class]]) {
             game = (Game *)object;
             metadata = game.metadata;
         } else if ([object isKindOfClass:[Image class]]) {
             image = (Image *)object;
             metadata = image.metadata.anyObject;
-            game = metadata.games.anyObject;
+            game = metadata.game;
             if (!metadata) {
                 NSLog(@"Image has no metadata!");
                 giveUp = YES;
@@ -248,14 +259,13 @@
 
 - (void)preparePreviewOfFileAtURL:(NSURL *)url completionHandler:(void (^)(NSError * _Nullable))handler {
 
-    _ifid = nil;
+    _hashTag = nil;
     _addedFileInfo = NO;
     _showingIcon = NO;
     _showingView = NO;
     iFiction = NO;
 
     NSString *extension = url.pathExtension.lowercaseString;
-
     if ([extension isEqualToString:@"ifiction"]) {
         iFiction = YES;
         [_imageView removeFromSuperview];
@@ -323,52 +333,46 @@
 
     [context performBlockAndWait:^{
         PreviewViewController *strongSelf = weakSelf;
+        if (!strongSelf)
+            return;
         NSError *error = nil;
-        NSArray *fetchedObjects;
-
-        NSFetchRequest *fetchRequest = [NSFetchRequest new];
-
-        fetchRequest.entity = [NSEntityDescription entityForName:@"Game" inManagedObjectContext:context];
-        fetchRequest.predicate = [NSPredicate predicateWithFormat:@"path like[c] %@", url.path];
-
-        fetchedObjects = [context executeFetchRequest:fetchRequest error:&error];
-        if (fetchedObjects == nil) {
+        NSString *hashTag = nil;
+        Game *game = [ReadOnlyStore gameForURL:url inContext:context hashTag:&hashTag error:&error];
+        if (error) {
             NSLog(@"QuickLook: fetch request failed. %@ Bailing to noPreviewForURL",error);
             [strongSelf noPreviewForURL:url handler:handler];
             giveUp = YES;
             return;
         }
-        if (fetchedObjects.count == 0) {
-            strongSelf.ifid = [strongSelf ifidFromFile:url.path];
-            if (strongSelf.ifid) {
-                fetchRequest.predicate = [NSPredicate predicateWithFormat:@"ifid like[c] %@", strongSelf.ifid];
-                fetchedObjects = [context executeFetchRequest:fetchRequest error:&error];
-            }
-            if (fetchedObjects.count == 0) {
-                metadata = [strongSelf metadataFromBlorb:url];
-                if (metadata == nil || metadata.count == 0) {
-                    // Found no matching path or ifid. File not a blorb or blorb empty. Bailing to noPreviewForURL
-                    [strongSelf noPreviewForURL:url handler:handler];
-                    giveUp = YES;
-                    return;
-                }
+        if (hashTag)
+            strongSelf.hashTag = hashTag;
+        if (!game) {
+            metadata = [strongSelf metadataFromBlorb:url inContext:context];
+            if (metadata == nil || metadata.count == 0) {
+                // Found no matching path or hashTag. File not a blorb or blorb empty. Bailing to noPreviewForURL
+                [strongSelf noPreviewForURL:url handler:handler];
+                giveUp = YES;
+                return;
             }
         }
 
         if (metadata == nil || metadata.count == 0) {
 
-            Game *game = fetchedObjects[0];
             Metadata *meta = game.metadata;
 
-            NSDictionary *attributes = [NSEntityDescription
+            NSArray<NSString*> *attributes = [NSEntityDescription
                                         entityForName:@"Metadata"
-                                        inManagedObjectContext:context].attributesByName;
+                                        inManagedObjectContext:context].attributesByName.allKeys;
 
             _metaDict = [[NSMutableDictionary alloc] initWithCapacity:attributes.count];
 
             for (NSString *attr in attributes) {
-                [_metaDict setValue:[meta valueForKey:attr] forKey:attr];
+                NSObject *value = [meta valueForKey:attr];
+                if (value) {
+                    [_metaDict setValue:[meta valueForKey:attr] forKey:attr];
+                }
             }
+
             _metaDict[@"ifid"] = game.ifid;
             _metaDict[@"cover"] = game.metadata.cover.data;
             _metaDict[@"lastPlayed"] = game.lastPlayed;
@@ -389,11 +393,11 @@
     if (!_metaDict[@"title"])
         _metaDict[@"title"] = url.lastPathComponent;
 
-    if ([Blorb isBlorbURL:url]) {
-        Blorb *blorb = [[Blorb alloc] initWithData:[NSData dataWithContentsOfURL:url]];
-        imageData = [blorb coverImageData];
+    // A malformed file only means no embedded cover, and we fall back
+    // to the database cover or file icon below.
+    imageData = [Blorb coverImageDataAtURL:url];
+    if (imageData)
         [_imageView addImageFromData:imageData];
-    }
 
     if (!_imageView.hasImage && _metaDict[@"cover"]) {
         imageData = (NSData *)_metaDict[@"cover"];
@@ -406,16 +410,8 @@
         [self addFileInfo:url];
     }
 
-    if (!_imageView.hasImage) {
-        _showingIcon = YES;
-        NSImage *image = [PreviewViewController iconFromURL:url];
-        if (image == [NSImage imageNamed:@"house"])
-            _showingIcon = NO;
-        imageData = image.TIFFRepresentation;
-        _metaDict[@"cover"] = imageData;
-        // If we add the icon image directly it becomes low resolution and blurry
-        [_imageView addImageFromData:imageData];
-    }
+    if (!_imageView.hasImage)
+        [self showIconForURL:url];
 
     [self makeAdjustments:handler];
     if (!_vertical)
@@ -563,6 +559,16 @@
     [_largeScrollView.contentView scrollPoint:NSZeroPoint];
 }
 
+// Runs block on the main queue after delay, unless the preview is gone by then.
+- (void)afterDelay:(NSTimeInterval)delay perform:(void (^)(PreviewViewController *strongSelf))block {
+    PreviewViewController * __weak weakSelf = self;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay * NSEC_PER_SEC)), dispatch_get_main_queue(), ^(void){
+        PreviewViewController *strongSelf = weakSelf;
+        if (strongSelf)
+            block(strongSelf);
+    });
+}
+
 -(void)checkForChange {
     BOOL wasVertical = _vertical;
     _vertical = (NSWidth(self.view.frame) - NSHeight(self.view.frame) <= 20 || NSWidth(self.view.frame) < 300);
@@ -570,30 +576,26 @@
         _vertical = YES;
     if (_vertical && !wasVertical) {
         _changing = YES;
-        PreviewViewController * __weak weakSelf = self;
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^(void){
-            PreviewViewController *strongSelf = weakSelf;
-            if (strongSelf && strongSelf.changing) {
-                strongSelf.changing = NO;
+        [self afterDelay:0.3 perform:^(PreviewViewController *strongSelf) {
+            if (!strongSelf.changing)
+                return;
+            strongSelf.changing = NO;
+            if (!strongSelf.view.inLiveResize)
+                [strongSelf drawVertical];
+        }];
+    } else if (!_vertical && wasVertical) {
+        _changing = YES;
+        [self afterDelay:0.3 perform:^(PreviewViewController *strongSelf) {
+            if (!strongSelf.changing)
+                return;
+            strongSelf.changing = NO;
+            if (![strongSelf drawHorizontal]) {
+                strongSelf.vertical = YES;
+                strongSelf.changedMyMindForWidth = NSWidth(strongSelf.view.frame);
                 if (!strongSelf.view.inLiveResize)
                     [strongSelf drawVertical];
             }
-        });
-    } else if (!_vertical && wasVertical) {
-        _changing = YES;
-        PreviewViewController * __weak weakSelf = self;
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^(void){
-            PreviewViewController *strongSelf = weakSelf;
-            if (strongSelf && strongSelf.changing) {
-                strongSelf.changing = NO;
-                if (![strongSelf drawHorizontal]) {
-                    strongSelf.vertical = YES;
-                    strongSelf.changedMyMindForWidth = NSWidth(strongSelf.view.frame);
-                    if (!strongSelf.view.inLiveResize)
-                        [strongSelf drawVertical];
-                }
-            }
-        });
+        }];
     }
 }
 
@@ -633,15 +635,11 @@
         return;
     if (!_changing) {
         _changing = YES;
-        PreviewViewController * __weak weakSelf = self;
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^(void){
-            PreviewViewController *strongSelf = weakSelf;
-            if (strongSelf) {
-                strongSelf.changing = NO;
-                if (!strongSelf.view.inLiveResize)
-                    [strongSelf makeAdjustments:nil];
-            }
-        });
+        [self afterDelay:0.3 perform:^(PreviewViewController *strongSelf) {
+            strongSelf.changing = NO;
+            if (!strongSelf.view.inLiveResize)
+                [strongSelf makeAdjustments:nil];
+        }];
     }
 }
 
@@ -671,26 +669,20 @@
             _forcedHeightForWidth = NSWidth(_textScrollView.frame);
             self.view.needsLayout = YES;
             _changing = YES;
-            PreviewViewController * __weak weakSelf = self;
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^(void){
-                PreviewViewController *strongSelf = weakSelf;
-                if (strongSelf && strongSelf.changing) {
-                    strongSelf.changing = NO;
-                    NSRect newFrame = strongSelf.textScrollView.frame;
-                    newFrame.size.height = strongSelf.textClipHeight.constant;
-                    newFrame.origin.y = ceil((NSHeight(strongSelf.horizontalView.frame) - newFrame.size.height) / 2);
-                    strongSelf.textScrollView.frame = newFrame;
-                    [strongSelf.textScrollView.contentView scrollPoint:NSZeroPoint];
-                }
-            });
+            [self afterDelay:0.3 perform:^(PreviewViewController *strongSelf) {
+                if (!strongSelf.changing)
+                    return;
+                strongSelf.changing = NO;
+                NSRect newFrame = strongSelf.textScrollView.frame;
+                newFrame.size.height = strongSelf.textClipHeight.constant;
+                newFrame.origin.y = ceil((NSHeight(strongSelf.horizontalView.frame) - newFrame.size.height) / 2);
+                strongSelf.textScrollView.frame = newFrame;
+                [strongSelf.textScrollView.contentView scrollPoint:NSZeroPoint];
+            }];
         } else {
-            PreviewViewController * __weak weakSelf = self;
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^(void){
-                PreviewViewController *strongSelf = weakSelf;
-                if (strongSelf) {
-                    [strongSelf.textScrollView.contentView scrollPoint:NSZeroPoint];
-                }
-            });
+            [self afterDelay:0.1 perform:^(PreviewViewController *strongSelf) {
+                [strongSelf.textScrollView.contentView scrollPoint:NSZeroPoint];
+            }];
         }
     }
 }
@@ -701,15 +693,11 @@
     if ((NSWindow *)notification.object == self.view.window) {
         // window matched
         _changing = NO;
-        PreviewViewController * __weak weakSelf = self;
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^(void){
-            PreviewViewController *strongSelf = weakSelf;
-            if (strongSelf) {
-                strongSelf.changing = NO;
-                if (!strongSelf.view.inLiveResize)
-                    [strongSelf makeAdjustments:nil];
-            }
-        });
+        [self afterDelay:0.3 perform:^(PreviewViewController *strongSelf) {
+            strongSelf.changing = NO;
+            if (!strongSelf.view.inLiveResize)
+                [strongSelf makeAdjustments:nil];
+        }];
     }
 }
 
@@ -789,11 +777,21 @@
 
 #pragma mark Adding metadata
 
+// With no cover image, show the file's icon instead. The house means the
+// Finder has no icon of its own for it.
+- (void)showIconForURL:(NSURL *)url {
+    _showingIcon = YES;
+    NSImage *image = [PreviewViewController iconFromURL:url];
+    if (image == [NSImage imageNamed:@"house"])
+        _showingIcon = NO;
+    NSData *iconData = image.TIFFRepresentation;
+    _metaDict[@"cover"] = iconData;
+    // If we add the icon image directly it becomes low resolution and blurry
+    [_imageView addImageFromData:iconData];
+}
+
 - (void)noPreviewForURL:(NSURL *)url handler:(void (^)(NSError *))handler {
-    NSFont *systemFont = [NSFont systemFontOfSize:20 weight:NSFontWeightBold];
-    NSMutableDictionary *attrDict = [NSMutableDictionary new];
-    attrDict[NSFontAttributeName] = systemFont;
-    attrDict[NSForegroundColorAttributeName] = [NSColor controlTextColor];
+    NSMutableDictionary *attrDict = [PreviewViewController titleAttributes];
     if (!_metaDict)
         _metaDict = [NSMutableDictionary new];
     _metaDict[@"title"] = url.lastPathComponent;
@@ -825,22 +823,22 @@
         _metaDict[@"blurb"] = description;
     }
 
-    if (_ifid.length) {
-        [self addInfoLine:[@"IFID: " stringByAppendingString:_ifid] attributes:attrDict linebreak:YES];
-        _metaDict[@"ifid"] = _ifid;
+    NSString *ifid = @"";
+
+    if (_metaDict[@"ifid"])
+        ifid = (NSString *)_metaDict[@"ifid"];
+    if (!ifid.length) {
+        ifid = [PreviewViewController ifidFromFile:url.path];
+    }
+    if (ifid.length) {
+        [self addInfoLine:[@"IFID: " stringByAppendingString:ifid] attributes:attrDict linebreak:YES];
+        _metaDict[@"ifid"] = ifid;
     }
 
     [self addFileInfo:url];
 
-    if (!_imageView.hasImage) {
-        _showingIcon = YES;
-        NSImage *image = [PreviewViewController iconFromURL:url];
-        if (image == [NSImage imageNamed:@"house"])
-            _showingIcon = NO;
-        NSData *imageData = image.TIFFRepresentation;
-        _metaDict[@"cover"] = imageData;
-        [_imageView addImageFromData:imageData];
-    }
+    if (!_imageView.hasImage)
+        [self showIconForURL:url];
 
     [self makeAdjustments:handler];
     if (!_vertical)
@@ -849,10 +847,7 @@
 
 - (void)updateWithMetadata:(NSDictionary *)metadict url:(nullable NSURL *)url {
     if (metadict && metadict.count) {
-        NSFont *systemFont = [NSFont systemFontOfSize:20 weight:NSFontWeightBold];
-        NSMutableDictionary *attrDict = [NSMutableDictionary new];
-        attrDict[NSFontAttributeName] = systemFont;
-        attrDict[NSForegroundColorAttributeName] = [NSColor controlTextColor];
+        NSMutableDictionary *attrDict = [PreviewViewController titleAttributes];
         [self addInfoLine:metadict[@"title"] attributes:attrDict linebreak:NO];
 
         if (!metadict[@"title"]) {
@@ -878,15 +873,20 @@
             }
         }
 
-        BOOL noMeta = (!((NSString *)metadict[@"headline"]).length && !((NSString *)metadict[@"author"]).length && !((NSString *)metadict[@"blurb"]).length);
+
+        NSString *headlineString = (NSString *)metadict[@"headline"];
+        NSString *authorString = (NSString *)metadict[@"author"];
+        NSString *blurbString = (NSString *)metadict[@"blurb"];
+
+        BOOL noMeta = (headlineString.length + authorString.length + blurbString.length == 0);
 
         [self addStarRating:metadict];
         attrDict[NSFontAttributeName] = [NSFont systemFontOfSize:[NSFont systemFontSize]];
-        [self addInfoLine:metadict[@"headline"] attributes:attrDict linebreak:YES];
-        [self addInfoLine:metadict[@"author"] attributes:attrDict linebreak:YES];
-        if (!metadict[@"author"])
+        [self addInfoLine:headlineString attributes:attrDict linebreak:YES];
+        [self addInfoLine:authorString attributes:attrDict linebreak:YES];
+        if (!authorString.length)
             [self addInfoLine:metadict[@"AUTH"] attributes:attrDict linebreak:YES];
-        [self addInfoLine:metadict[@"blurb"] attributes:attrDict linebreak:YES];
+        [self addInfoLine:blurbString attributes:attrDict linebreak:YES];
 
         [self addInfoLine:metadict[@"ANNO"] attributes:attrDict linebreak:YES];
         if (metadict[@"(c) "])
@@ -961,17 +961,17 @@
     if (_addedFileInfo)
         return;
     _addedFileInfo = YES;
-    NSMutableDictionary *attrDict = [NSMutableDictionary new];
-    attrDict[NSFontAttributeName] = [NSFont systemFontOfSize:[NSFont systemFontSize]];
-    attrDict[NSForegroundColorAttributeName] = [NSColor controlTextColor];
+    NSMutableDictionary *attrDict = [PreviewViewController attributesWithFont:[NSFont systemFontOfSize:[NSFont systemFontSize]]];
 
     NSError *error = nil;
     NSDictionary * fileAttributes = [[NSFileManager defaultManager] attributesOfItemAtPath:url.path error:&error];
     if (fileAttributes) {
         NSDate *modificationDate = (NSDate *)fileAttributes[NSFileModificationDate];
         [self addInfoLine:[NSString stringWithFormat:@"Last modified: %@", [InfoView formattedStringFromDate:modificationDate]] attributes:attrDict linebreak:YES];
-
-        NSInteger fileSize = ((NSNumber *)fileAttributes[NSFileSize]).integerValue;
+        NSNumber *fileSizeObj = (NSNumber *)fileAttributes[NSFileSize];
+        NSInteger fileSize = 0;
+        if (fileSizeObj)
+            fileSize = fileSizeObj.integerValue;
         NSString *fileSizeString = [PreviewViewController unitStringFromBytes:fileSize];
         _metaDict[@"fileSize"] = fileSizeString;
         [self addInfoLine:fileSizeString attributes:attrDict linebreak:YES];
@@ -1001,68 +1001,75 @@
     return date;
 }
 
-- (NSMutableDictionary *)metadataFromBlorb:(NSURL *)url {
+// Must be called from inside a perform block on context, which is used
+// for the IFhd title lookup.
+- (NSMutableDictionary *)metadataFromBlorb:(NSURL *)url inContext:(NSManagedObjectContext *)context {
     if (![Blorb isBlorbURL:url])
         return nil;
 
     NSMutableDictionary *metaDict = [NSMutableDictionary new];
 
-    Blorb *blorb = [[Blorb alloc] initWithData:[NSData dataWithContentsOfURL:url]];
-    metaDict[@"cover"] = [blorb coverImageData];
+    NSData *data = nil;
 
-    metaDict[@"IFhd"] = [blorb ifidFromIFhd];
-    if (metaDict[@"IFhd"]) {
-        metaDict[@"IFhdTitle"] = [self titleFromIfid:metaDict[@"IFhd"]];
-    } else NSLog(@"No IFdh resource in Blorb file");
+    // This is called from inside a Core Data perform block, so an exception
+    // from a malformed file would be rethrown and crash the extension.
+    // Treat it as a file without Blorb metadata instead.
+    Blorb *blorb = [Blorb blorbAtURL:url];
+    @try {
+        metaDict[@"cover"] = [blorb coverImageData];
 
-    for (NSString *chunkName in blorb.optionalChunks.allKeys) {
-        metaDict[chunkName] = blorb.optionalChunks[chunkName];
-        //        NSLog(@"metaDict[%@] = \"%@\"", chunkName, metaDict[chunkName]);
-    }
+        metaDict[@"IFhd"] = [blorb ifidFromIFhd];
+        if (metaDict[@"IFhd"]) {
+            metaDict[@"IFhdTitle"] = [self titleFromIfid:metaDict[@"IFhd"] inContext:context];
+        } else NSLog(@"No IFdh resource in Blorb file");
 
-    NSData *data = blorb.metaData;
-    if (data) {
-        NSError *error = nil;
-        NSXMLDocument *xml =
-        [[NSXMLDocument alloc] initWithData:data
-                                    options:NSXMLDocumentTidyXML
-                                      error:&error];
-        if (error)
-            NSLog(@"Error: %@", error);
-
-        NSArray *nodeNames = @[@"title", @"author", @"headline", @"description"];
-
-        NSXMLElement *story =
-        [[xml rootElement] elementsForName:@"story"].firstObject;
-        if (story) {
-            NSXMLElement *idElement = [story elementsForName:@"bibliographic"].firstObject;
-            for (NSXMLNode *node in idElement.children) {
-                if (node.stringValue.length) {
-                    for (NSString *nodeName in nodeNames) {
-                        if ([node.name compare:nodeName] == 0) {
-                            if ([nodeName isEqualToString:@"description"])
-                                metaDict[@"blurb"] = node.stringValue;
-                            else
-                                metaDict[nodeName] = node.stringValue;
-                            break;
-                        }
-                    }
-                }
-            }
-            if (_ifid) {
-                metaDict[@"ifid"] = _ifid;
-            } else {
-                idElement = [story elementsForName:@"identification"].firstObject;
-                for (NSXMLNode *node in idElement.children) {
-                    if ([node.name compare:@"ifid"] == 0 && node.stringValue.length) {
-                        metaDict[@"ifid"] = node.stringValue;
-                        break;
-                    }
-                }
-            }
+        for (NSString *chunkName in blorb.optionalChunks.allKeys) {
+            metaDict[chunkName] = blorb.optionalChunks[chunkName];
+            //        NSLog(@"metaDict[%@] = \"%@\"", chunkName, metaDict[chunkName]);
         }
+
+        data = blorb.metaData;
+    } @catch (NSException *exception) {
+        NSLog(@"QuickLook: Exception parsing Blorb file %@: %@", url.path, exception);
+        return nil;
     }
+
+    // A Blorb holds the iFiction record of one story
+    IFStory *story = data ? [[IFictionMetadata alloc] initWithData:data].firstStory : nil;
+    IFBibliographic *bibliographic = story.bibliographic;
+    if (bibliographic.title.length)
+        metaDict[@"title"] = bibliographic.title;
+    if (bibliographic.author.length)
+        metaDict[@"author"] = bibliographic.author;
+    if (bibliographic.headline.length)
+        metaDict[@"headline"] = bibliographic.headline;
+    if (bibliographic.blurb.length)
+        metaDict[@"blurb"] = bibliographic.blurb;
+
+    // Prefer the IFID the Blorb identifies itself with, if the record lists it
+    NSSet<NSString *> *ifids = story.identification.ifids;
+    NSString *ifhd = metaDict[@"IFhd"];
+    if (ifhd.length && [ifids containsObject:ifhd])
+        metaDict[@"ifid"] = ifhd;
+    else if (ifids.count)
+        metaDict[@"ifid"] = [ifids.allObjects sortedArrayUsingSelector:@selector(compare:)].firstObject;
     return metaDict;
+}
+
+// Must be called from inside a perform block on context, so that callers
+// already running on a context's queue can reuse it instead of creating a
+// second context and nesting another performBlockAndWait inside the first.
+- (NSString *)titleFromIfid:(NSString *)ifid inContext:(NSManagedObjectContext *)context {
+    if (!ifid || !context)
+        return nil;
+
+    Game *game = [ReadOnlyStore gameMatching:[NSPredicate predicateWithFormat:@"ifid ==[c] %@", ifid]
+                                   inContext:context
+                                       error:NULL];
+    if (!game)
+        return nil;
+    [self addImageFromGame:game];
+    return game.metadata.title;
 }
 
 - (NSString *)titleFromIfid:(NSString *)ifid {
@@ -1073,31 +1080,15 @@
         NSLog(@"Could not create new context!");
         return nil;
     }
-    Game __block *game = nil;
+    NSString __block *title = nil;
 
+    // Managed objects may only be accessed on their context's queue,
+    // so read everything we need from the game inside the block
     [context performBlockAndWait:^{
-        NSError *error = nil;
-        NSArray *fetchedObjects;
-
-        NSFetchRequest *fetchRequest = [NSFetchRequest new];
-
-        fetchRequest.entity = [NSEntityDescription entityForName:@"Game" inManagedObjectContext:context];
-        fetchRequest.predicate = [NSPredicate predicateWithFormat:@"ifid like[c] %@", ifid];
-
-        fetchedObjects = [context executeFetchRequest:fetchRequest error:&error];
-        if (fetchedObjects && fetchedObjects.count) {
-            if (fetchedObjects.count > 1)
-                NSLog(@"Found %ld games with ifid %@", fetchedObjects.count, ifid);
-            game = fetchedObjects.firstObject;
-        }
+        title = [self titleFromIfid:ifid inContext:context];
     }];
 
-    if (game) {
-        [self addImageFromGame:game];
-        return game.metadata.title;
-    } else {
-        return nil;
-    }
+    return title;
 }
 
 - (NSString *)titleFromHash:(NSString *)hash {
@@ -1106,58 +1097,46 @@
         NSLog(@"context is nil!");
         return nil;
     }
-    Game __block *game = nil;
+    NSString __block *title = nil;
 
+    // Managed objects may only be accessed on their context's queue,
+    // so read everything we need from the game inside the block
     [context performBlockAndWait:^{
-        NSError *error = nil;
-        NSArray *fetchedObjects;
-
-        NSFetchRequest *fetchRequest = [NSFetchRequest new];
-        fetchRequest.entity = [NSEntityDescription entityForName:@"Game" inManagedObjectContext:context];
-        fetchRequest.predicate = [NSPredicate predicateWithFormat:@"hashTag like[c] %@", hash];
-
-        fetchedObjects = [context executeFetchRequest:fetchRequest error:&error];
-        if (fetchedObjects && fetchedObjects.count) {
-            if (fetchedObjects.count > 1)
-                NSLog(@"Found %ld games with requested hash", fetchedObjects.count);
-            game = fetchedObjects.firstObject;
+        Game *game = [ReadOnlyStore gameMatching:[NSPredicate predicateWithFormat:@"serialString ==[c] %@", hash]
+                                       inContext:context
+                                           error:NULL];
+        if (game) {
+            [self addImageFromGame:game];
+            title = game.metadata.title;
         }
     }];
-    if (game) {
-        [self addImageFromGame:game];
-        return game.metadata.title;
-    } else {
-        return nil;
-    }
+
+    return title;
 }
 
-- (NSString *)ifidFromFile:(NSString *)path {
++ (NSString *)ifidFromFile:(NSString *)path {
     if (!path.length)
         return nil;
     void *context = get_babel_ctx();
     if (context == NULL) {
         return nil;
     }
-    char *format = babel_init_ctx((char*)path.UTF8String, context);
-    if (!format || !babel_get_authoritative_ctx(context))
-    {
-        babel_release_ctx(context);
-        free(context);
-        return nil;
-    }
 
+    int rv = 0;
     char buf[TREATY_MINIMUM_EXTENT];
 
-    int rv = babel_treaty_ctx(GET_STORY_FILE_IFID_SEL, buf, sizeof buf, context);
-    if (rv <= 0)
-    {
-        babel_release_ctx(context);
-        free(context);
-        return nil;
+    char *format = babel_init_ctx((char *)path.fileSystemRepresentation, context);
+    if (format && babel_get_authoritative_ctx(context)) {
+        rv = babel_treaty_ctx(GET_STORY_FILE_IFID_SEL, buf, sizeof buf, context);
     }
 
     babel_release_ctx(context);
     free(context);
+
+    if (rv <= 0) {
+        return nil;
+    }
+
     return @(buf);
 }
 
@@ -1195,78 +1174,61 @@
 }
 
 - (NSString *)titleFromQuetzalSave:(NSData *)data {
-    NSString *title = nil;
+    NSString __block *title = nil;
     NSString *ifid = nil;
     if (data) {
-        const void *ptr = data.bytes;
-        if (isForm(ptr, 'I', 'F', 'Z', 'S') || isForm(ptr, 'B', 'F', 'Z', 'S')) {
-            ptr += 12;
-            unsigned int chunkID;
-            NSUInteger length = chunkIDAndLength(ptr, &chunkID);
-            if (chunkID == IFFID('I', 'F', 'h', 'd')) {
-                // Game Identifier Chunk
-                NSUInteger releaseNumber = unpackShort(ptr + 8);
+        const unsigned char *bytes = data.bytes;
+        NSUInteger dataLength = data.length;
+        uint32_t chunkID, length;
+        IFhdInfo info;
+        if ((isForm(bytes, dataLength, 'I', 'F', 'Z', 'S') || isForm(bytes, dataLength, 'B', 'F', 'Z', 'S')) &&
+            chunkHeaderAt(bytes, dataLength, 12, &chunkID, &length) && chunkID == IFFID('I', 'F', 'h', 'd') &&
+            length <= dataLength - 20 && parseIFhd(bytes + 20, length, &info)) {
+            // Game Identifier Chunk
+            NSUInteger releaseNumber = info.release;
+            NSUInteger checksum = info.checksum;
+            NSString *serialNum = [[NSString alloc] initWithBytes:info.serial length:6 encoding:NSASCIIStringEncoding];
 
-                NSData *serialData = [NSData dataWithBytes:ptr + 10 length:6];
-                NSUInteger checksum  = unpackShort(ptr + 16);
-                NSString *serialNum = [[NSString alloc] initWithData:serialData encoding:NSASCIIStringEncoding];
+            // See if we can find a path to the game file as well
+            NSString __block *path = nil;
+            NSUInteger next = 20 + paddedLength(length);
+            if (chunkHeaderAt(bytes, dataLength, next, &chunkID, &length) &&
+                chunkID == IFFID('I', 'n', 't', 'D') &&
+                length >= 12 && length <= dataLength - next - 8) {
+                // Found IntD chunk! The path follows its 12-byte header.
+                NSData *pathData = [data subdataWithRange:NSMakeRange(next + 20, length - 12)];
+                path = [[NSString alloc] initWithData:pathData encoding:NSASCIIStringEncoding];
+            }
 
-                // See if we can find a path to the game file as well
-                NSString __block *path = nil;
-                ptr += paddedLength(length) + 8;
-                length = chunkIDAndLength(ptr, &chunkID);
-                if (chunkID == IFFID('I', 'n', 't', 'D')) {
-                    // Found IntD chunk!
-                    NSData *pathData = [NSData dataWithBytes:ptr + 20 length:length - 12];
-                    path = [[NSString alloc] initWithData:pathData encoding:NSASCIIStringEncoding];
-                }
+            NSManagedObjectContext *context = self.persistentContainer.newBackgroundContext;
+            if (context) {
+                // Managed objects may only be accessed on their context's
+                // queue, so read everything we need from the game in here
+                [context performBlockAndWait:^{
+                    Game *game = [ReadOnlyStore gameMatching:[NSPredicate predicateWithFormat:@"serialString ==[c] %@ AND releaseNumber == %d AND checksum == %d", serialNum, releaseNumber, checksum]
+                                                   inContext:context
+                                                       error:NULL];
 
-                NSManagedObjectContext *context = self.persistentContainer.newBackgroundContext;
-                if (context) {
-                    Game __block *game = nil;
-
-                    [context performBlockAndWait:^{
-                        NSError *error = nil;
-                        NSArray *fetchedObjects;
-
-                        NSFetchRequest *fetchRequest = [NSFetchRequest new];
-                        fetchRequest.entity = [NSEntityDescription entityForName:@"Game" inManagedObjectContext:context];
-                        fetchRequest.predicate = [NSPredicate predicateWithFormat:@"serialString LIKE[c] %@ AND releaseNumber == %d AND checksum == %d", serialNum, releaseNumber, checksum];
-                        fetchedObjects = [context executeFetchRequest:fetchRequest error:&error];
-
-                        //If no match, look for path
-                        if (!fetchedObjects.count && path.length) {
-                            fetchRequest.predicate = [NSPredicate predicateWithFormat:@"path LIKE[c] %@", path];
-                            fetchedObjects = [context executeFetchRequest:fetchRequest error:&error];
-                        }
-
-                        if (fetchedObjects.count > 1)
-                            NSLog(@"Found %ld matching games!", fetchedObjects.count);
-                        game = fetchedObjects.firstObject;
-
-                    }];
+                    //If no match, look for path
+                    if (!game && path.length) {
+                        game = [ReadOnlyStore gameMatching:[NSPredicate predicateWithFormat:@"path ==[c] %@", path]
+                                                 inContext:context
+                                                     error:NULL];
+                    }
 
                     if (game) {
                         title = game.metadata.title;
                         [self addImageFromGame:game];
                     }
-                }
+                }];
+            }
 
-                if (!title) {
-                    if (path.length) {
-                        title = path.lastPathComponent;
-                    } else if (!ifid) {
-                        serialNum = [serialNum stringByReplacingOccurrencesOfString:@"[^0-Z]" withString:@"-" options:NSRegularExpressionSearch range:NSMakeRange(0, 6)];
-
-                        NSInteger date = serialNum.intValue;
-
-                        if ((date < 700000 || date > 900000) && date != 0 && date != 999999) {
-                            ifid = [NSString stringWithFormat:@"ZCODE-%ld-%@-%04lX", releaseNumber, serialNum, (unsigned long)checksum];
-                        } else {
-                            ifid = [NSString stringWithFormat:@"ZCODE-%ld-%@", releaseNumber, serialNum];
-                        }
-                        title = [self titleFromIfid:ifid];
-                    }
+            if (!title) {
+                if (path.length) {
+                    title = path.lastPathComponent;
+                } else if (!ifid) {
+                    ifid = [Blorb zcodeIFIDWithRelease:releaseNumber serial:serialNum ?: @"" checksum:checksum];
+                    title = [self titleFromIfid:ifid];
                 }
             }
         }
@@ -1278,29 +1240,15 @@
 }
 
 - (NSString *)hashFromQuetzalSave:(NSData *)data {
-    NSMutableString *hexString = nil;
-    if (data.length >= 84) {
-        const void *ptr = data.bytes;
-        if (isForm(ptr, 'I', 'F', 'Z', 'S')) {
-            ptr += 12;
-            unsigned int chunkID;
-            chunkIDAndLength(ptr, &chunkID);
-            if (chunkID == IFFID('I', 'F', 'h', 'd')) {
-                // Game Identifier Chunk
-                Byte *bytes64 = (Byte *)malloc(64);
-                [data getBytes:bytes64
-                         range:NSMakeRange(20, 64)];
-
-                hexString = [NSMutableString stringWithCapacity:(64 * 2)];
-
-                for (int i = 0; i < 64; ++i) {
-                    [hexString appendFormat:@"%02x", (unsigned int)bytes64[i]];
-                }
-                free(bytes64);
-            }
-        }
+    // The first 64 bytes of the IFhd payload, which for Glulx saves is the
+    // start of the game file header.
+    uint32_t chunkID, length;
+    if (data.length >= 84 && isForm(data.bytes, data.length, 'I', 'F', 'Z', 'S') &&
+        chunkHeaderAt(data.bytes, data.length, 12, &chunkID, &length) &&
+        chunkID == IFFID('I', 'F', 'h', 'd')) {
+        return [FileSignature hexStringFromData:[data subdataWithRange:NSMakeRange(20, 64)]].lowercaseString;
     }
-    return hexString;
+    return nil;
 }
 
 + (NSString *)ifidFromData:(NSData *)data {

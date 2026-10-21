@@ -1,0 +1,11 @@
+look
+pct
+hash
+empty
+both
+paired
+dollar
+dollarempty
+north
+look
+south

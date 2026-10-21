@@ -1,0 +1,170 @@
+# Space Boy's First Adventure (David Parish, 2005) - FULL WIN, 1009/1374.
+# Deterministic headless harness:  sh harness/play.sh games/"Space Boy's First Adventure.taf" harness/space_boy_solution.txt
+# Win marker: "STAY TUNED FOR MORE EXCITING EPISODES..." (task 46, EndGame var1=0).
+# All 4 power items (Boots/Gloves/Goggles/Belt) + cape recovered.
+#
+# 1009 is the ceiling for a run that never repeats a scoring task.  The 1374
+# the game advertises is 55 more than its own ChangeScore pool (1319), and
+# three chunks of that pool are unreachable:
+#   * task 11, ice gloves +30 -- the pattern is '{take\get} ... gloves', a
+#     backslash where the author meant a slash, so nothing can ever match it
+#     and the library's own take hands over the gloves for free.
+#   * task 72, "drop cape to the floor" +250 -- run400 lets the library's
+#     ordinary drop claim the command outright and the task never runs; see
+#     run_task_reachable_by_library_callback() in scrunner.cpp for the
+#     measurement (Adrift_8_pET2.txt / Adrift_10_pET4.txt, 2026-08-23).
+#   * one of the +30 transporter buttons.  Blue (task 53, room 10) is the
+#     only way to the Moon Base and red (task 54, room 69) the only way back
+#     by button, but the Moon Base Garage also holds task 52, "enter
+#     transporter" (+50), which returns you home for 20 points more.  Taking
+#     52 costs the red button; taking both would mean pressing the blue
+#     button a second time, and 53/54 are Repeatable, so that is score
+#     farming rather than a longer route.
+# 1319 - 30 - 250 - 30 = 1009.
+# --- Phase 1: Flight Boots (up the oak tree) ---
+n
+read computer
+s
+s
+sw
+s
+climb up oak tree
+take boots
+wear boots
+climb down tree
+# --- Phase 2: to the flight hub (Living Room -> Front Yard -> Landing Platform) ---
+n
+ne
+n
+e
+e
+# --- Phase 3: fly NORTH to the Castle, solve the tile/safe puzzle, get Ice Gloves ---
+fly north
+e
+ne
+examine old painting
+sw
+e
+take book page
+read book page
+w
+s
+take small bottle
+drink orange liquid
+s
+take whiteredblue tile
+put whiteredblue tile on control panel
+in
+take gloves
+wear gloves
+# --- Phase 4: leave the Castle (grow back), return to hub, fly SOUTH ---
+out
+take tiny bottle
+drink bluish liquid
+n
+w
+s
+fly south
+# --- Phase 5: Volcano Islands — Fire God statue puzzle, Heat Goggles ---
+read sign
+w
+read plaque
+d
+shout ell
+shout aay
+shout vee
+shout aay aay
+shout ach
+nw
+take feet
+se
+ne
+take legs
+sw
+se
+take chest
+nw
+sw
+take arms
+ne
+s
+take head
+n
+u
+assemble statue
+put statue on base
+freeze wall
+south
+take goggles
+wear goggles
+fly ne
+n
+fly east
+read sign
+enter cave
+take small shovel
+read small sign
+dig a hole in sand
+dig more
+w
+take stick
+read note
+light stick with goggles
+w
+s
+w
+w
+n
+melt ice with goggles
+light stick with goggles
+n
+w
+n
+freeze fire with ice gloves
+e
+e
+u
+e
+n
+take phased ion bridge
+out
+w
+w
+w
+s
+in
+out
+install bridge
+in
+push blue button
+out
+e
+take fork
+w
+use fork on hole
+read paper
+take belt
+wear belt
+u
+w
+w
+press button
+e
+e
+enter transporter
+out
+sw
+w
+move huge rock
+take key
+e
+ne
+n
+unlock door
+open room door
+take cape
+# Kept as in-transcript evidence for the task-72 note above: the library's
+# own drop claims this and the +250 task never runs.
+drop cape to the floor
+w
+read scribbled note

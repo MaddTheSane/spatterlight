@@ -1,0 +1,106 @@
+Loading game...
+
+Locura
+Piensas, luego estás...
+
+Sala
+ Salón comedor de estilo victoriano, muy sobrecardo de maderas labradas,
+aperos mediavales y cabezas de pobres mamíferos caidos mientras pastaban...
+¡Mal sino el de tan admirables cornudos!
+
+> admirar cornudos
+Te detienes cerca de los macabros trofeos y muestras tus respetos al espiritu
+del hermano-animal.                                                   Lo que
+queda de un noble ejemplar de cornudo común te llama especialmente la
+atención. Algo verde brilla bajo su cornamenta, parece un paquetito con...
+hierba.
+
+> coger hierba
+ Metes la mano donde antes había una oreja de ciervo que escuchaba cosas del
+bosque hasta que percibió un tirito. Palpas sin pudor y sacas una pequeña
+talega de plástico con hierva dentro.
+
+> s
+You move south.
+
+Terraza
+ El joven sol primaveral se agarra a los terrazos creando un ambiente algo
+onírico, al otro lado de la varandilla hay un oasis un poco difuso por la
+flama... A tu lado ves una camita...
+
+> acostarse en la camita
+ Desde aquí te resulta sobreacogedora...
+
+> fumar hierba
+ Como no tienes tabaco ni papel envuelves un cogollo bien picadito en un
+jirón de la mosquitera (100x100 algodon). Fumas esparcido sobre los
+inquientos intestinos de, probablemente, algún colega de los cornudos del
+salón... de pronto te ves a ti mismo flotando junto a un escuadrón de bovinos
+silvestres armados con hoces, flotais hacia vuestras presas de tres
+cuernos... parece que se dirijen al oasis.
+
+Volando voy..
+ Sobrevuelas algo montado en una cama-palco voladora. En un par de lejanías
+diferenciadas te parece distinguir el oasis y la terraza... volando vooy, ...
+volando vengo engo, ... en el camiino,  yo me entretengo...
+
+> volar oasis
+Vas al oasis con tu camita...
+
+> pedir cerveza
+ Antes de abrir la boca, Lawrence te trae una jarra de cerveza fresquita y
+mirando su crucigrama te dice:  padre del psicoanalisis?
+
+> freud
+ Lawrence vuelve a mirar el crucigrama y dice: Muy bien... caballo de
+Alejandro Magno?
+
+> bucefalo
+Lawrence escribe tu respuesta con gran alegría y dice:
+BU-CÉ-FA-LO...siiiiiii...  pico más alto de Extremadura?
+
+> calvitero
+ Tras apuntar tu respuesta, Lawrence se monta en el camello y antes de irse
+al galope te dice: Gracias Sir... recuerda que la decisión acabará con todos
+tus problemas....                      Ves como Lawrence se aleja
+tambaleandose sobre una joroba motorizada.
+
+Muerto
+No notas nada, no ves nada, no hueles nada....
+                                                                          Te
+cuesta decidir entre la vida y la muerte.
+                                                                          No
+puedes moverte. Apenas puedes pensar.
+
+> estoy vivo
+ Sientes...
+
+Psicólogo
+ Salón comedor de estilo victoriano, muy sobrecardo de maderas labradas,
+aperos mediavales y cabezas de pobres cornudos caidos mientras pastaban...
+¡Mal sino el de tan admirables mamíferos!
+       Tu psicólogo entra y sin prestarte atención se sienta junto a un
+precioso diván.
+
+> no estoy
+DESAPARECES...
+
+> score
+Your score is 125 out of a maximum of 200.  (62%)
+
+> salvar el planeta
+ Con tu altruista decisión das nuevas esperanzas a un planeta debilitado por
+la incomprensión de sus poderosos hijos...            Lastima que más gente
+no siga tu ejemplo, hubiera sido tan bonito...
+
+Muerto
+No notas nada, no ves nada, no hueles nada....
+                                                                          Te
+cuesta decidir entre la vida y la muerte.
+                                                                          No
+puedes moverte. Apenas puedes pensar.
+You scored 175 out of the maximum 200!
+That is 87% of the game!
+You finished 25 points short.
+
+[Press any key to end]

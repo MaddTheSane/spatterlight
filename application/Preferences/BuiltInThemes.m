@@ -7,51 +7,73 @@
 
 #import "BuiltInThemes.h"
 #import "Theme.h"
+#import "Fetches.h"
 #import "GlkStyle.h"
 #import "NSColor+integer.h"
-#import "Preferences.h"
+
+// The layout values every built-in theme sets
+typedef struct {
+    int32_t rows, cols;
+    BOOL dashes, doStyles, smartQuotes;
+    kSpacesFormatType spaceFormat;
+    int32_t border;
+    int32_t bufferMarginX, bufferMarginY;
+    int32_t gridMarginX, gridMarginY;
+    int32_t winSpacingX, winSpacingY;
+    NSUnderlineStyle gridLinkStyle;
+} BuiltInLayout;
 
 @implementation BuiltInThemes
 
-+ (void)checkThemesInContext:(NSManagedObjectContext *)context {
-    //Loop through all attributes of theme and assign them to me
-    NSDictionary *attributes = [NSEntityDescription
-                                 entityForName:@"Theme"
-                                 inManagedObjectContext:context].attributesByName;
+#pragma mark Builder helpers
 
-    NSError *error = nil;
-    NSFetchRequest *fetchRequest = [NSFetchRequest new];
-    fetchRequest.entity = [NSEntityDescription entityForName:@"Theme" inManagedObjectContext:context];
-
-    fetchRequest.predicate = [NSPredicate predicateWithFormat:@"editable = NO"];
-    NSArray *fetchedObjects = [context executeFetchRequest:fetchRequest error:&error];
-
-    if (!fetchedObjects || !fetchedObjects.count) {
-        NSLog(@"No built-in themes found!");
-    } else NSLog(@"%ld built-in themes found!", fetchedObjects.count);
-
-    if (error != nil) {
-        NSLog(@"BuiltInThemes checkThemesInContext: %@", error);
-    }
-
-
-    for (NSString *attr in attributes) {
-        id value = [fetchedObjects[0] valueForKey:attr];
-        BOOL same = YES;
-        for (Theme *theme in fetchedObjects) {
-            if (![[theme valueForKey:attr] isEqual:value]) {
-                same = NO;
-                break;
-            }
-        }
-
-        if (same)
-            NSLog(@"%@ (%@)", attr, value);
-    }
++ (void)applyLayout:(BuiltInLayout)layout toTheme:(Theme *)theme {
+    theme.dashes = layout.dashes;
+    theme.defaultRows = layout.rows;
+    theme.defaultCols = layout.cols;
+    theme.doStyles = layout.doStyles;
+    theme.smartQuotes = layout.smartQuotes;
+    theme.spaceFormat = layout.spaceFormat;
+    theme.border = layout.border;
+    theme.bufferMarginX = layout.bufferMarginX;
+    theme.bufferMarginY = layout.bufferMarginY;
+    theme.gridMarginX = layout.gridMarginX;
+    theme.gridMarginY = layout.gridMarginY;
+    theme.winSpacingX = layout.winSpacingX;
+    theme.winSpacingY = layout.winSpacingY;
+    theme.gridLinkStyle = (int32_t)layout.gridLinkStyle;
 }
 
+// Zero baseline offset and the given maximum line height (0 = none) on the
+// grid normal style. Call before populateStyles, which derives the other
+// grid styles from it.
++ (void)setGridNormalOfTheme:(Theme *)theme maximumLineHeight:(CGFloat)height {
+    [theme.gridNormal updateAttributes:^(NSMutableDictionary *attributes) {
+        attributes[NSBaselineOffsetAttributeName] = @(0);
+    }];
+    [theme.gridNormal updateParagraphStyle:^(NSMutableParagraphStyle *para) {
+        para.maximumLineHeight = height;
+    }];
+}
+
+// Copy the grid and buffer cell sizes out of the normal styles. Call last.
++ (void)refreshCellSizesOfTheme:(Theme *)theme {
+    NSSize size = theme.gridNormal.cellSize;
+    theme.cellHeight = size.height;
+    theme.cellWidth = size.width;
+
+    size = theme.bufferNormal.cellSize;
+    theme.bufferCellHeight = size.height;
+    theme.bufferCellWidth = size.width;
+}
+
++ (NSFont *)boldVersionOf:(NSFont *)font {
+    return [[NSFontManager sharedFontManager] convertWeight:YES ofFont:font];
+}
+
+#pragma mark Themes
+
 + (void)createBuiltInThemesInContext:(NSManagedObjectContext *)context forceRebuild:(BOOL)force {
-    [BuiltInThemes createThemeFromDefaultsPlistInContext:context forceRebuild:force];
     [BuiltInThemes createDefaultThemeInContext:context forceRebuild:force];
     [BuiltInThemes createZoomThemeInContext:context forceRebuild:force];
     [BuiltInThemes createClassicSpatterlightThemeInContext:context forceRebuild:force];
@@ -62,17 +84,31 @@
     [BuiltInThemes createGargoyleThemeInContext:context forceRebuild:force];
     [BuiltInThemes createMontserratThemeInContext:context forceRebuild:force];
     [BuiltInThemes createAutomapThemeInContext:context forceRebuild:force];
-    //    [BuiltInThemes createSTThemeInContext:managedObjectContext forceRebuild:force];
 }
 
-+ (nullable Theme *)createThemeFromDefaultsPlistInContext:(NSManagedObjectContext *)context forceRebuild:(BOOL)force {
+// A missing defaults key gives a nil name, which fontWithName:size: must not get.
+// The callers fall back to another font when this returns nil.
+static NSFont *fontNamedInDefaults(NSString *name, CGFloat size) {
+    if (![name isKindOfClass:[NSString class]] || !name.length)
+        return nil;
+    return [NSFont fontWithName:name size:size];
+}
 
+// Imports the pre-themes preferences once, for a user with no saved theme
+// (see Preferences readDefaults). Old settings is then the user's to edit or
+// delete, so it is never rebuilt: a forced rebuild of the built-in themes
+// used to overwrite their edits, recreate it after deletion, or delete it
+// when the old defaults matched Spatterlight Classic.
++ (nullable Theme *)createThemeFromDefaultsPlistInContext:(NSManagedObjectContext *)context {
     BOOL exists = NO;
     Theme *oldTheme = [BuiltInThemes findOrCreateTheme:@"Old settings" inContext:context alreadyExists:&exists];
-    if (exists && !force)
+    if (exists)
         return oldTheme;
 
-    Theme *defaultTheme = [BuiltInThemes findOrCreateTheme:@"Spatterlight Classic" inContext:context alreadyExists:&exists];
+    // Built, not just found or created: a bare find-or-create here left a
+    // blank Spatterlight Classic that the Classic builder below then took as
+    // existing and skipped, unless the rebuild was forced
+    Theme *defaultTheme = [BuiltInThemes createClassicSpatterlightThemeInContext:context forceRebuild:NO];
 
     BOOL foundDifference = NO;
 
@@ -108,7 +144,7 @@
     if (defaultTheme.gridNormal.font.pointSize != size)
         foundDifference = YES;
 
-    oldTheme.gridNormal.font = [NSFont fontWithName:name size:size];
+    oldTheme.gridNormal.font = fontNamedInDefaults(name, size);
 
     if (!oldTheme.gridNormal.font) {
         NSLog(@"pref: failed to create grid font '%@'", name);
@@ -128,7 +164,7 @@
     if (defaultTheme.bufferNormal.font.pointSize != size)
         foundDifference = YES;
 
-    oldTheme.bufferNormal.font = [NSFont fontWithName:name size:size];
+    oldTheme.bufferNormal.font = fontNamedInDefaults(name, size);
     if (!oldTheme.bufferNormal.font) {
         NSLog(@"pref: failed to create buffer font '%@'", name);
         oldTheme.bufferNormal.font = [NSFont userFontOfSize:0];
@@ -145,9 +181,9 @@
     if (defaultTheme.bufInput.font.pointSize != size)
         foundDifference = YES;
 
-    oldTheme.bufInput.font = [NSFont fontWithName:name size:size];
+    oldTheme.bufInput.font = fontNamedInDefaults(name, size);
 
-    NSFont *bufbold = [[NSFontManager sharedFontManager] convertWeight:YES ofFont:oldTheme.bufferNormal.font];
+    NSFont *bufbold = [BuiltInThemes boldVersionOf:oldTheme.bufferNormal.font];
 
     if (!oldTheme.bufInput.font) {
         NSLog(@"pref: failed to create input font '%@'", name);
@@ -159,15 +195,7 @@
 
     oldTheme.gridNormal.lineSpacing = 0;
 
-    NSSize cellSize = oldTheme.gridNormal.cellSize;
-
-    oldTheme.cellHeight = cellSize.height;
-    oldTheme.cellWidth = cellSize.width;
-
-    cellSize = oldTheme.bufferNormal.cellSize;
-
-    oldTheme.bufferCellHeight = cellSize.height;
-    oldTheme.bufferCellWidth = cellSize.width;
+    [BuiltInThemes refreshCellSizesOfTheme:oldTheme];
 
     [oldTheme populateStyles];
 
@@ -187,11 +215,10 @@
            @"border": @"Border",
         };
 
-        NSDictionary *attributes = [NSEntityDescription
-                                    entityForName:@"Theme"
-                                    inManagedObjectContext:context].attributesByName;
-
-        for (NSString *attr in attributes) {
+        // Only the attributes above have a defaults key. Looking up the
+        // others would pass a nil key to objectForKey:, which crashes
+        // ("CFHash() called with NULL") on macOS 10.13 and earlier.
+        for (NSString *attr in attributesToDefaultsDict) {
             id defaultsValue = [defaults objectForKey:attributesToDefaultsDict[attr]];
 
             if (defaultsValue == nil) {
@@ -233,23 +260,16 @@
     if (exists && !force)
         return defaultTheme;
 
-    defaultTheme.bZAdjustment = 0;
-    defaultTheme.dashes = YES;
-    defaultTheme.defaultRows = 50;
-    defaultTheme.defaultCols = 80;
-    defaultTheme.doStyles = YES;
-    defaultTheme.smartQuotes = YES;
-    defaultTheme.spaceFormat = TAG_SPACES_GAME;
-    defaultTheme.border = 0;
-    defaultTheme.bufferMarginX = 15;
-    defaultTheme.bufferMarginY = 15;
-    defaultTheme.gridMarginX = 5;
-    defaultTheme.gridMarginY = 5;
-
-    defaultTheme.winSpacingX = 0;
-    defaultTheme.winSpacingY = 0;
-
-    defaultTheme.gridLinkStyle = NSUnderlineStyleSingle;
+    defaultTheme.bZAdjustment = -2;
+    [BuiltInThemes applyLayout:(BuiltInLayout){
+        .rows = 50, .cols = 80,
+        .dashes = YES, .doStyles = YES, .smartQuotes = YES,
+        .spaceFormat = TAG_SPACES_GAME, .border = 0,
+        .bufferMarginX = 15, .bufferMarginY = 15,
+        .gridMarginX = 5, .gridMarginY = 5,
+        .winSpacingX = 0, .winSpacingY = 0,
+        .gridLinkStyle = NSUnderlineStyleSingle
+    } toTheme:defaultTheme];
 
     defaultTheme.gridNormal.font = [NSFont fontWithName:@"Source Code Pro" size:11];
     defaultTheme.gridBackground = [NSColor blackColor];
@@ -262,17 +282,11 @@
 
     defaultTheme.bufferNormal.lineSpacing = 1;
 
+    [BuiltInThemes setGridNormalOfTheme:defaultTheme maximumLineHeight:0];
+
     [defaultTheme populateStyles];
 
-    NSSize size = defaultTheme.gridNormal.cellSize;
-
-    defaultTheme.cellHeight = size.height;
-    defaultTheme.cellWidth = size.width;
-
-    size = defaultTheme.bufferNormal.cellSize;
-
-    defaultTheme.bufferCellHeight = size.height;
-    defaultTheme.bufferCellWidth = size.width;
+    [BuiltInThemes refreshCellSizesOfTheme:defaultTheme];
 
     return defaultTheme;
 }
@@ -287,29 +301,24 @@
     if (exists && !force)
         return classicTheme;
 
-    classicTheme.bZAdjustment = 4;
+    classicTheme.bZAdjustment = 0;
 
-    classicTheme.dashes = NO;
-    classicTheme.defaultRows = 50;
-    classicTheme.defaultCols = 80;
-    classicTheme.doStyles = YES;
-    classicTheme.smartQuotes = YES;
-    classicTheme.spaceFormat = TAG_SPACES_ONE;
-    classicTheme.border = 0;
-    classicTheme.bufferMarginX = 15;
-    classicTheme.bufferMarginY = 15;
-    classicTheme.gridMarginX = 5;
-    classicTheme.gridMarginY = 5;
-
-    classicTheme.winSpacingX = 0;
-    classicTheme.winSpacingY = 0;
-
-    classicTheme.gridLinkStyle = NSUnderlineStyleSingle;
+    [BuiltInThemes applyLayout:(BuiltInLayout){
+        .rows = 50, .cols = 80,
+        .dashes = NO, .doStyles = YES, .smartQuotes = YES,
+        .spaceFormat = TAG_SPACES_ONE, .border = 0,
+        .bufferMarginX = 15, .bufferMarginY = 15,
+        .gridMarginX = 5, .gridMarginY = 5,
+        .winSpacingX = 0, .winSpacingY = 0,
+        .gridLinkStyle = NSUnderlineStyleSingle
+    } toTheme:classicTheme];
 
     classicTheme.gridNormal.font = [NSFont fontWithName:@"Monaco" size:12];
 
     classicTheme.gridBackground = [NSColor blackColor];
     classicTheme.gridNormal.color = [NSColor colorWithDeviceRed:0.847 green:0.847 blue:0.847 alpha:1.0];
+
+    [BuiltInThemes setGridNormalOfTheme:classicTheme maximumLineHeight:12];
 
     classicTheme.bufferNormal.font = [NSFont fontWithName:@"Helvetica" size:13];
 
@@ -321,15 +330,7 @@
 
     [classicTheme populateStyles];
 
-    NSSize size = classicTheme.gridNormal.cellSize;
-
-    classicTheme.cellHeight = size.height;
-    classicTheme.cellWidth = size.width;
-
-    size = classicTheme.bufferNormal.cellSize;
-
-    classicTheme.bufferCellHeight = size.height;
-    classicTheme.bufferCellWidth = size.width;
+    [BuiltInThemes refreshCellSizesOfTheme:classicTheme];
 
     return classicTheme;
 }
@@ -344,25 +345,17 @@
     if (exists && !force)
         return gargoyleTheme;
 
-    gargoyleTheme.bZAdjustment = -3;
+    gargoyleTheme.bZAdjustment = 0;
 
-    gargoyleTheme.dashes = YES;
-    gargoyleTheme.defaultRows = 30;
-    gargoyleTheme.defaultCols = 62;
-
-    gargoyleTheme.doStyles = YES;
-    gargoyleTheme.smartQuotes = YES;
-    gargoyleTheme.spaceFormat = TAG_SPACES_GAME;
-    gargoyleTheme.border = 20;
-    gargoyleTheme.bufferMarginX = 3;
-    gargoyleTheme.bufferMarginY = 7;
-    gargoyleTheme.gridMarginX = 0;
-    gargoyleTheme.gridMarginY = 3;
-
-    gargoyleTheme.winSpacingX = 0;
-    gargoyleTheme.winSpacingY = 0;
-
-    gargoyleTheme.gridLinkStyle = NSUnderlineStyleSingle;
+    [BuiltInThemes applyLayout:(BuiltInLayout){
+        .rows = 30, .cols = 62,
+        .dashes = YES, .doStyles = YES, .smartQuotes = YES,
+        .spaceFormat = TAG_SPACES_GAME, .border = 20,
+        .bufferMarginX = 3, .bufferMarginY = 7,
+        .gridMarginX = 0, .gridMarginY = 3,
+        .winSpacingX = 0, .winSpacingY = 0,
+        .gridLinkStyle = NSUnderlineStyleSingle
+    } toTheme:gargoyleTheme];
 
     gargoyleTheme.gridBackground = [NSColor whiteColor];
     gargoyleTheme.bufferBackground = [NSColor whiteColor];
@@ -370,16 +363,14 @@
     gargoyleTheme.bufferNormal.font = [NSFont fontWithName:@"Linux Libertine O" size:15.5];
     gargoyleTheme.bufferNormal.lineSpacing = 2;
 
-    gargoyleTheme.bufInput.font = [[NSFontManager sharedFontManager] convertWeight:YES ofFont:gargoyleTheme.bufferNormal.font];
+    gargoyleTheme.bufInput.font = [BuiltInThemes boldVersionOf:gargoyleTheme.bufferNormal.font];
     gargoyleTheme.bufInput.color = [NSColor colorWithDeviceRed:0.100 green:0.587 blue:0.275 alpha:1.0];
     gargoyleTheme.bufInput.autogenerated = NO;
 
     gargoyleTheme.gridNormal.font = [NSFont fontWithName:@"Liberation Mono" size:12.5];
     gargoyleTheme.gridNormal.color = [NSColor colorWithDeviceRed:0.376 green:0.376 blue:0.376 alpha:1.0];
 
-    NSMutableDictionary *dict = [gargoyleTheme.gridNormal.attributeDict mutableCopy];
-    dict[NSBaselineOffsetAttributeName] = @(-2);
-    gargoyleTheme.gridNormal.attributeDict = dict;
+    [BuiltInThemes setGridNormalOfTheme:gargoyleTheme maximumLineHeight:14];
 
     [gargoyleTheme populateStyles];
 
@@ -388,18 +379,11 @@
     gargoyleTheme.bufSubH.font = [NSFont fontWithName:@"Linux Libertine O Bold" size:15.5];
     gargoyleTheme.bufSubH.autogenerated = NO;
 
-    NSSize size = gargoyleTheme.gridNormal.cellSize;
-
-    gargoyleTheme.cellHeight = size.height;
-    gargoyleTheme.cellWidth = size.width;
-
-    size = gargoyleTheme.bufferNormal.cellSize;
-
-    gargoyleTheme.bufferCellHeight = size.height;
-    gargoyleTheme.bufferCellWidth = size.width;
+    [BuiltInThemes refreshCellSizesOfTheme:gargoyleTheme];
 
     return gargoyleTheme;
 }
+
 + (Theme *)createLectroteThemeInContext:(NSManagedObjectContext *)context forceRebuild:(BOOL)force {
     BOOL exists = NO;
     Theme *lectroteTheme = [BuiltInThemes findOrCreateTheme:@"Lectrote" inContext:context alreadyExists:&exists];
@@ -409,25 +393,17 @@
     if (exists && !force)
         return lectroteTheme;
 
-    lectroteTheme.bZAdjustment = -2;
+    lectroteTheme.bZAdjustment = -4;
 
-    lectroteTheme.dashes = YES;
-    lectroteTheme.defaultRows = 40;
-    lectroteTheme.defaultCols = 100;
-
-    lectroteTheme.doStyles = YES;
-    lectroteTheme.smartQuotes = YES;
-    lectroteTheme.spaceFormat = TAG_SPACES_GAME;
-    lectroteTheme.border = 20;
-    lectroteTheme.bufferMarginX = 20;
-    lectroteTheme.bufferMarginY = 15;
-    lectroteTheme.gridMarginX = 15;
-    lectroteTheme.gridMarginY = 6;
-
-    lectroteTheme.winSpacingX = 0;
-    lectroteTheme.winSpacingY = 10;
-
-    lectroteTheme.gridLinkStyle = NSUnderlineStyleSingle;
+    [BuiltInThemes applyLayout:(BuiltInLayout){
+        .rows = 40, .cols = 100,
+        .dashes = YES, .doStyles = YES, .smartQuotes = YES,
+        .spaceFormat = TAG_SPACES_GAME, .border = 20,
+        .bufferMarginX = 20, .bufferMarginY = 15,
+        .gridMarginX = 15, .gridMarginY = 6,
+        .winSpacingX = 0, .winSpacingY = 10,
+        .gridLinkStyle = NSUnderlineStyleSingle
+    } toTheme:lectroteTheme];
 
     lectroteTheme.gridBackground = [NSColor colorWithDeviceRed:0.450844 green:0.325858 blue:0.205177 alpha:1];
     lectroteTheme.bufferBackground = [NSColor whiteColor];
@@ -435,7 +411,7 @@
     lectroteTheme.bufferNormal.font = [NSFont fontWithName:@"Lora" size:15];
     lectroteTheme.bufferNormal.lineSpacing = 3.2;
 
-    lectroteTheme.bufInput.font = [[NSFontManager sharedFontManager] convertWeight:YES ofFont:lectroteTheme.bufferNormal.font];
+    lectroteTheme.bufInput.font = [BuiltInThemes boldVersionOf:lectroteTheme.bufferNormal.font];
 
     lectroteTheme.bufInput.color = [NSColor colorWithDeviceRed:0.042041 green:0.333368 blue:0.011031 alpha:1];
     lectroteTheme.bufInput.autogenerated = NO;
@@ -443,15 +419,9 @@
     lectroteTheme.gridNormal.font = [NSFont fontWithName:@"Source Code Pro" size:14];
     lectroteTheme.gridNormal.color = [NSColor colorWithDeviceRed:0.916565 green:0.902161 blue:0.839754 alpha:1];
 
-    NSSize size = lectroteTheme.gridNormal.cellSize;
+    [BuiltInThemes setGridNormalOfTheme:lectroteTheme maximumLineHeight:0];
 
-    lectroteTheme.cellHeight = size.height;
-    lectroteTheme.cellWidth = size.width;
-
-    size = lectroteTheme.bufferNormal.cellSize;
-
-    lectroteTheme.bufferCellHeight = size.height;
-    lectroteTheme.bufferCellWidth = size.width;
+    [BuiltInThemes refreshCellSizesOfTheme:lectroteTheme];
 
     [lectroteTheme populateStyles];
 
@@ -467,25 +437,17 @@
     if (exists && !force)
         return lectroteDarkTheme;
 
-    lectroteDarkTheme.bZAdjustment = -2;
+    lectroteDarkTheme.bZAdjustment = -4;
 
-    lectroteDarkTheme.dashes = YES;
-    lectroteDarkTheme.defaultRows = 40;
-    lectroteDarkTheme.defaultCols = 100;
-
-    lectroteDarkTheme.doStyles = YES;
-    lectroteDarkTheme.smartQuotes = YES;
-    lectroteDarkTheme.spaceFormat = TAG_SPACES_GAME;
-    lectroteDarkTheme.border = 20;
-    lectroteDarkTheme.bufferMarginX = 20;
-    lectroteDarkTheme.bufferMarginY = 15;
-    lectroteDarkTheme.gridMarginX = 15;
-    lectroteDarkTheme.gridMarginY = 6;
-
-    lectroteDarkTheme.winSpacingX = 0;
-    lectroteDarkTheme.winSpacingY = 10;
-
-    lectroteDarkTheme.gridLinkStyle = NSUnderlineStyleSingle;
+    [BuiltInThemes applyLayout:(BuiltInLayout){
+        .rows = 40, .cols = 100,
+        .dashes = YES, .doStyles = YES, .smartQuotes = YES,
+        .spaceFormat = TAG_SPACES_GAME, .border = 20,
+        .bufferMarginX = 20, .bufferMarginY = 15,
+        .gridMarginX = 15, .gridMarginY = 6,
+        .winSpacingX = 0, .winSpacingY = 10,
+        .gridLinkStyle = NSUnderlineStyleSingle
+    } toTheme:lectroteDarkTheme];
 
     lectroteDarkTheme.gridBackground = [NSColor colorWithDeviceRed:0.991 green:0.957 blue:0.937 alpha:1];
     lectroteDarkTheme.bufferBackground = [NSColor blackColor];
@@ -497,19 +459,13 @@
 
     lectroteDarkTheme.bufferNormal.lineSpacing = 3.2;
 
-    lectroteDarkTheme.bufInput.font = [[NSFontManager sharedFontManager] convertWeight:YES ofFont:lectroteDarkTheme.bufferNormal.font];
+    lectroteDarkTheme.bufInput.font = [BuiltInThemes boldVersionOf:lectroteDarkTheme.bufferNormal.font];
     lectroteDarkTheme.bufInput.color = [NSColor colorWithDeviceRed:0.842 green:0.994 blue:0.820 alpha:1];
     lectroteDarkTheme.bufInput.autogenerated = NO;
 
-    NSSize size = lectroteDarkTheme.gridNormal.cellSize;
+    [BuiltInThemes setGridNormalOfTheme:lectroteDarkTheme maximumLineHeight:0];
 
-    lectroteDarkTheme.cellHeight = size.height;
-    lectroteDarkTheme.cellWidth = size.width;
-
-    size = lectroteDarkTheme.bufferNormal.cellSize;
-
-    lectroteDarkTheme.bufferCellHeight = size.height;
-    lectroteDarkTheme.bufferCellWidth = size.width;
+    [BuiltInThemes refreshCellSizesOfTheme:lectroteDarkTheme];
 
     [lectroteDarkTheme populateStyles];
 
@@ -520,33 +476,25 @@
     BOOL exists = NO;
     Theme *zoomTheme = [BuiltInThemes findOrCreateTheme:@"Zoom" inContext:context alreadyExists:&exists];
 
+    [zoomTheme resetCommonValues];
+
     if (exists && !force)
         return zoomTheme;
 
-    [zoomTheme resetCommonValues];
+    zoomTheme.bZAdjustment = 0;
 
-    zoomTheme.bZAdjustment = -4;
+    [BuiltInThemes applyLayout:(BuiltInLayout){
+        .rows = 50, .cols = 92,
+        .dashes = YES, .doStyles = YES, .smartQuotes = YES,
+        .spaceFormat = TAG_SPACES_GAME, .border = 0,
+        .bufferMarginX = 10, .bufferMarginY = 12,
+        .gridMarginX = 0, .gridMarginY = 0,
+        .winSpacingX = 0, .winSpacingY = 0,
+        .gridLinkStyle = NSUnderlineStyleSingle
+    } toTheme:zoomTheme];
 
-    zoomTheme.dashes = YES;
-    zoomTheme.defaultRows = 50;
-    zoomTheme.defaultCols = 92;
-
-    zoomTheme.doStyles = YES;
-    zoomTheme.smartQuotes = YES;
-    zoomTheme.spaceFormat = TAG_SPACES_GAME;
-    zoomTheme.border = 0;
-    zoomTheme.bufferMarginX = 10;
-    zoomTheme.bufferMarginY = 12;
-    zoomTheme.gridMarginX = 0;
-    zoomTheme.gridMarginY = 0;
-
-    zoomTheme.winSpacingX = 0;
-    zoomTheme.winSpacingY = 0;
-
-    zoomTheme.gridLinkStyle = NSUnderlineStyleSingle;
-
-    zoomTheme.gridBackground = [NSColor colorWithDeviceRed:1 green:1 blue:0.8 alpha:1];
-    zoomTheme.bufferBackground = [NSColor colorWithDeviceRed:1 green:1 blue:0.8 alpha:1];
+    zoomTheme.gridBackground = [NSColor colorWithDeviceRed:1 green:0.996 blue:0.820 alpha:1];
+    zoomTheme.bufferBackground = [NSColor colorWithDeviceRed:1 green:0.996 blue:0.820 alpha:1];
 
     zoomTheme.bufferNormal.font = [NSFont fontWithName:@"Gill Sans" size:12];
 
@@ -558,29 +506,16 @@
     zoomTheme.gridNormal.font = [NSFont fontWithName:@"Courier" size:12];
     zoomTheme.gridNormal.color = [NSColor blackColor];
 
-    NSMutableDictionary *dict = [zoomTheme.gridNormal.attributeDict mutableCopy];
-    dict[NSBaselineOffsetAttributeName] = @(1);
-    zoomTheme.gridNormal.attributeDict = dict;
+    [BuiltInThemes setGridNormalOfTheme:zoomTheme maximumLineHeight:12];
 
-    NSSize size = zoomTheme.gridNormal.cellSize;
-
-    zoomTheme.cellHeight = size.height;
-    zoomTheme.cellWidth = size.width;
-
-    size = zoomTheme.bufferNormal.cellSize;
-
-    zoomTheme.bufferCellHeight = size.height;
-    zoomTheme.bufferCellWidth = size.width;
+    [BuiltInThemes refreshCellSizesOfTheme:zoomTheme];
 
     [zoomTheme populateStyles];
 
-    dict = zoomTheme.bufBlock.attributeDict.mutableCopy;
-
-    NSMutableParagraphStyle *para = [dict[NSParagraphStyleAttributeName] mutableCopy];
-    para.headIndent = 10;
-    para.firstLineHeadIndent = 10;
-    dict[NSParagraphStyleAttributeName] = para;
-    zoomTheme.bufBlock.attributeDict = dict;
+    [zoomTheme.bufBlock updateParagraphStyle:^(NSMutableParagraphStyle *para) {
+        para.headIndent = 10;
+        para.firstLineHeadIndent = 10;
+    }];
     zoomTheme.bufBlock.font = [[NSFontManager sharedFontManager] convertFont:zoomTheme.bufBlock.font toHaveTrait:NSBoldFontMask];
     zoomTheme.bufBlock.autogenerated = NO;
 
@@ -590,11 +525,9 @@
     zoomTheme.bufSubH.autogenerated = NO;
 
     zoomTheme.bufHead.font = [NSFont fontWithName:@"Gill Sans" size:16];
-    dict = zoomTheme.bufHead.attributeDict.mutableCopy;
-    para = [dict[NSParagraphStyleAttributeName] mutableCopy];
-    para.alignment = NSTextAlignmentCenter;
-    dict[NSParagraphStyleAttributeName] = para;
-    zoomTheme.bufHead.attributeDict = dict;
+    [zoomTheme.bufHead updateParagraphStyle:^(NSMutableParagraphStyle *para) {
+        para.alignment = NSTextAlignmentCenter;
+    }];
     zoomTheme.bufHead.autogenerated = NO;
 
     return zoomTheme;
@@ -611,23 +544,15 @@
 
     dosTheme.bZAdjustment = 0;
 
-    dosTheme.dashes = NO;
-    dosTheme.defaultRows = 24;
-    dosTheme.defaultCols = 80;
-
-    dosTheme.doStyles = YES;
-    dosTheme.smartQuotes = NO;
-    dosTheme.spaceFormat = TAG_SPACES_GAME;
-    dosTheme.border = 20;
-    dosTheme.bufferMarginX = 0;
-    dosTheme.bufferMarginY = 0;
-    dosTheme.gridMarginX = 0;
-    dosTheme.gridMarginY = 0;
-
-    dosTheme.winSpacingX = 0;
-    dosTheme.winSpacingY = 0;
-
-    dosTheme.gridLinkStyle = NSUnderlineStyleSingle;
+    [BuiltInThemes applyLayout:(BuiltInLayout){
+        .rows = 24, .cols = 80,
+        .dashes = NO, .doStyles = YES, .smartQuotes = NO,
+        .spaceFormat = TAG_SPACES_GAME, .border = 20,
+        .bufferMarginX = 0, .bufferMarginY = 0,
+        .gridMarginX = 0, .gridMarginY = 0,
+        .winSpacingX = 0, .winSpacingY = 0,
+        .gridLinkStyle = NSUnderlineStyleSingle
+    } toTheme:dosTheme];
 
     dosTheme.gridBackground =  [NSColor blackColor];
     dosTheme.bufferBackground = [NSColor blackColor];
@@ -641,27 +566,17 @@
     dosTheme.bufInput.color = [NSColor colorWithDeviceRed:0.512756 green:0.512821  blue:0.512721 alpha:1];
     dosTheme.bufInput.autogenerated = NO;
 
-    NSSize size = dosTheme.gridNormal.cellSize;
+    [BuiltInThemes refreshCellSizesOfTheme:dosTheme];
 
-    dosTheme.cellHeight = size.height;
-    dosTheme.cellWidth = size.width;
-
-    size = dosTheme.bufferNormal.cellSize;
-
-    dosTheme.bufferCellHeight = size.height;
-    dosTheme.bufferCellWidth = size.width;
-
-    NSMutableDictionary *dict = [dosTheme.gridNormal.attributeDict mutableCopy];
-    dict[NSBaselineOffsetAttributeName] = @(0);
-
-    NSMutableParagraphStyle *para = [dict[NSParagraphStyleAttributeName] mutableCopy];
-    para.lineSpacing = 0;
-    para.paragraphSpacing = 0;
-    para.paragraphSpacingBefore = 0;
-    para.maximumLineHeight = 18.2;
-    dict[NSParagraphStyleAttributeName] = para;
-
-    dosTheme.gridNormal.attributeDict = dict;
+    [dosTheme.gridNormal updateAttributes:^(NSMutableDictionary *attributes) {
+        attributes[NSBaselineOffsetAttributeName] = @(0);
+    }];
+    [dosTheme.gridNormal updateParagraphStyle:^(NSMutableParagraphStyle *para) {
+        para.lineSpacing = 0;
+        para.paragraphSpacing = 0;
+        para.paragraphSpacingBefore = 0;
+        para.maximumLineHeight = 18.2;
+    }];
 
     [dosTheme populateStyles];
 
@@ -690,25 +605,17 @@
     if (exists && !force)
         return dosBoxTheme;
 
-    dosBoxTheme.bZAdjustment = -3;
+    dosBoxTheme.bZAdjustment = -2;
 
-    dosBoxTheme.dashes = NO;
-    dosBoxTheme.defaultRows = 24;
-    dosBoxTheme.defaultCols = 80;
-
-    dosBoxTheme.doStyles = YES;
-    dosBoxTheme.smartQuotes = NO;
-    dosBoxTheme.spaceFormat = TAG_SPACES_GAME;
-    dosBoxTheme.border = 20;
-    dosBoxTheme.bufferMarginX = 0;
-    dosBoxTheme.bufferMarginY = 0;
-    dosBoxTheme.gridMarginX = 0;
-    dosBoxTheme.gridMarginY = 0;
-
-    dosBoxTheme.winSpacingX = 0;
-    dosBoxTheme.winSpacingY = 0;
-
-    dosBoxTheme.gridLinkStyle = NSUnderlineStyleSingle;
+    [BuiltInThemes applyLayout:(BuiltInLayout){
+        .rows = 24, .cols = 80,
+        .dashes = NO, .doStyles = YES, .smartQuotes = NO,
+        .spaceFormat = TAG_SPACES_GAME, .border = 20,
+        .bufferMarginX = 0, .bufferMarginY = 0,
+        .gridMarginX = 0, .gridMarginY = 0,
+        .winSpacingX = 0, .winSpacingY = 0,
+        .gridLinkStyle = NSUnderlineStyleSingle
+    } toTheme:dosBoxTheme];
 
     dosBoxTheme.gridBackground = [NSColor colorWithDeviceRed:0.008897 green:0  blue:0.633764 alpha:1];
     dosBoxTheme.bufferBackground = [NSColor colorWithDeviceRed:0.008897 green:0  blue:0.633764 alpha:1];
@@ -722,6 +629,8 @@
     dosBoxTheme.bufInput.font = [NSFont fontWithName:@"PxPlus VGA SquarePX" size:24];
     dosBoxTheme.bufInput.color = [NSColor colorWithDeviceRed:0.602654 green:0.602749  blue:0.602620 alpha:1];
     dosBoxTheme.bufInput.autogenerated = NO;
+
+    [BuiltInThemes setGridNormalOfTheme:dosBoxTheme maximumLineHeight:0];
 
     [dosBoxTheme populateStyles];
 
@@ -738,80 +647,9 @@
     dosBoxTheme.gridSubH.color = [NSColor whiteColor];
     dosBoxTheme.gridSubH.autogenerated = NO;
 
-    NSSize size = dosBoxTheme.gridNormal.cellSize;
-
-    dosBoxTheme.cellHeight = size.height;
-    dosBoxTheme.cellWidth = size.width;
-
-    size = dosBoxTheme.bufferNormal.cellSize;
-
-    dosBoxTheme.bufferCellHeight = size.height;
-    dosBoxTheme.bufferCellWidth = size.width;
+    [BuiltInThemes refreshCellSizesOfTheme:dosBoxTheme];
 
     return dosBoxTheme;
-}
-
-+ (Theme *)createSTThemeInContext:(NSManagedObjectContext *)context forceRebuild:(BOOL)force {
-    BOOL exists = NO;
-    Theme *stTheme = [BuiltInThemes findOrCreateTheme:@"Atari ST" inContext:context alreadyExists:&exists];
-
-    [stTheme resetCommonValues];
-
-    if (exists && !force)
-        return stTheme;
-
-    stTheme.dashes = NO;
-    stTheme.defaultRows = 24;
-    stTheme.defaultCols = 80;
-
-
-    stTheme.doStyles = YES;
-
-    stTheme.smartQuotes = NO;
-    stTheme.spaceFormat = TAG_SPACES_GAME;
-    stTheme.border = 0;
-    stTheme.bufferMarginX = 0;
-    stTheme.bufferMarginY = 0;
-    stTheme.gridMarginX = 0;
-    stTheme.gridMarginY = 0;
-
-    stTheme.winSpacingX = 0;
-    stTheme.winSpacingY = 0;
-
-    stTheme.gridBackground = [NSColor blackColor];
-    stTheme.bufferBackground = [NSColor whiteColor];
-
-    stTheme.gridNormal.font = [NSFont fontWithName:@"Atari ST 8x16 System Font" size:18];
-    stTheme.gridNormal.color = [NSColor whiteColor];
-
-
-    stTheme.bufferNormal.font = [NSFont fontWithName:@"Atari ST 8x16 System Font" size:18];
-
-    stTheme.bufInput.font = [NSFont fontWithName:@"Atari ST 8x16 System Font" size:18];
-    stTheme.bufInput.autogenerated = NO;
-
-    [stTheme populateStyles];
-
-    stTheme.bufHead.font = [NSFont fontWithName:@"Atari ST 8x16 System Font Bold" size:18];
-    stTheme.bufHead.autogenerated = NO;
-    stTheme.bufSubH.font = [NSFont fontWithName:@"Atari ST 8x16 System Font Bold" size:18];
-    stTheme.bufSubH.autogenerated = NO;
-    stTheme.bufEmph.font = [NSFont fontWithName:@"Atari ST 8x16 System Font Bold" size:18];
-    stTheme.bufEmph.autogenerated = NO;
-    stTheme.gridEmph.font = [NSFont fontWithName:@"Atari ST 8x16 System Font Bold" size:18];
-    stTheme.gridEmph.autogenerated = NO;
-
-    NSSize size = stTheme.gridNormal.cellSize;
-
-    stTheme.cellHeight = size.height;
-    stTheme.cellWidth = size.width;
-
-    size = stTheme.bufferNormal.cellSize;
-
-    stTheme.bufferCellHeight = size.height;
-    stTheme.bufferCellWidth = size.width;
-
-    return stTheme;
 }
 
 + (Theme *)createMontserratThemeInContext:(NSManagedObjectContext *)context forceRebuild:(BOOL)force {
@@ -823,23 +661,15 @@
     if (exists && !force)
         return montserratTheme;
 
-    montserratTheme.dashes = NO;
-    montserratTheme.defaultRows = 50;
-    montserratTheme.defaultCols = 65;
-
-    montserratTheme.doStyles = NO;
-    montserratTheme.smartQuotes = YES;
-    montserratTheme.spaceFormat = TAG_SPACES_ONE;
-    montserratTheme.border = 0;
-    montserratTheme.bufferMarginX = 60;
-    montserratTheme.bufferMarginY = 60;
-    montserratTheme.gridMarginX = 40;
-    montserratTheme.gridMarginY = 10;
-
-    montserratTheme.winSpacingX = 0;
-    montserratTheme.winSpacingY = 0;
-
-    montserratTheme.gridLinkStyle = NSUnderlineStyleSingle;
+    [BuiltInThemes applyLayout:(BuiltInLayout){
+        .rows = 50, .cols = 65,
+        .dashes = NO, .doStyles = NO, .smartQuotes = YES,
+        .spaceFormat = TAG_SPACES_ONE, .border = 0,
+        .bufferMarginX = 60, .bufferMarginY = 60,
+        .gridMarginX = 40, .gridMarginY = 10,
+        .winSpacingX = 0, .winSpacingY = 0,
+        .gridLinkStyle = NSUnderlineStyleSingle
+    } toTheme:montserratTheme];
 
     montserratTheme.gridBackground = [NSColor whiteColor];
     montserratTheme.bufferBackground = [NSColor whiteColor];
@@ -861,51 +691,36 @@
     montserratTheme.bufHead.font = [NSFont fontWithName:@"Montserrat Black" size:30];
     montserratTheme.bufHead.lineSpacing = 0;
 
-    NSMutableDictionary *dict = montserratTheme.bufHead.attributeDict.mutableCopy;
-
-    NSMutableParagraphStyle *para = [dict[NSParagraphStyleAttributeName] mutableCopy];
-    para.lineSpacing = 0;
-    para.paragraphSpacing = 15;
-    para.paragraphSpacingBefore = 0;
-    para.maximumLineHeight = 30;
-    dict[NSParagraphStyleAttributeName] = para;
-
-    montserratTheme.bufHead.attributeDict = dict;
+    [montserratTheme.bufHead updateAttributes:^(NSMutableDictionary *attributes) {
+        attributes[NSBaselineOffsetAttributeName] = @(0);
+    }];
+    [montserratTheme.bufHead updateParagraphStyle:^(NSMutableParagraphStyle *para) {
+        para.lineSpacing = 0;
+        para.paragraphSpacing = 15;
+        para.paragraphSpacingBefore = 0;
+        para.maximumLineHeight = 30;
+    }];
     montserratTheme.bufHead.autogenerated = NO;
 
     montserratTheme.bufSubH.font = [NSFont fontWithName:@"Montserrat ExtraBold" size:20];
     montserratTheme.bufSubH.lineSpacing = 10;
 
-    dict = montserratTheme.bufSubH.attributeDict.mutableCopy;
-    para = [dict[NSParagraphStyleAttributeName] mutableCopy];
-    para.lineSpacing = 10;
-    para.paragraphSpacing = 0;
-    para.paragraphSpacingBefore = 0;
-    para.maximumLineHeight = 30;
-    dict[NSParagraphStyleAttributeName] = para;
-
-    montserratTheme.bufSubH.attributeDict = dict;
+    [montserratTheme.bufSubH updateParagraphStyle:^(NSMutableParagraphStyle *para) {
+        para.lineSpacing = 10;
+        para.paragraphSpacing = 0;
+        para.paragraphSpacingBefore = 0;
+        para.maximumLineHeight = 30;
+    }];
     montserratTheme.bufSubH.autogenerated = NO;
 
-    dict = montserratTheme.bufBlock.attributeDict.mutableCopy;
-
-    para = [dict[NSParagraphStyleAttributeName] mutableCopy];
-    para.headIndent = 10;
-    para.firstLineHeadIndent = 10;
-    para.alignment = NSTextAlignmentJustified;
-    dict[NSParagraphStyleAttributeName] = para;
-    montserratTheme.bufBlock.attributeDict = dict;
+    [montserratTheme.bufBlock updateParagraphStyle:^(NSMutableParagraphStyle *para) {
+        para.headIndent = 10;
+        para.firstLineHeadIndent = 10;
+        para.alignment = NSTextAlignmentJustified;
+    }];
     montserratTheme.bufBlock.autogenerated = NO;
 
-    NSSize size = montserratTheme.gridNormal.cellSize;
-
-    montserratTheme.cellHeight = size.height;
-    montserratTheme.cellWidth = size.width;
-
-    size = montserratTheme.bufferNormal.cellSize;
-
-    montserratTheme.bufferCellHeight = size.height;
-    montserratTheme.bufferCellWidth = size.width;
+    [BuiltInThemes refreshCellSizesOfTheme:montserratTheme];
 
     return montserratTheme;
 }
@@ -919,25 +734,15 @@
     if (exists && !force)
         return autoMapTheme;
 
-    autoMapTheme.dashes = YES;
-    autoMapTheme.defaultRows = 59;
-    autoMapTheme.defaultCols = 80;
-
-    autoMapTheme.doStyles = YES;
-    autoMapTheme.smartQuotes = YES;
-    autoMapTheme.spaceFormat = TAG_SPACES_ONE;
-    autoMapTheme.border = 0;
-
-    autoMapTheme.gridMarginX = 20;
-    autoMapTheme.gridMarginY = 10;
-
-    autoMapTheme.bufferMarginX = 20;
-    autoMapTheme.bufferMarginY = 30;
-
-    autoMapTheme.winSpacingX = 0;
-    autoMapTheme.winSpacingY = 0;
-
-    autoMapTheme.gridLinkStyle = NSUnderlineStyleNone;
+    [BuiltInThemes applyLayout:(BuiltInLayout){
+        .rows = 59, .cols = 80,
+        .dashes = YES, .doStyles = YES, .smartQuotes = YES,
+        .spaceFormat = TAG_SPACES_ONE, .border = 0,
+        .bufferMarginX = 20, .bufferMarginY = 30,
+        .gridMarginX = 20, .gridMarginY = 10,
+        .winSpacingX = 0, .winSpacingY = 0,
+        .gridLinkStyle = NSUnderlineStyleNone
+    } toTheme:autoMapTheme];
 
     autoMapTheme.gridBackground = [NSColor whiteColor];
     autoMapTheme.bufferBackground = [NSColor whiteColor];
@@ -945,53 +750,30 @@
     autoMapTheme.gridNormal.font = [NSFont fontWithName:@"Source Code Pro" size:16];
     autoMapTheme.gridNormal.color = [NSColor blackColor];
 
-    NSMutableDictionary *dict = autoMapTheme.gridNormal.attributeDict.mutableCopy;
-    dict[NSKernAttributeName] = @(0);
-
-    NSMutableParagraphStyle *para = [dict[NSParagraphStyleAttributeName] mutableCopy];
-
-    para.maximumLineHeight = 16;
-    para.lineSpacing = 0;
-    dict[NSParagraphStyleAttributeName] = para;
-
-    autoMapTheme.gridNormal.attributeDict = dict;
+    [autoMapTheme.gridNormal updateAttributes:^(NSMutableDictionary *attributes) {
+        attributes[NSKernAttributeName] = @(0);
+    }];
+    [autoMapTheme.gridNormal updateParagraphStyle:^(NSMutableParagraphStyle *para) {
+        para.maximumLineHeight = 16;
+        para.lineSpacing = 0;
+    }];
 
     autoMapTheme.bufferNormal.font = [NSFont fontWithName:@"Helvetica" size:13];
 
     [autoMapTheme populateStyles];
 
-    NSSize size = autoMapTheme.gridNormal.cellSize;
-
-    autoMapTheme.cellHeight = size.height;
-    autoMapTheme.cellWidth = size.width;
-
-    size = autoMapTheme.bufferNormal.cellSize;
-
-    autoMapTheme.bufferCellHeight = size.height;
-    autoMapTheme.bufferCellWidth = size.width;
+    [BuiltInThemes refreshCellSizesOfTheme:autoMapTheme];
 
     return autoMapTheme;
 }
 
 + (Theme *)findOrCreateTheme:(NSString *)themeName inContext:(NSManagedObjectContext *)context alreadyExists:(BOOL *)existsFlagPointer {
 
-    NSError *error = nil;
-    *existsFlagPointer = NO;
-
     // First, check if it already exists
-    NSFetchRequest *fetchRequest = [[NSFetchRequest alloc] init];
-    fetchRequest.entity = [NSEntityDescription entityForName:@"Theme" inManagedObjectContext:context];
-
-    fetchRequest.predicate = [NSPredicate predicateWithFormat:@"name like[c] %@", themeName];
-    NSArray *fetchedObjects = [context executeFetchRequest:fetchRequest error:&error];
-
-    if (fetchedObjects && fetchedObjects.count) {
-        *existsFlagPointer = YES;
-        return fetchedObjects[0];
-    } else if (error != nil) {
-        NSLog(@"BuiltInThemes findOrCreateTheme: %@", error);
-        return nil;
-    }
+    Theme *existing = [Fetches findTheme:themeName inContext:context];
+    *existsFlagPointer = (existing != nil);
+    if (existing)
+        return existing;
 
     Theme *newTheme = (Theme *) [NSEntityDescription
                                  insertNewObjectForEntityForName:@"Theme"

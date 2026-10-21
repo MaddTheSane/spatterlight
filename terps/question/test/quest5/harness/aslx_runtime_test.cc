@@ -1,0 +1,2568 @@
+/*
+ * Copyright (C) 2026  Petter Sjölund
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+ */
+
+// aslx_runtime_test.cc -- milestone-2 script/expression runtime tests.
+//
+//   ./aslx_runtime_test            run the assertions
+//
+// Built by test/Makefile; links libexpat + zlib (via the loader). See
+// ../README.md.
+
+#include "../../../quest5/aslx.hh"
+#include "../../../quest5/aslx-runtime.hh"
+
+#include <cstdio>
+#include <iostream>
+
+static int g_failures = 0;
+
+#define CHECK(cond)                                                            \
+    do {                                                                       \
+        if (!(cond)) {                                                         \
+            std::fprintf(stderr, "FAIL %s:%d: %s\n", __FILE__, __LINE__,       \
+                         #cond);                                               \
+            ++g_failures;                                                      \
+        }                                                                      \
+    } while (0)
+
+#define CHECK_STR(a, b)                                                        \
+    do {                                                                       \
+        std::string _a = (a), _b = (b);                                        \
+        if (_a != _b) {                                                        \
+            std::cerr << "FAIL " << __FILE__ << ":" << __LINE__ << ": got ["    \
+                      << _a << "] want [" << _b << "]\n";                      \
+            ++g_failures;                                                      \
+        }                                                                      \
+    } while (0)
+
+using namespace aslx;
+
+// Run a script against a world and return its output (trailing newline trimmed).
+static std::string run(Interp &in, const std::string &src) {
+    in.clear_output();
+    Context ctx;
+    in.run_script(src, ctx);
+    std::string o = in.output();
+    while (!o.empty() && o.back() == '\n') o.pop_back();
+    return o;
+}
+
+// Evaluate a single expression to a string.
+static std::string evals(Interp &in, const std::string &expr) {
+    Context ctx;
+    return Interp::to_string(in.eval(expr, ctx));
+}
+
+// The message a failing expression raises (past the "Error evaluating
+// expression '...': " wrapper), or "" if it evaluates.
+static std::string eval_error(Interp &in, const std::string &expr) {
+    try { evals(in, expr); } catch (const std::runtime_error &e) {
+        std::string m = e.what();
+        size_t at = m.find("': ");
+        return at == std::string::npos ? m : m.substr(at + 3);
+    }
+    return "";
+}
+
+static void test_expressions() {
+    World w;
+    w.asl_version = 550;
+    Interp in(w);
+
+    CHECK_STR(evals(in, "1 + 2 * 3"), "7");
+    CHECK_STR(evals(in, "(1 + 2) * 3"), "9");
+    // int/int is INTEGER division (HandleBinaryResult's intercept -- FLEE
+    // compiled to IL where int/int = int); mixed operands stay double.
+    CHECK_STR(evals(in, "10 / 4"), "2");
+    CHECK_STR(evals(in, "10 / 4.0"), "2.5");
+    CHECK_STR(evals(in, "10 - 3 - 2"), "5");
+    CHECK_STR(evals(in, "7 % 3"), "1");
+    CHECK_STR(evals(in, "\"foo\" + \"bar\""), "foobar");
+    CHECK_STR(evals(in, "\"n=\" + 5"), "n=5");
+    CHECK_STR(evals(in, "2 = 2"), "True");
+    CHECK_STR(evals(in, "2 <> 3"), "True");
+    CHECK_STR(evals(in, "3 > 2 and 1 < 2"), "True");
+    CHECK_STR(evals(in, "3 > 2 or 1 > 2"), "True");
+    CHECK_STR(evals(in, "not (1 = 2)"), "True");
+    // `not` binds looser than `=` (QuestViva notOperator level): "not x = y" is
+    // "not (x = y)". Core relies on this pervasively ("not obj = null").
+    CHECK_STR(evals(in, "not 1 = 2"), "True");
+    CHECK_STR(evals(in, "not 1 = 1"), "False");
+    CHECK_STR(evals(in, "not \"x\" = null"), "True");
+    CHECK_STR(evals(in, "not 1 = 1 and 2 = 2"), "False");
+    CHECK_STR(evals(in, "not not 1 = 1"), "True");
+    CHECK_STR(evals(in, "5 > 3 ? \"big\" : \"small\""), "big");
+    CHECK_STR(evals(in, "-4 + 1"), "-3");
+    CHECK_STR(evals(in, "true and false"), "False");
+    CHECK_STR(evals(in, "\"a\" < \"b\""), "True");
+    // Backslash escapes in string literals (Parlot StringLiteralQuotes): \" \' \\.
+    CHECK_STR(evals(in, "Replace(\"a\\\"b\", \"\\\"\", \"X\")"), "aXb");
+    CHECK_STR(evals(in, "\"\\\\D\""), "\\D");
+
+    // Built-in string functions (1-based positions).
+    CHECK_STR(evals(in, "LCase(\"ABC\")"), "abc");
+    CHECK_STR(evals(in, "UCase(\"abc\")"), "ABC");
+    // .NET case mapping is full-Unicode, not ASCII: Greek-language games
+    // (Iron John) LCase player input against LCase'd aliases, and CapFirst
+    // article-based templates ("το" -> "Το"). Includes accented vowels and
+    // the final-sigma asymmetry (ς uppercases to Σ; Σ lowercases to σ).
+    CHECK_STR(evals(in, "LCase(\"Βασιλιά\")"), "βασιλιά");
+    CHECK_STR(evals(in, "UCase(\"βασιλιάς\")"), "ΒΑΣΙΛΙΆΣ");
+    CHECK_STR(evals(in, "LCase(\"ΆΈΉΊΌΎΏΣ\")"), "άέήίόύώσ");
+    CHECK_STR(evals(in, "CapFirst(\"το\")"), "Το");
+    CHECK_STR(evals(in, "LCase(\"ÉÀÑ\")"), "éàñ");
+    CHECK_STR(evals(in, "UCase(\"éàñ\")"), "ÉÀÑ");
+    CHECK_STR(evals(in, "Left(\"hello\", 2)"), "he");
+    CHECK_STR(evals(in, "Right(\"hello\", 3)"), "llo");
+    CHECK_STR(evals(in, "Mid(\"hello\", 2, 3)"), "ell");
+    CHECK_STR(evals(in, "Mid(\"hello\", 3)"), "llo");
+    CHECK_STR(evals(in, "Instr(\"hello\", \"l\")"), "3");
+    CHECK_STR(evals(in, "Instr(\"hello\", \"z\")"), "0");
+    CHECK_STR(evals(in, "Replace(\"a-b-c\", \"-\", \"+\")"), "a+b+c");
+    CHECK_STR(evals(in, "Trim(\"  hi  \")"), "hi");
+    // VB trims strip only ' ' and U+3000 (tabs survive); InstrRev finds the
+    // last match ending at or before start; all checked against the oracle.
+    CHECK_STR(evals(in, "\"[\" + LTrim(\"  a b  \") + \"][\" + RTrim(\"  a b  \") + \"]\""), "[a b  ][  a b]");
+    CHECK_STR(evals(in, "LengthOf(Trim(Chr(9) + \"x \" + Chr(9)))"), "4");
+    CHECK_STR(evals(in, "Trim(\"\u3000x \u3000\")"), "x");
+    CHECK_STR(evals(in, "InstrRev(\"abcabc\", \"bc\")"), "5");
+    CHECK_STR(evals(in, "InstrRev(\"abcabc\", \"\")"), "6");
+    CHECK_STR(evals(in, "InstrRev(\"\", \"\")"), "0");
+    CHECK_STR(evals(in, "InstrRev(4, \"abcabc\", \"bc\")"), "2");
+    CHECK_STR(evals(in, "InstrRev(2, \"abcabc\", \"bc\")"), "0");
+    CHECK_STR(evals(in, "InstrRev(10, \"abcabc\", \"bc\")"), "0");
+    CHECK_STR(evals(in, "InstrRev(3, \"abcabc\", \"\")"), "3");
+    CHECK_STR(evals(in, "InstrRev(\"aBc\", \"b\")"), "0");
+    CHECK_STR(eval_error(in, "InstrRev(0, \"abc\", \"b\")"),
+              "Argument 'Start' must be greater than 0 or equal to -1. (Parameter 'Start')");
+    // Asc/Chr: ASCII as the oracle; 128-255 are Windows-1252 (a deliberate
+    // deviation: QuestViva errors there for want of the code page).
+    CHECK_STR(evals(in, "Asc(\"abc\")"), "97");
+    CHECK_STR(evals(in, "Chr(65) + Chr(127)"), "A\x7F");
+    CHECK_STR(evals(in, "LengthOf(Chr(0))"), "1");
+    CHECK_STR(evals(in, "Chr(233) + Chr(128)"), "\u00E9\u20AC");
+    CHECK_STR(evals(in, "Asc(\"\u00E9\") + Asc(\"\u20AC\")"), "361");
+    CHECK_STR(evals(in, "Asc(\"\u0436\")"), "63");
+    CHECK_STR(eval_error(in, "Asc(\"\")"),
+              "Length of argument 'String' must be greater than zero. (Parameter 'String')");
+    CHECK_STR(eval_error(in, "GetExternalFileData(\"x\")"), "GetExternalFileData is not supported");
+    CHECK_STR(evals(in, "TypeOf(CurrentDateUTC())"), "int");
+    // NCalc list literals: "(a, b)" with ',' or ';', and "()"; FLEE's
+    // `x in (a, b)` is the real use. Membership is case- and type-exact.
+    CHECK_STR(evals(in, "\"a\" in (\"a\", \"b\")"), "True");
+    CHECK_STR(evals(in, "\"A\" in (\"a\", \"b\")"), "False");
+    CHECK_STR(evals(in, "1 in (\"1\", \"2\")"), "False");
+    CHECK_STR(evals(in, "3 in (1; 2; 3)"), "True");
+    CHECK_STR(evals(in, "\"c\" not in (\"a\", \"b\")"), "True");
+    CHECK_STR(evals(in, "ListCount((\"a\", \"b\")) + ListCount(())"), "2");
+    CHECK_STR(evals(in, "(\"a\")"), "a");
+    CHECK_STR(evals(in, "LengthOf(\"hello\")"), "5");
+    CHECK_STR(evals(in, "StartsWith(\"hello\", \"he\")"), "True");
+    CHECK_STR(evals(in, "Join(Split(\"a,b,c\", \",\"), \"|\")"), "a|b|c");
+    CHECK_STR(evals(in, "ListCount(Split(\"a,b,c\", \",\"))"), "3");
+    CHECK_STR(evals(in, "CInt(\"42\") + 1"), "43");
+    CHECK_STR(evals(in, "Abs(-7)"), "7");
+    CHECK_STR(evals(in, "Max(3, 9)"), "9");
+
+    // NCalc's "^" is exponentiation, right-associative, binding tighter than
+    // unary minus; and "e"/"pi" are built-in parameters that WIN over a local
+    // of the same name. All four behaviours checked against the oracle while
+    // wiring Moquette (whose GetRandomPoisson opens "L = e ^ -expected").
+    CHECK_STR(evals(in, "2 ^ 3"), "8");
+    CHECK_STR(evals(in, "2 ^ 3 ^ 2"), "512");
+    CHECK_STR(evals(in, "-2 ^ 2"), "-4");
+    CHECK_STR(evals(in, "CInt(e * 1000)"), "2718");
+    CHECK_STR(evals(in, "CInt(pi * 1000)"), "3142");
+    CHECK_STR(evals(in, "CInt(E * 1000)"), "2718");
+    CHECK_STR(run(in, "e = 5\nmsg (CInt(e * 1000))"), "2718");
+    CHECK_STR(evals(in, "CInt((e ^ -2) * 10000)"), "1353");
+}
+
+static void test_control_flow() {
+    World w;
+    w.asl_version = 550;
+    Interp in(w);
+
+    CHECK_STR(run(in, "msg (\"hi\")"), "hi");
+
+    // Statement splitting must not be derailed by an escaped quote in a string
+    // literal: "\"" is a literal quote, so the next line is a separate statement
+    // (regression for the JSSafe-style whole-body-swallow bug).
+    CHECK_STR(run(in,
+        "s = Replace(\"a\\\"b\", \"\\\"\", \"\")\n"
+        "msg (s)"), "ab");
+    // A // inside a string is not a comment.
+    CHECK_STR(run(in, "msg (\"http://x\")"), "http://x");
+
+    // if / else if / else
+    CHECK_STR(run(in,
+        "x = 5\n"
+        "if (x > 10) {\n"
+        "  msg (\"big\")\n"
+        "}\n"
+        "else if (x > 3) {\n"
+        "  msg (\"medium\")\n"
+        "}\n"
+        "else {\n"
+        "  msg (\"small\")\n"
+        "}"), "medium");
+
+    // while
+    CHECK_STR(run(in,
+        "i = 0\n"
+        "result = \"\"\n"
+        "while (i < 3) {\n"
+        "  result = result + i\n"
+        "  i = i + 1\n"
+        "}\n"
+        "msg (result)"), "012");
+
+    // for with step
+    CHECK_STR(run(in,
+        "s = \"\"\n"
+        "for (n, 1, 5, 2) {\n"
+        "  s = s + n\n"
+        "}\n"
+        "msg (s)"), "135");
+
+    // foreach over a split list
+    CHECK_STR(run(in,
+        "out = \"\"\n"
+        "foreach (item, Split(\"x,y,z\", \",\")) {\n"
+        "  out = out + item\n"
+        "}\n"
+        "msg (out)"), "xyz");
+}
+
+static void test_functions_and_objects() {
+    World w;
+    bool ok = load_file("../fixtures/runtime.aslx", w);
+    if (!ok) std::cerr << dump(w);
+    CHECK(ok);
+    Interp in(w);
+
+    // Function with a return value + object attribute mutation.
+    CHECK_STR(run(in, "msg (AddScore(10))"), "10");
+    CHECK_STR(run(in, "msg (AddScore(5))"), "15");   // score persisted
+    CHECK_STR(run(in, "msg (player.score)"), "15");
+
+    // Function reading an inherited attribute and an object arg.
+    CHECK_STR(run(in, "Describe(box)"), "The box weighs 4");
+
+    // Inherited attribute directly.
+    CHECK_STR(run(in, "msg (box.capacity)"), "10");
+    CHECK(w.find("box"));
+    {
+        Context ctx;
+        CHECK(Interp::to_string(in.eval("DoesInherit(box, \"container\")", ctx)) == "True");
+        CHECK(Interp::to_string(in.eval("DoesInherit(player, \"container\")", ctx)) == "False");
+    }
+
+    // Numeric loop function.
+    CHECK_STR(run(in, "msg (SumTo(5))"), "15");
+
+    // if/elseif/else inside a function returning strings.
+    CHECK_STR(run(in, "msg (Classify(-3))"), "negative");
+    CHECK_STR(run(in, "msg (Classify(0))"), "zero");
+    CHECK_STR(run(in, "msg (Classify(7))"), "positive");
+}
+
+static void test_script_commands() {
+    World w;
+    bool ok = load_file("../fixtures/runtime.aslx", w);
+    if (!ok) std::cerr << dump(w);
+    CHECK(ok);
+    Interp in(w);
+
+    // switch / case (multiple values) / default
+    const char *sw =
+        "switch (x) {\n"
+        "  case (1) { msg (\"one\") }\n"
+        "  case (2, 3) { msg (\"two-three\") }\n"
+        "  default { msg (\"other\") }\n"
+        "}";
+    CHECK_STR(run(in, std::string("x = 2\n") + sw), "two-three");
+    CHECK_STR(run(in, std::string("x = 3\n") + sw), "two-three");
+    CHECK_STR(run(in, std::string("x = 9\n") + sw), "other");
+
+    // firsttime / otherwise -- state persists across runs of the same (cached)
+    // script source, mirroring Quest's per-instance m_hasRun.
+    const char *ft =
+        "firsttime { msg (\"first\") }\n"
+        "otherwise { msg (\"again\") }";
+    CHECK_STR(run(in, ft), "first");
+    CHECK_STR(run(in, ft), "again");
+    CHECK_STR(run(in, ft), "again");
+
+    // do -- run a named script attribute on an object
+    CHECK_STR(run(in, "do (player, \"greet\")"), "player waves");
+
+    // create / create-with-type / destroy
+    run(in, "create (\"widget\")");
+    CHECK(w.find("widget"));
+    run(in, "create (\"crate\", \"container\")");
+    {
+        Context c;
+        CHECK_STR(Interp::to_string(in.eval("DoesInherit(crate, \"container\")", c)),
+                  "True");
+    }
+    run(in, "destroy (\"widget\")");
+    CHECK(!w.find("widget"));
+
+    // set(obj, field, value)
+    CHECK_STR(run(in, "set (box, \"colour\", \"red\")\nmsg (box.colour)"), "red");
+
+    // list add / list remove, local and on an attribute
+    CHECK_STR(run(in,
+        "l = NewStringList()\n"
+        "list add (l, \"x\")\n"
+        "list add (l, \"y\")\n"
+        "list remove (l, \"x\")\n"
+        "msg (Join(l, \",\"))"), "y");
+    CHECK_STR(run(in,
+        "box.tags = NewStringList()\n"
+        "list add (box.tags, \"heavy\")\n"
+        "list add (box.tags, \"wooden\")\n"
+        "msg (ListCount(box.tags))"), "2");
+
+    // dictionary add / remove / count / contains / item
+    CHECK_STR(run(in,
+        "d = NewDictionary()\n"
+        "dictionary add (d, \"a\", \"1\")\n"
+        "dictionary add (d, \"b\", \"2\")\n"
+        "dictionary remove (d, \"a\")\n"
+        "msg (DictionaryContains(d, \"a\"))\n"
+        "msg (DictionaryContains(d, \"b\"))\n"
+        "msg (DictionaryCount(d))\n"
+        "msg (DictionaryItem(d, \"b\"))"), "False\nTrue\n1\n2");
+
+    // on ready -- with no prompt callback outstanding it runs immediately,
+    // inline (WorldModel.AddOnReady); deferral until a pending show menu /
+    // ask / get input / wait resolves is exercised by test_input_model.
+    CHECK_STR(run(in,
+        "msg (\"a\")\n"
+        "on ready { msg (\"deferred\") }\n"
+        "msg (\"b\")"), "a\ndeferred\nb");
+
+    // JS.addText routes to the output sink; other JS.* calls are ignored.
+    CHECK_STR(run(in, "JS.addText (\"<b>hi</b>\")\nJS.updateLocation (\"room\")"),
+              "<b>hi</b>");
+
+    // JS.setPanelContents (the picture frame: SetFramePicture /
+    // ClearFramePicture) routes to the set_panel_contents host hook when one
+    // is installed -- with the evaluated argument -- and stays a silent no-op
+    // otherwise (the run above already covered unset-hook JS.* calls).
+    std::vector<std::string> panels;
+    in.set_panel_contents = [&](const std::string &html) {
+        panels.push_back(html);
+    };
+    run(in, "JS.setPanelContents (\"<img src=\\\"pic\\\" />\" )\n"
+            "JS.setPanelContents (\"\")");
+    CHECK(panels.size() == 2);
+    if (panels.size() == 2) {
+        CHECK_STR(panels[0], "<img src=\"pic\" />");
+        CHECK_STR(panels[1], "");
+    }
+    in.set_panel_contents = nullptr;
+
+    // finish sets the world flag.
+    CHECK(!w.finished);
+    run(in, "finish");
+    CHECK(w.finished);
+}
+
+static void test_new_builtins() {
+    World w;
+    bool ok = load_file("../fixtures/runtime.aslx", w);
+    CHECK(ok);
+    Interp in(w);
+
+    // Load-time [template] substitution: Templated() returns "[Greeting] world"
+    // with [Greeting] already replaced by the template text.
+    CHECK_STR(run(in, "msg (Templated())"), "hello world");
+    // Template() / DynamicTemplate() at runtime.
+    CHECK_STR(evals(in, "Template(\"Greeting\")"), "hello");
+    CHECK_STR(evals(in, "DynamicTemplate(\"Weigh\", box)"), "weighs 4");
+
+    // String helpers.
+    CHECK_STR(evals(in, "CapFirst(\"hello\")"), "Hello");
+    CHECK_STR(evals(in, "SafeXML(\"a<b>&c\")"), "a&lt;b&gt;&amp;c");
+
+    // TypeOf(obj, attr): own, inherited, and missing.
+    CHECK_STR(evals(in, "TypeOf(box, \"weight\")"), "int");
+    CHECK_STR(evals(in, "TypeOf(box, \"capacity\")"), "int");   // inherited
+    CHECK_STR(evals(in, "TypeOf(box, \"nope\")"), "null");
+
+    // World-model queries.
+    CHECK_STR(evals(in, "ListCount(AllObjects())"), "4");  // chest, room, player, box
+    CHECK_STR(evals(in, "ListCount(GetDirectChildren(room))"), "2");
+
+    // listextend merges on read (Fields.GetMergedResult): the base list's
+    // entries first, then extensions least-derived -> most-derived -- here
+    // container's base + openable's extension + chest's own extension. The
+    // plain base list on a sibling type user is unaffected.
+    CHECK_STR(evals(in, "Join(chest.displayverbs, \",\")"),
+              "Look,Take,Open,Close,Lock");
+    CHECK_STR(evals(in, "Join(box.displayverbs, \",\")"), "Look,Take");
+    CHECK_STR(evals(in, "TypeOf(chest, \"displayverbs\")"), "stringlist");
+    CHECK_STR(evals(in, "ListCount(chest.displayverbs)"), "5");
+    CHECK_STR(evals(in, "Contains(room, player)"), "True");
+    CHECK_STR(evals(in, "Contains(player, room)"), "False");
+    CHECK_STR(evals(in, "ListContains(GetAttributeNames(player, false), \"score\")"),
+              "True");
+
+    // Typed list/dictionary item access.
+    CHECK_STR(evals(in, "StringListItem(Split(\"a,b,c\", \",\"), 1)"), "b");
+    CHECK_STR(evals(in, "ObjectListItem(AllObjects(), 0)"), "room");
+}
+
+// Constructs the real-game boot smoke test hit (TODO §Status): multi-word
+// identifiers, in/not in, "=>" script assignment, headless media no-ops, and
+// graceful degradation on a parse error.
+static void test_realgame_constructs() {
+    World w;
+    w.asl_version = 550;
+    Interp in(w);
+
+    // -- Multi-word (space-encoded) identifiers, per EncodeIdentifierSpaces.
+    run(in, "create (\"OUTSIDE INN\")");
+    run(in, "OUTSIDE INN.MORNING = true");
+    CHECK_STR(evals(in, "GetBoolean(OUTSIDE INN, \"MORNING\")"), "True");
+    // Dracula's shape: `not` applies to the whole call, and `not`/`and` stay
+    // keywords (never joined into an identifier).
+    CHECK_STR(evals(in, "not GetBoolean(OUTSIDE INN, \"MORNING\")"), "False");
+    CHECK_STR(evals(in, "GetBoolean(OUTSIDE INN, \"MORNING\") and true"), "True");
+    // Magi's shape: an attribute name containing a space (game.Next text).
+    run(in, "create (\"thegame\")");
+    run(in, "thegame.Next text = \"chapter 2\"");
+    CHECK_STR(evals(in, "thegame.Next text"), "chapter 2");
+    // Spaces inside string literals are never touched.
+    CHECK_STR(evals(in, "\"OUTSIDE INN\""), "OUTSIDE INN");
+
+    // -- in / not in (relational level, QuestNCalcLogicalExpressionParser).
+    CHECK_STR(evals(in, "\"b\" in Split(\"a,b,c\", \",\")"), "True");
+    CHECK_STR(evals(in, "\"z\" in Split(\"a,b,c\", \",\")"), "False");
+    CHECK_STR(evals(in, "\"z\" not in Split(\"a,b,c\", \",\")"), "True");
+    CHECK_STR(evals(in, "OUTSIDE INN in AllObjects()"), "True");
+    CHECK_STR(evals(in, "\"ell\" in \"hello\""), "True");
+    // spondre's shape: prefix not over a membership test.
+    CHECK_STR(evals(in, "not OUTSIDE INN in AllObjects()"), "False");
+    CHECK_STR(run(in,
+        "d = NewDictionary()\n"
+        "dictionary add (d, \"k\", \"v\")\n"
+        "msg (\"k\" in d)\n"
+        "msg (\"j\" in d)"), "True\nFalse");
+
+    // -- list add / dictionary add through an EXPRESSION target (spondre's
+    // ResponseLib_GroupResponses: `list add (groups[class], entry)`).
+    // QuestViva mutates whatever QuestList/QuestDictionary the expression
+    // yields; the aliasing Value copy must edit the stored collection.
+    CHECK_STR(run(in,
+        "groups = NewDictionary()\n"
+        "l = NewList()\n"
+        "dictionary add (groups, \"c\", l)\n"
+        "list add (groups[\"c\"], \"hit\")\n"
+        "msg (ListCount(groups[\"c\"]))"), "1");
+
+    // -- Property access on a null receiver throws QuestViva's exact message
+    // (spondre's golden opens with it: UpdatePlayerUI reads
+    // game.pov.longtermtopics before StartGame assigns pov).
+    CHECK_STR(run(in,
+        "create (\"holder\")\n"
+        "msg (holder.pov.longtermtopics)"),
+        "Error running script: Error evaluating expression "
+        "'holder.pov.longtermtopics': Property 'longtermtopics' not found on ''");
+    w.errors.clear();
+
+    // -- "x => { script }" assigns a script literal (SetScriptScript).
+    run(in, "create (\"guard\")");
+    CHECK_STR(run(in,
+        "guard.oncrit => {\n"
+        "  if (guard.health > 100) {\n"
+        "    msg (\"overhealed\")\n"
+        "  }\n"
+        "}\n"
+        "guard.health = 150\n"
+        "do (guard, \"oncrit\")"), "overhealed");
+    CHECK_STR(evals(in, "HasScript(guard, \"oncrit\")"), "True");
+
+    // -- Media commands no-op with a one-time warning; no errors. On v540+,
+    // `picture` PRINTS its image as an <img> tag (PictureScript -> PrintAsync);
+    // the sound commands stay silent (async playback has no text side).
+    CHECK(w.errors.empty());
+    CHECK_STR(run(in,
+        "picture (\"cover.jpg\")\n"
+        "play sound (\"boop.wav\", false, true)\n"
+        "stop sound\n"
+        "msg (\"after\")"), "<img src=\"cover.jpg\" />\nafter");
+    CHECK(w.errors.empty());
+    CHECK(w.warnings.size() >= 3);
+    size_t warned = w.warnings.size();
+    run(in, "picture (\"again.jpg\")");   // warn once per command, not per call
+    CHECK(w.warnings.size() == warned);
+    // wait registers its callback and pends until the host's finish_wait (the
+    // keypress); statements after it in the block run first (fire-and-forget).
+    CHECK_STR(run(in, "wait { msg (\"resumed\") }\nmsg (\"after wait\")"),
+              "after wait");
+    CHECK(in.pending_wait());
+    in.clear_output();
+    in.finish_wait();
+    CHECK_STR(in.output(), "resumed\n");
+    CHECK(!in.pending_wait());
+    CHECK(w.errors.empty());
+
+    // #2177 / #2182: `on ready` inside a wait callback body runs immediately
+    // (after SignalCallbackResolving), while a trailing `on ready` registered
+    // while the wait was still dormant waits until the whole body finishes.
+    CHECK_STR(run(in,
+        "wait {\n"
+        "  msg (\"a\")\n"
+        "  on ready {\n"
+        "    msg (\"b\")\n"
+        "  }\n"
+        "  msg (\"c\")\n"
+        "}\n"
+        "on ready {\n"
+        "  msg (\"trailing\")\n"
+        "}\n"
+        "msg (\"after\")\n"),
+              "after");
+    CHECK(in.pending_wait());
+    in.clear_output();
+    in.finish_wait();
+    {
+        std::string phase2 = in.output();
+        while (!phase2.empty() && phase2.back() == '\n') phase2.pop_back();
+        CHECK_STR(phase2, "a\nb\nc\ntrailing");
+    }
+    CHECK(!in.pending_wait());
+    CHECK(w.errors.empty());
+
+    // #2179: a deferred `on ready` queued while a wait is dormant (sibling of
+    // the wait, still inside an outer on ready) must see state the wait
+    // callback left behind -- flushed at the turn boundary, not mid-body.
+    // Use an object attribute (not a local): queued callbacks snapshot Context.
+    run(in, "create (\"marker\")");
+    CHECK_STR(run(in,
+        "marker.stale_flag = 0\n"
+        "on ready {\n"
+        "  wait {\n"
+        "    on ready {\n"
+        "      msg (\"inner cascade\")\n"
+        "    }\n"
+        "    marker.stale_flag = 1\n"
+        "    msg (\"callback end\")\n"
+        "  }\n"
+        "  on ready {\n"
+        "    msg (\"stale: flag=\" + marker.stale_flag)\n"
+        "  }\n"
+        "}\n"),
+              "");
+    CHECK(in.pending_wait());
+    in.clear_output();
+    in.finish_wait();
+    {
+        std::string phase2 = in.output();
+        while (!phase2.empty() && phase2.back() == '\n') phase2.pop_back();
+        CHECK_STR(phase2, "inner cascade\ncallback end\nstale: flag=1");
+    }
+    CHECK(!in.pending_wait());
+    CHECK(w.errors.empty());
+
+    // -- Robustness: a statement whose EXPRESSION fails to parse compiles to
+    // a stub that errors only when it RUNS (QuestViva's NCalc expressions
+    // parse lazily at evaluation): reached, it reports and aborts the body;
+    // unreached (EFMB's `MoveObject (coin, )` behind an always-false guard),
+    // it stays silent and the rest of the body still loads.
+    std::string bad = run(in, "x = )bad(\nmsg (\"unreached\")");
+    CHECK(bad.find("Error running script") != std::string::npos);
+    CHECK(bad.find("unreached") == std::string::npos);
+    CHECK(!w.errors.empty());
+    CHECK(w.errors.back().find("Error running script") == 0);
+    w.errors.clear();
+    CHECK_STR(run(in, "if (false) {\n  x = )bad(\n}\nmsg (\"fine\")"), "fine");
+    CHECK(w.errors.empty());
+    w.errors.clear();
+    CHECK_STR(run(in, "msg (\"recovered\")"), "recovered");
+    // Host-level eval THROWS (wrapped at the expression root); the script
+    // boundary is what reports it (QuestViva semantics).
+    bool threw = false;
+    try {
+        evals(in, "1 +");
+    } catch (const std::exception &) {
+        threw = true;
+    }
+    CHECK(threw);
+    w.errors.clear();
+    // A runtime error aborts the innermost script body only; the calling
+    // script's next statement still runs (each run_script is a boundary). The
+    // `error` command throws, like QuestViva's ErrorScript.
+    run(in, "create (\"bomb\")");
+    run(in, "bomb.boom => { error (\"kaboom\") }");
+    std::string r = run(in,
+        "do (bomb, \"boom\")\n"
+        "msg (\"outer continues\")");
+    CHECK(r.find("Error running script: kaboom") != std::string::npos);
+    CHECK(r.find("outer continues") != std::string::npos);
+    CHECK(!w.errors.empty() &&
+          w.errors.back().find("kaboom") != std::string::npos);
+    w.errors.clear();
+}
+
+// Typed lists: entries are full Values (QuestList<object>) -- the spondre
+// blocker. Lists of dictionaries index as match["score"], entries keep their
+// type through list add / ListItem / foreach / the QuestList operators, and
+// removal follows QuestViva semantics (Remove = first occurrence, by
+// reference identity for collections; Exclude filters all).
+static void test_typed_lists() {
+    World w;
+    w.asl_version = 550;
+    Interp in(w);
+
+    // A list of dictionaries, indexed (spondre's match["score"] shape).
+    CHECK_STR(run(in,
+        "matches = NewList()\n"
+        "d = NewDictionary()\n"
+        "dictionary add (d, \"score\", 5)\n"
+        "dictionary add (d, \"name\", \"first\")\n"
+        "list add (matches, d)\n"
+        "msg (ListItem(matches, 0)[\"score\"])\n"
+        "msg (matches[0][\"name\"])"), "5\nfirst");
+
+    // The list holds the dictionary by reference: mutating it through the
+    // ListItem alias is visible through the original variable. Add a NEW key
+    // through the alias -- `dictionary add` with an EXISTING key THROWS in
+    // QuestViva (OrderedDictionary.Insert -> Dictionary.Add; see the duplicate
+    // `touch` verb error in The Zen Garden's golden), it does not replace.
+    CHECK_STR(run(in,
+        "l = NewList()\n"
+        "d = NewDictionary()\n"
+        "dictionary add (d, \"score\", 1)\n"
+        "list add (l, d)\n"
+        "e = ListItem(l, 0)\n"
+        "dictionary add (e, \"bonus\", 99)\n"
+        "msg (d[\"bonus\"])"), "99");
+
+    // `dictionary add` with a key already present throws, exactly like
+    // QuestViva's QuestDictionary.Add (Dictionary.Add on a dup key).
+    {
+        World dw;
+        Interp di(dw);
+        run(di,
+            "d = NewDictionary()\n"
+            "dictionary add (d, \"k\", 1)\n"
+            "dictionary add (d, \"k\", 2)");
+        CHECK(!dw.errors.empty());
+    }
+
+    // foreach binds the typed entry (a dictionary, not its string form).
+    CHECK_STR(run(in,
+        "l = NewList()\n"
+        "d1 = NewDictionary()\n"
+        "dictionary add (d1, \"n\", 1)\n"
+        "d2 = NewDictionary()\n"
+        "dictionary add (d2, \"n\", 2)\n"
+        "list add (l, d1)\n"
+        "list add (l, d2)\n"
+        "total = 0\n"
+        "foreach (m, l) {\n"
+        "  total = total + m[\"n\"]\n"
+        "}\n"
+        "msg (total)"), "3");
+
+    // Numeric entries stay numeric through add/index/arithmetic.
+    CHECK_STR(run(in,
+        "l = NewList()\n"
+        "list add (l, 42)\n"
+        "list add (l, \"x\")\n"
+        "msg (l[0] + 1)\n"
+        "msg (TypeOf(l[0]))\n"
+        "msg (TypeOf(l[1]))"), "43\nint\nstring");
+
+    // list remove takes the FIRST occurrence only (QuestList.Remove ->
+    // List<T>.Remove); ListExclude filters ALL occurrences into a new list,
+    // and also accepts a list of elements to exclude.
+    CHECK_STR(run(in,
+        "l = NewStringList()\n"
+        "list add (l, \"a\")\n"
+        "list add (l, \"b\")\n"
+        "list add (l, \"a\")\n"
+        "list remove (l, \"a\")\n"
+        "msg (Join(l, \",\"))\n"
+        "msg (Join(ListExclude(l, \"a\"), \",\"))"), "b,a\nb");
+
+    // Removing a collection entry matches by reference identity, not text.
+    CHECK_STR(run(in,
+        "l = NewList()\n"
+        "d1 = NewDictionary()\n"
+        "d2 = NewDictionary()\n"
+        "dictionary add (d1, \"k\", \"one\")\n"
+        "dictionary add (d2, \"k\", \"two\")\n"
+        "list add (l, d1)\n"
+        "list add (l, d2)\n"
+        "list remove (l, d1)\n"
+        "msg (ListCount(l))\n"
+        "msg (l[0][\"k\"])"), "1\ntwo");
+
+    // The QuestList + operator appends the boxed value itself.
+    CHECK_STR(run(in,
+        "d = NewDictionary()\n"
+        "dictionary add (d, \"k\", \"boxed\")\n"
+        "l = NewList() + d\n"
+        "msg (l[0][\"k\"])"), "boxed");
+
+    // `in` compares typed entries.
+    CHECK_STR(run(in,
+        "l = NewList()\n"
+        "list add (l, 5)\n"
+        "msg (5 in l)\n"
+        "msg (6 in l)"), "True\nFalse");
+
+    CHECK(w.errors.empty());
+}
+
+// The parser primitives: named-group matching, match strength, and Populate,
+// mirroring QuestViva Utility.IsRegexMatch/GetMatchStrength/Populate on the
+// simplepattern-derived regexes CoreParser feeds them.
+static void test_regex_primitives() {
+    World w; w.asl_version = 550;
+    Interp in(w);
+
+    // IsRegexMatch: named group + case-insensitive, like a "look at #object1#"
+    // command pattern. Non-matching input returns False, not an error.
+    CHECK_STR(evals(in, "IsRegexMatch(\"^look at (?<object1>.*)$\", \"look at thing\")"),
+              "True");
+    CHECK_STR(evals(in, "IsRegexMatch(\"^TAKE (?<object1>.*)$\", \"take sword\")"),
+              "True");
+    CHECK_STR(evals(in, "IsRegexMatch(\"^look at (?<object1>.*)$\", \"take thing\")"),
+              "False");
+
+    // GetMatchStrength = input length minus the length matched by named groups.
+    // "look at thing" is 13 chars, object1 captures "thing" (5) -> 8.
+    CHECK_STR(evals(in, "GetMatchStrength(\"^look at (?<object1>.*)$\", \"look at thing\")"),
+              "8");
+    // A more specific command (less captured by the group) scores higher.
+    CHECK_STR(evals(in, "GetMatchStrength(\"^(?<object1>.*)$\", \"look at thing\")"),
+              "0");
+
+    // Populate returns a string dictionary of group name -> captured text.
+    CHECK_STR(evals(in,
+              "StringDictionaryItem(Populate(\"^put (?<object1>.*) in (?<object2>.*)$\","
+              " \"put hat in box\"), \"object1\")"), "hat");
+    CHECK_STR(evals(in,
+              "StringDictionaryItem(Populate(\"^put (?<object1>.*) in (?<object2>.*)$\","
+              " \"put hat in box\"), \"object2\")"), "box");
+    CHECK_STR(evals(in,
+              "DictionaryCount(Populate(\"^put (?<object1>.*) in (?<object2>.*)$\","
+              " \"put hat in box\"))"), "2");
+
+    // Multi-alternative verb regex (from ConvertVerbSimplePattern shape).
+    CHECK_STR(evals(in,
+              "IsRegexMatch(\"^take (?<object>.*)$|^get (?<object>.*)$\", \"get lamp\")"),
+              "True");
+    CHECK_STR(evals(in,
+              "StringDictionaryItem(Populate(\"^take (?<object>.*)$|^get (?<object>.*)$\","
+              " \"get lamp\"), \"object\")"), "lamp");
+
+    // Character-class group, no backslash escapes needed in the source string.
+    CHECK_STR(evals(in,
+              "StringDictionaryItem(Populate(\"^(?<num>[0-9]+)(?<rest>.*)$\","
+              " \"42abc\"), \"num\")"), "42");
+
+    // The literal-prefix prefilter in front of the regex (derive_prefixes) must
+    // only ever turn away an input the regex would have rejected anyway.
+    CHECK_STR(evals(in, "IsRegexMatch(\"^looks? at (?<object>.*)$\", \"look at it\")"), "True");
+    CHECK_STR(evals(in, "IsRegexMatch(\"^looks? at (?<object>.*)$\", \"looks at it\")"), "True");
+    CHECK_STR(evals(in, "IsRegexMatch(\"^looks? at (?<object>.*)$\", \"loo at it\")"), "False");
+    CHECK_STR(evals(in, "IsRegexMatch(\"^(go )?north$\", \"north\")"), "True");
+    CHECK_STR(evals(in, "IsRegexMatch(\"^(go )?north$\", \"go north\")"), "True");
+    CHECK_STR(evals(in, "IsRegexMatch(\"^(look at|x|examine) (?<object>.*)$\", \"X lamp\")"), "True");
+    CHECK_STR(evals(in, "IsRegexMatch(\"^(look at|x|examine) (?<object>.*)$\", \"examine lamp\")"), "True");
+    CHECK_STR(evals(in, "IsRegexMatch(\"^(look at|x|examine) (?<object>.*)$\", \"xlamp\")"), "False");
+    CHECK_STR(evals(in, "IsRegexMatch(\"^(look at|x|examine) (?<object>.*)$\", \"take lamp\")"), "False");
+    CHECK_STR(evals(in, "IsRegexMatch(\"^(?:take|get) (?<object>.*)$\", \"Get lamp\")"), "True");
+    CHECK_STR(evals(in, "IsRegexMatch(\"^(take|get)+ (?<object>.*)$\", \"takeget lamp\")"), "True");
+    CHECK_STR(evals(in, "IsRegexMatch(\"^(tak*|get) (?<object>.*)$\", \"ta lamp\")"), "True");
+    CHECK_STR(evals(in, "IsRegexMatch(\"^(ta[kc]e|get) (?<object>.*)$\", \"tace lamp\")"), "True");
+    CHECK_STR(evals(in, "IsRegexMatch(\"^(?!drop)(?<verb>.*) lamp$\", \"take lamp\")"), "True");
+    CHECK_STR(evals(in, "IsRegexMatch(\"^(?!drop)(?<verb>.*) lamp$\", \"drop lamp\")"), "False");
+    CHECK_STR(evals(in, "IsRegexMatch(\"^north$|^n$|^go north$\", \"N\")"), "True");
+    CHECK_STR(evals(in, "IsRegexMatch(\"^north$|^n$|^go north$\", \"go north\")"), "True");
+    CHECK_STR(evals(in, "IsRegexMatch(\"^north$|^n$|^go north$\", \"go south\")"), "False");
+    CHECK_STR(evals(in, "IsRegexMatch(\"^north$|n$\", \"turn\")"), "True");
+    CHECK_STR(evals(in, "IsRegexMatch(\"north\", \"go north\")"), "True");
+    CHECK_STR(evals(in, "IsRegexMatch(\"^[Tt]ake (?<object>.*)$\", \"take it\")"), "True");
+    CHECK_STR(evals(in, "IsRegexMatch(\"^ab{2}c$\", \"abbc\")"), "True");
+    CHECK_STR(evals(in, "IsRegexMatch(\"^a|b\", \"xb\")"), "True");
+    CHECK_STR(evals(in, "IsRegexMatch(\"^take (?<object>.*)$\", \"TAKE\")"), "False");
+    CHECK_STR(evals(in, "IsRegexMatch(\"^take(?<object>.*)$\", \"TAKE\")"), "True");
+    CHECK_STR(evals(in, "IsRegexMatch(\"^(a|)x$\", \"x\")"), "True");
+    CHECK_STR(evals(in, "IsRegexMatch(\"^((go|walk) to|enter) (?<object>.*)$\", \"walk to bar\")"), "True");
+    CHECK_STR(evals(in, "IsRegexMatch(\"^((go|walk) to|enter) (?<object>.*)$\", \"enter bar\")"), "True");
+    CHECK_STR(evals(in, "IsRegexMatch(\"^((go|walk) to|enter) (?<object>.*)$\", \"run to bar\")"), "False");
+
+    // Cache path: same cacheID reuses the compiled regex (3-arg form).
+    CHECK_STR(evals(in,
+              "IsRegexMatch(\"^go (?<object1>.*)$\", \"go north\", \"go\")"), "True");
+    CHECK_STR(evals(in,
+              "GetMatchStrength(\"^go (?<object1>.*)$\", \"go north\", \"go\")"), "3");
+}
+
+static void test_rng_determinism() {
+    World w; w.asl_version = 550;
+    Interp a(w), b(w);
+    Context c1, c2;
+    std::string s1, s2;
+    for (int i = 0; i < 5; ++i) {
+        s1 += Interp::to_string(a.eval("GetRandomInt(1, 100)", c1)) + ",";
+        s2 += Interp::to_string(b.eval("GetRandomInt(1, 100)", c2)) + ",";
+    }
+    CHECK_STR(s1, s2);            // deterministic across instances (seed 1234)
+    CHECK(s1.find_first_not_of("0123456789,") == std::string::npos);
+}
+
+// The Spatterlight autosave carries every RNG stream: the eval() cache's and
+// the ones embedded in compiled script bodies (which the statement parser
+// compiles OUTSIDE that cache, so a roll in `msg (...)` is its own stream).
+// A fresh Interp given the capture must continue both sequences exactly where
+// the source Interp left them, not restart from the seed.
+static void test_rng_streams_survive_capture() {
+    World w; w.asl_version = 550;
+    const std::string script = "msg (\"r\" + GetRandomInt(1, 1000000))";
+    auto drive = [&](Interp &in, int n, std::string &script_out, std::string &eval_out) {
+        in.print = [&](const std::string &s) { script_out += s + ","; };
+        for (int i = 0; i < n; ++i) {
+            Context c;
+            in.run_script(script, c);
+            eval_out += Interp::to_string(in.eval("GetRandomInt(1, 1000000)", c)) + ",";
+        }
+    };
+    // Reference: one Interp, six draws of each kind.
+    Interp ref(w);
+    std::string ref_s, ref_e;
+    drive(ref, 6, ref_s, ref_e);
+
+    // Three draws, capture, three more in a NEW Interp seeded from the capture.
+    Interp a(w);
+    std::string a_s, a_e;
+    drive(a, 3, a_s, a_e);
+    std::vector<std::pair<std::string, std::array<uint32_t, 4>>> streams;
+    a.capture_rng_streams(streams);
+    CHECK(streams.size() >= 3);   // fallback + eval'd root + script-body root
+    bool saw_script_root = false;
+    for (const auto &e : streams)
+        if (!e.first.empty() && e.first[0] == '\x01') saw_script_root = true;
+    CHECK(saw_script_root);
+
+    Interp b(w);
+    b.restore_rng_streams(streams);
+    std::string b_s, b_e;
+    drive(b, 3, b_s, b_e);
+    CHECK_STR(a_s + b_s, ref_s);
+    CHECK_STR(a_e + b_e, ref_e);
+
+    // Without the restore the second half restarts from the seed (the bug the
+    // capture exists to prevent) -- guards against a trivially passing check.
+    Interp c(w);
+    std::string c_s, c_e;
+    drive(c, 3, c_s, c_e);
+    CHECK(c_s == a_s);
+    CHECK(c_s != b_s);
+}
+
+// The Spatterlight autosave's undo history (capture_undo_history): a session
+// saved, restored onto a freshly loaded world and handed its history back must
+// undo exactly as the session it was taken from -- same message, same world --
+// all the way down the stack.
+static void test_undo_history_survives_capture() {
+    const char *game = "../fixtures/command.aslx";
+    const char *core = "../../../quest5/aslx-core";
+    auto boot = [](World &w, Interp &in, bool fresh) {
+        Context c;
+        if (w.find("InitInterface")) in.call_function("InitInterface", {}, &c);
+        if (fresh && w.find("StartGame")) in.call_function("StartGame", {}, &c);
+        if (in.has_pending_on_ready()) in.drain_on_ready();
+    };
+
+    World w;
+    CHECK(load_file(game, w, core));
+    Interp in(w);
+    std::string out;
+    in.print = [&](const std::string &s) { out += s + "\n"; };
+    boot(w, in, true);
+
+    // Outside any transaction: the list and dictionary the turns below change.
+    Context c;
+    in.run_script("game.tags = NewStringList()\n"
+                  "list add (game.tags, \"old\")\n"
+                  "game.notes = NewStringDictionary()", c);
+    // Parser turns (Core opens a transaction for each), then turns that reach
+    // every kind of action: a list still in the world and one that is not, a
+    // dictionary, an element created and destroyed, a firsttime.
+    const char *ft = "start transaction (\"ft\")\nfirsttime { msg (\"FT\") }";
+    in.send_command("take apple");
+    in.send_command("north");
+    in.run_script("start transaction (\"lists\")\n"
+                  "list add (game.tags, \"new\")\n"
+                  "game.scratch = NewStringList()\n"
+                  "list add (game.scratch, \"gone\")\n"
+                  "game.scratch = null\n"
+                  "dictionary add (game.notes, \"day\", \"one\")\n"
+                  "create (\"kite\")\n"
+                  "kite.parent = player\n"
+                  "kite.colour = \"red\"", c);
+    in.run_script("start transaction (\"break kite\")\n"
+                  "kite.colour = \"blue\"\n"
+                  "destroy (\"kite\")\n"
+                  "list remove (game.tags, \"old\")", c);
+    in.run_script(ft, c);
+    in.send_command("south");
+    CHECK(w.errors.empty());
+    CHECK(in.undo_available());
+
+    const std::string save = in.save_game("command.aslx");
+    const std::string history = in.capture_undo_history();
+    // Capturing changes nothing.
+    CHECK_STR(in.save_game("command.aslx"), save);
+    CHECK_STR(in.capture_undo_history(), history);
+
+    World w2;
+    CHECK(load_file(game, w2, core));
+    Interp in2(w2);
+    std::string out2;
+    in2.print = [&](const std::string &s) { out2 += s + "\n"; };
+    std::string err;
+    CHECK(in2.restore_game(save, err));
+    CHECK(!in2.undo_available());
+    CHECK(in2.restore_undo_history(history));
+    // The saved-game boot runs with logging off, so nothing it does is added.
+    boot(w2, in2, false);
+    in2.resume_undo_logging();
+    CHECK(in2.undo_available());
+    CHECK_STR(in2.capture_undo_history(), history);
+    CHECK_STR(in2.save_game("command.aslx"), save);
+
+    // Undo both sessions to the bottom of the stack, comparing as they go.
+    int undone = 0;
+    for (; undone < 20 && in.undo_available(); ++undone) {
+        out.clear();
+        out2.clear();
+        CHECK(in2.undo_available());
+        in.send_command("undo");
+        in2.send_command("undo");
+        CHECK(!out.empty());
+        CHECK_STR(out2, out);
+        CHECK_STR(in2.save_game("command.aslx"), in.save_game("command.aslx"));
+        if (out.find("Undo: ft") != std::string::npos) {
+            // "ft" undone: the flag inside the restored world's compiled
+            // script was cleared, so the block fires again there too.
+            out2.clear();
+            Context c2;
+            in2.run_script("firsttime { msg (\"FT\") }", c2);
+            in.run_script("firsttime { msg (\"FT\") }", c);
+        }
+        if (out.find("Undo: break kite") != std::string::npos) {
+            // "break kite" undone: the destroyed element is back, as it was
+            // before that turn.
+            CHECK(w2.find("kite") != nullptr);
+            Context c2;
+            CHECK_STR(Interp::to_string(in2.eval("kite.colour", c2)), "red");
+            CHECK_STR(Interp::to_string(in2.eval("ListCount(game.tags)", c2)), "2");
+        }
+    }
+    CHECK(undone >= 5);
+    CHECK(!in2.undo_available());
+    CHECK(w2.find("kite") == nullptr);
+    Context c2;
+    CHECK_STR(Interp::to_string(in2.eval("ListCount(game.tags)", c2)), "1");
+    CHECK_STR(Interp::to_string(in2.eval("DictionaryCount(game.notes)", c2)), "0");
+    CHECK(w2.errors.empty());
+
+    // Malformed history: refused whole, at every length, leaving none.
+    for (size_t cut = 0; cut < history.size(); cut += 7) {
+        World w3;
+        CHECK(load_file(game, w3, core));
+        Interp in3(w3);
+        CHECK(in3.restore_game(save, err));
+        bool accepted = in3.restore_undo_history(history.substr(0, cut));
+        CHECK(!accepted);
+        in3.resume_undo_logging();
+        CHECK(!in3.undo_available());
+        if (accepted || cut > 2000) break;   // one world load per probe
+    }
+}
+
+// End-to-end boot: load a game plus the full Core library, run InitInterface +
+// StartGame, and confirm the whole pipeline (default types, parent field, the
+// text processor via msg->OutputText, ~all the primitives) runs with zero
+// errors and produces processed output. This is the milestone-3 boot proof.
+static void test_coreboot_runs() {
+    World w;
+    // core_dir relative to test/ (where the harness runs).
+    bool ok = load_file("../fixtures/coreboot.aslx", w, "../../../quest5/aslx-core");
+    CHECK(ok);
+    CHECK(w.errors.empty());
+    if (!w.errors.empty())
+        for (auto &e : w.errors) std::cerr << "  boot-load err: " << e << "\n";
+
+    Interp in(w);
+    std::string out;
+    in.print = [&](const std::string &s) { out += s; };
+
+    Context c1, c2;
+    if (w.find("InitInterface")) in.call_function("InitInterface", {}, &c1);
+    if (w.find("StartGame")) in.call_function("StartGame", {}, &c2);
+    if (in.has_pending_on_ready()) in.drain_on_ready();
+
+    // The whole boot ran without a single script error.
+    if (!w.errors.empty())
+        for (auto &e : w.errors) std::cerr << "  boot-run err: " << e << "\n";
+    CHECK(w.errors.empty());
+
+    // The title rendered (StartGame -> PrintCentered -> msg -> OutputText), and
+    // the {...} text processor expanded (no raw "{=" survives; WriteVerb ran
+    // with the editor_player "you" gender, so "You are" appears).
+    CHECK(out.find("Core Boot Test") != std::string::npos);
+    CHECK(out.find("You are") != std::string::npos);
+    CHECK(out.find("{=") == std::string::npos);
+
+    // The parent field is exposed and drives containment.
+    CHECK_STR(Interp::to_string(in.eval("player.parent", c1)), "lounge");
+    CHECK_STR(Interp::to_string(in.eval("Contains(lounge, chest)", c1)), "True");
+    // The game object inherits defaultgame (implicit default type).
+    CHECK_STR(Interp::to_string(in.eval("DoesInherit(game, \"defaultgame\")", c1)),
+              "True");
+}
+
+// End-to-end command driving: load a game plus full Core, boot it, then feed
+// real player commands through Core's HandleCommand -> ScopeCommands ->
+// ResolveName -> verb-script chain. Exercises command-template patterns
+// ([look]), verbtemplate patterns (template="lookat"), object resolution,
+// object-typed command params (do/invoke), the QuestList +/- operators, and
+// exit movement -- the milestone-3 "drive a real command" proof. Every command
+// must run with zero script errors and produce the expected Core output.
+static void test_command_driving() {
+    World w;
+    bool ok = load_file("../fixtures/command.aslx", w, "../../../quest5/aslx-core");
+    CHECK(ok);
+    CHECK(w.errors.empty());
+
+    Interp in(w);
+    std::string out;
+    in.print = [&](const std::string &s) { out += s; };
+
+    Context boot;
+    if (w.find("InitInterface")) in.call_function("InitInterface", {}, &boot);
+    if (w.find("StartGame")) in.call_function("StartGame", {}, &boot);
+    if (in.has_pending_on_ready()) in.drain_on_ready();
+    w.errors.clear();
+
+    auto run = [&](const char *cmd) -> std::string {
+        out.clear();
+        Context cc;
+        Value cv; cv.type = Value::Type::String; cv.str = cmd;
+        Value mv; mv.type = Value::Type::Null;
+        in.call_function("HandleCommand", {cv, mv}, &cc);
+        if (in.has_pending_on_ready()) in.drain_on_ready();
+        if (!w.errors.empty()) {
+            for (auto &e : w.errors)
+                std::cerr << "  cmd '" << cmd << "' err: " << e << "\n";
+        }
+        CHECK(w.errors.empty());
+        w.errors.clear();
+        return out;
+    };
+
+    // look: room description lists both objects and renders the exit as "north"
+    // ([look] command template + FormatList + {exit:} text processor).
+    std::string look = run("look");
+    CHECK(look.find("apple") != std::string::npos);
+    CHECK(look.find("chest") != std::string::npos);
+    CHECK(look.find("north") != std::string::npos);
+    CHECK(look.find("{exit") == std::string::npos);  // exit processor ran
+
+    // take: allow_all/notheld scope, QuestList `- game.pov`, object move.
+    // Second person ("You pick it up.") -- editor_player's "you" gender flows
+    // through WriteVerb now that changedparent/OnEnterRoom fire properly.
+    CHECK(run("take apple").find("You pick it up") != std::string::npos);
+    CHECK(run("inventory").find("apple") != std::string::npos);
+
+    // examine (verbtemplate) resolves the object and runs the lookat script.
+    CHECK(run("examine chest").find("Nothing out of the ordinary") !=
+          std::string::npos);
+    // open (verbtemplate) passes the object to TryOpenClose via do(...,params).
+    CHECK(run("open chest").find("You open it") != std::string::npos);
+
+    // go through the exit, then confirm we are in the new room.
+    run("north");
+    std::string look2 = run("look");
+    CHECK(look2.find("garden") != std::string::npos);
+    CHECK(look2.find("rose") != std::string::npos);
+    CHECK_STR(Interp::to_string(in.eval("player.parent", boot)), "garden");
+}
+
+// The §3 input model, end to end through send_command: `get input` command
+// override, engine `show menu` (+ `on ready` deferral until the response),
+// `ask`, real pending `wait`, and Core's own ASLX disambiguation menu
+// (game.menucallback -> HandleMenuTextResponse), which needs no engine prompt
+// at all -- the numbered answer arrives as the next command.
+static void test_input_model() {
+    World w;
+    bool ok = load_file("../fixtures/command.aslx", w, "../../../quest5/aslx-core");
+    CHECK(ok);
+    CHECK(w.errors.empty());
+
+    Interp in(w);
+    std::string out;
+    in.print = [&](const std::string &s) { out += s; };
+
+    Context boot;
+    if (w.find("InitInterface")) in.call_function("InitInterface", {}, &boot);
+    if (w.find("StartGame")) in.call_function("StartGame", {}, &boot);
+    in.drain_on_ready();
+    w.errors.clear();
+
+    auto run = [&](const char *cmd) -> std::string {
+        out.clear();
+        in.send_command(cmd);
+        if (!w.errors.empty()) {
+            for (auto &e : w.errors)
+                std::cerr << "  cmd '" << cmd << "' err: " << e << "\n";
+        }
+        CHECK(w.errors.empty());
+        w.errors.clear();
+        return out;
+    };
+
+    // get input: the next command line goes to the callback, not the parser.
+    run("type");
+    CHECK(in.command_override());
+    std::string t = run("hello world");
+    CHECK(t.find("You typed hello world") != std::string::npos);
+    CHECK(!in.command_override());
+
+    // show menu: caption printed, options exposed to the host, `on ready`
+    // deferred while the menu pends and flushed by the response, which is
+    // echoed as " - <display text>".
+    t = run("pick");
+    CHECK(t.find("Pick a colour") != std::string::npos);
+    CHECK(t.find("menu settled") == std::string::npos);
+    const MenuData *m = in.pending_menu();
+    CHECK(m != nullptr);
+    if (m) {
+        CHECK(m->options.size() == 3);
+        CHECK_STR(m->options[1].first, "green");
+        CHECK(!m->allow_cancel);
+    }
+    out.clear();
+    std::string key = "green";
+    in.set_menu_response(&key);
+    CHECK(out.find(" - green") != std::string::npos);
+    CHECK(out.find("You picked green") != std::string::npos);
+    CHECK(out.find("menu settled") != std::string::npos);
+    CHECK(in.pending_menu() == nullptr);
+    CHECK(w.errors.empty());
+
+    // ask: caption handed to the host (not printed), boolean result.
+    run("query");
+    CHECK(in.pending_question() != nullptr &&
+          *in.pending_question() == "Are you sure?");
+    out.clear();
+    in.set_question_response(true);
+    CHECK(out.find("Confirmed") != std::string::npos);
+    CHECK(in.pending_question() == nullptr);
+
+    // wait: pends until the host keypress.
+    run("nap");
+    CHECK(in.pending_wait());
+    out.clear();
+    in.finish_wait();
+    CHECK(out.find("You wake up.") != std::string::npos);
+    CHECK(!in.pending_wait());
+    CHECK(w.errors.empty());
+
+    // Core disambiguation: two objects alias "hat"; Core's ShowMenu (pure
+    // ASLX) prints a numbered menu and stores game.menucallback; the numbered
+    // answer is an ordinary command that HandleCommand routes to
+    // HandleMenuTextResponse.
+    t = run("take hat");
+    CHECK(t.find("1") != std::string::npos);
+    CHECK(t.find("2") != std::string::npos);
+    CHECK(in.pending_menu() == nullptr);  // engine prompt NOT involved
+    t = run("1");
+    CHECK(t.find("pick") != std::string::npos);  // "You pick it up."
+    CHECK_STR(Interp::to_string(in.eval("tophat.parent", boot)), "player");
+}
+
+// UpdateListsAsync port: the pane lists (only with an update_list
+// subscriber), the JS.updateStatus route, and the SendEventCore bridge.
+static void test_update_lists() {
+    World w;
+    bool ok = load_file("../fixtures/command.aslx", w, "../../../quest5/aslx-core");
+    CHECK(ok);
+
+    Interp in(w);
+    std::string out;
+    in.print = [&](const std::string &s) { out += s; };
+
+    std::map<std::string, std::vector<ListData>> lists;
+    in.update_list = [&](const char *type, const std::vector<ListData> &items) {
+        lists[type] = items;
+    };
+    std::string status;
+    in.update_status = [&](const std::string &html) { status = html; };
+
+    Context boot;
+    if (w.find("InitInterface")) in.call_function("InitInterface", {}, &boot);
+    if (w.find("StartGame")) in.call_function("StartGame", {}, &boot);
+    in.drain_on_ready();
+    w.errors.clear();
+
+    auto has = [&](const char *list, const char *name) {
+        for (const ListData &d : lists[list])
+            if (d.element_name == name)
+                return true;
+        return false;
+    };
+
+    // A command turn refreshes every list (HandleCommandAsyncInternal ->
+    // UpdateListsAsync).
+    in.send_command("take apple");
+    CHECK(has("inventory", "apple"));
+    CHECK(!has("placesobjects", "apple"));      // held, no longer in the room
+    CHECK(has("placesobjects", "chest"));
+    CHECK(!has("placesobjects", "player"));     // GetPlacesObjectsList excludes pov
+    // The exits are appended to "Places and Objects" (the UI filters the
+    // compass directions out) and also form their own list.
+    CHECK(lists["exits"].size() == 1);
+    CHECK_STR(lists["exits"][0].display_alias, "north");
+    CHECK(has("placesobjects", lists["exits"][0].element_name.c_str()));
+    // v580 Core supplies GetDisplayVerbs ("Look at"/"Drop"/...).
+    CHECK(!lists["inventory"][0].verbs.empty());
+
+    // "hidefrominventory" drops a carried object from the pane only
+    // (GetInventoryObjectsList, QuestViva #2516): the verb menus and the
+    // parser still see it as held.
+    Context hide;
+    in.run_script("apple.hidefrominventory = true", hide);
+    in.send_command("look");
+    CHECK(!has("inventory", "apple"));
+    bool menu_has_apple = false;
+    for (const ListData &d : in.verb_menu_objects())
+        if (d.element_name == "apple") menu_has_apple = true;
+    CHECK(menu_has_apple);
+    in.send_command("drop apple");
+    CHECK_STR(Interp::to_string(in.eval("apple.parent", boot)), "lounge");
+    w.errors.clear();
+
+    // Status attributes: Core's UpdateStatusAttributes runs every turn and
+    // lands in JS.updateStatus.
+    Context ctx;
+    in.run_script("game.statusattributes = NewStringDictionary()\n"
+                  "dictionary add (game.statusattributes, \"score\", \"\")\n"
+                  "game.score = 7", ctx);
+    in.send_command("look");
+    CHECK_STR(status, "Score: 7");
+    CHECK(w.errors.empty());
+
+    // SendEventCore: a missing handler reports like the reference.
+    out.clear();
+    in.send_event("NoSuchHandler", "param");
+    CHECK(out.find("Error - no handler for event 'NoSuchHandler'") !=
+          std::string::npos);
+}
+
+// An element cannot be made its own parent (Fields.Set), except in the one
+// game whose solution depends on it.
+static void test_self_parent_guard() {
+    for (bool exempt : {false, true}) {
+        World w;
+        w.asl_version = 520;
+        Element *game = w.create_object("game", "", "game");
+        if (exempt) {
+            Value id; id.type = Value::Type::String;
+            id.str = "3b93afe0-6756-4eba-8889-09539f798752";
+            game->set_field("gameid", id);
+        }
+        w.create_object("room");
+        Element *box = w.create_object("box");
+        Value v; v.type = Value::Type::ObjectRef; v.str = "room";
+        box->set_field("parent", v);
+        Interp in(w);
+        std::string out;
+        in.print = [&](const std::string &s) { out += s; };
+        in.script_error = [&](const std::string &s) { out += s; };
+        Context ctx;
+        in.run_script("box.parent = box", ctx);
+        const Value *p = box->field("parent");
+        CHECK(p && p->str == (exempt ? "box" : "room"));
+        CHECK((out.find("Parent of element 'box' cannot be set to itself") !=
+               std::string::npos) == !exempt);
+    }
+}
+
+// The 2026-07-16 golden-parity batch: timers, turn suspension, clone-on-set,
+// v530 null-removal, per-expression RNG, create exit, Clone, expression
+// ShowMenu. Each mirrors a QuestViva behaviour verified against a golden.
+static void test_parity_batch() {
+    World w;
+    w.asl_version = 550;
+    w.create_object("game", "", "game");
+    Element *room = w.create_object("room");
+    Element *player = w.create_object("player");
+    player->set_field("parent", [&] {
+        Value v; v.type = Value::Type::ObjectRef; v.str = "room"; return v;
+    }());
+    (void)room;
+    Interp in(w);
+
+    // -- timers: TimerRunner. An enabled timer arms to its interval at
+    // begin_timers, fires when tick() reaches the trigger (with `this`
+    // bound), and re-arms; next_timer_seconds reports the delta.
+    run(in, "create timer (\"t1\")");
+    run(in, "set (GetTimer(\"t1\"), \"interval\", 5)");
+    run(in, "set (GetTimer(\"t1\"), \"enabled\", true)");
+    run(in, "set (GetTimer(\"t1\"), \"script\", null)");
+    Context c0;
+    in.run_script("t1.script => { msg (\"tick \" + this.name) }", c0);
+    in.begin_timers();
+    CHECK(in.next_timer_seconds() == 5);
+    in.clear_output();
+    in.tick(4);
+    CHECK_STR(in.output(), "");
+    CHECK(in.next_timer_seconds() == 1);
+    in.tick(1);
+    std::string t = in.output();
+    CHECK(t.find("tick t1") != std::string::npos);
+    CHECK(in.next_timer_seconds() == 5);  // re-armed
+    run(in, "set (GetTimer(\"t1\"), \"enabled\", false)");
+    CHECK(in.next_timer_seconds() == 0);  // no enabled timer
+
+    // -- synchronous `play sound` abandons the rest of the turn, silently:
+    // TurnSuspended passes through the script boundary to the host/turn
+    // boundary (send_command and friends catch it; a raw run_script caller
+    // sees it, like QuestViva's suspended await chain).
+    in.clear_output();
+    bool suspended = false;
+    try {
+        Context sc;
+        in.run_script("msg (\"before\")\n"
+                      "play sound (\"x.mp3\", true, false)\n"
+                      "msg (\"after\")", sc);
+    } catch (const TurnSuspended &) {
+        suspended = true;
+    }
+    CHECK(suspended);
+    std::string sus = in.output();
+    CHECK(sus.find("before") != std::string::npos);
+    CHECK(sus.find("after") == std::string::npos);
+    CHECK(sus.find("Error") == std::string::npos);
+
+    // -- ...but with a play_sound host hook, a synchronous play runs through
+    // the hook (which blocks until the sound ends) and the turn CONTINUES --
+    // QuestViva's awaited wait slot, resolved by a UI that can finish a
+    // sound. Args arrive evaluated in PlaySoundScript order.
+    struct SoundCall { std::string file; bool sync, loop; };
+    std::vector<SoundCall> sounds;
+    int stops = 0;
+    in.play_sound = [&](const std::string &f, bool s, bool l) {
+        sounds.push_back({f, s, l});
+    };
+    in.stop_sound = [&] { stops++; };
+    size_t warned_before = w.warnings.size();
+    in.clear_output();
+    {
+        Context sc;
+        in.run_script("play sound (\"bg\" + \".mp3\", false, true)\n"
+                      "play sound (\"sting.wav\", true, false)\n"
+                      "stop sound\n"
+                      "msg (\"turn continues\")", sc);
+    }
+    CHECK(sounds.size() == 2);
+    CHECK(sounds[0].file == "bg.mp3" && !sounds[0].sync && sounds[0].loop);
+    CHECK(sounds[1].file == "sting.wav" && sounds[1].sync && !sounds[1].loop);
+    CHECK(stops == 1);
+    CHECK(in.output().find("turn continues") != std::string::npos);
+    CHECK(w.warnings.size() == warned_before);   // hooked: no warning
+    // A synchronous play still claims the wait slot: a pending `wait` is
+    // cancelled, its callback never runs (BeginPrompt on _waitTcs).
+    in.clear_output();
+    run(in, "wait { msg (\"wait resumed\") }");
+    CHECK(in.pending_wait());
+    run(in, "play sound (\"claim.mp3\", true, false)");
+    CHECK(!in.pending_wait());
+    CHECK(in.output().find("wait resumed") == std::string::npos);
+    in.play_sound = nullptr;
+    in.stop_sound = nullptr;
+
+    // -- clone-on-set: assigning a list to a field copies the backing, so
+    // later mutations through the source alias don't leak in (Fields.Set).
+    run(in, "src = NewStringList()\n"
+            "list add (src, \"a\")\n"
+            "player.mylist = src\n"
+            "list add (src, \"b\")\n"
+            "msg (ListCount(player.mylist))");
+    CHECK_STR(run(in, "msg (ListCount(player.mylist))"), "1");
+    // ...and localising an inherited list gives the element its own copy.
+    Element *ty = w.create_object("sharedtype", "", "type");
+    {
+        Value lst; lst.type = Value::Type::StringList;
+        lst.list().push_back(vstr("base"));
+        ty->set_field("povalt", lst);
+    }
+    run(in, "create (\"npc1\", \"sharedtype\")\n"
+            "create (\"npc2\", \"sharedtype\")");
+    run(in, "npc1.povalt = npc1.povalt\nlist add (npc1.povalt, \"extra\")");
+    CHECK_STR(run(in, "msg (ListCount(npc1.povalt))"), "2");
+    CHECK_STR(run(in, "msg (ListCount(npc2.povalt))"), "1");
+
+    // -- v530+ null assignment removes the attribute (HasAttribute false).
+    run(in, "player.flagattr = \"x\"");
+    CHECK_STR(evals(in, "HasAttribute(player, \"flagattr\")"), "True");
+    run(in, "player.flagattr = null");
+    CHECK_STR(evals(in, "HasAttribute(player, \"flagattr\")"), "False");
+
+    // -- Arithmetic on a null operand is a reported script error (HandleBinaryResult's
+    // guard; FLEE has no Add for object + object), naming the unset attribute,
+    // and -- a DELIBERATE DEVIATION from QuestViva/desktop, which throw -- the
+    // expression evaluates to null and the script carries on. `+` with a string
+    // operand is concatenation, null -> "". Sburb's pre-login Medium scene is
+    // `Player.chumhandlefirst + Player.chumhandlelast`.
+    CHECK_STR(evals(in, "\"[\" + player.unsetattr + \"]\""), "[]");
+    {
+        const char *guard = "' is null (it has not been set) and cannot be used in this calculation.";
+        const char *exprs[] = {"player.unsetattr + player.unsetattr2",
+                               "1 + player.unsetattr",
+                               "player.unsetattr * 2"};
+        for (const char *ex : exprs) {
+            w.errors.clear();
+            Context ctx;
+            CHECK(in.eval(ex, ctx).type == Value::Type::Null);
+            CHECK(w.errors.size() == 1);
+            CHECK(!w.errors.empty() &&
+                  w.errors[0].find(std::string("Error running script: 'player.unsetattr") ) == 0 &&
+                  w.errors[0].find(guard) != std::string::npos);
+        }
+        w.errors.clear();
+    }
+
+    // -- RNG is per-compiled-expression: two distinct expressions each start
+    // a fresh seed-1234 stream, so their first draws over one domain agree.
+    Context rc;
+    Value r1 = in.eval("GetRandomInt(0, 999983)", rc);
+    Value r2 = in.eval("GetRandomInt(0, 999983) + 0", rc);
+    CHECK(r1.integer == r2.integer);
+
+    // -- create exit: alias/parent/to, generated "exitN" id + anonymous.
+    run(in, "create (\"room2\")");
+    run(in, "create exit (\"north\", room, room2)");
+    CHECK_STR(evals(in, "AllExits()[0].alias"), "north");
+    CHECK_STR(evals(in, "AllExits()[0].parent.name"), "room");
+    CHECK_STR(evals(in, "AllExits()[0].to.name"), "room2");
+    CHECK_STR(evals(in, "AllExits()[0].anonymous"), "True");
+
+    // -- Clone: fresh trailing-digit name, own field backings, deep children.
+    run(in, "create (\"box\")\n"
+            "box.tags = NewStringList()\n"
+            "list add (box.tags, \"tag1\")\n"
+            "create (\"gem\")\n"
+            "gem.parent = box");
+    CHECK_STR(evals(in, "Clone(box).name"), "box1");
+    run(in, "list add (box1.tags, \"tag2\")");
+    CHECK_STR(evals(in, "ListCount(box.tags)"), "1");
+    CHECK_STR(evals(in, "ListCount(box1.tags)"), "2");
+    CHECK_STR(evals(in, "ListCount(GetDirectChildren(box1))"), "1");
+
+    // -- expression ShowMenu: synchronous host provider supplies the key.
+    // 540-580 refuse the expression form, so this runs as a 520 game.
+    w.asl_version = 520;
+    in.menu_provider = [](const MenuData &m, std::string &key) {
+        CHECK(m.options.size() == 2);
+        key = m.options[1].first;
+        return true;
+    };
+    run(in, "opts = NewStringList()\n"
+            "list add (opts, \"first\")\n"
+            "list add (opts, \"second\")\n"
+            "picked = ShowMenu(\"Pick one\", opts, false)\n"
+            "msg (\"picked \" + picked)");
+    CHECK(in.output().find("picked second") != std::string::npos);
+    in.menu_provider = nullptr;
+}
+
+// UndoLogger port: lazy per-command transactions (`start transaction` commits
+// the previous one), `undo` = RollbackTransaction, actions logged only while a
+// transaction is open. See UndoLogger.cs / Fields.cs / QuestList.cs.
+static void test_undo() {
+    World w;
+    w.asl_version = 550;
+    w.create_object("box", "");
+    w.templates.emplace_back("NothingToUndo", "Nothing to undo!");
+    w.dynamic_templates.emplace_back("UndoTurn", "\"Undo: \" + text");
+    Interp in(w);
+
+    // Empty stack: the NothingToUndo template prints (no error).
+    CHECK_STR(run(in, "undo"), "Nothing to undo!");
+    CHECK(w.errors.empty());
+
+    // Changes outside any transaction are not undoable (boot/StartGame).
+    run(in, "box.colour = \"red\"\n"
+            "box.d = NewStringDictionary()\n"
+            "box.tags = NewStringList()\n"
+            "list add (box.tags, \"old\")");
+
+    // Command 1: field write, added attribute, list/dict mutations, create.
+    run(in, "start transaction (\"paint box\")\n"
+            "box.colour = \"blue\"\n"
+            "box.items = NewStringList()\n"
+            "list add (box.items, \"brush\")\n"
+            "list remove (box.tags, \"old\")\n"
+            "dictionary add (box.d, \"k\", \"v\")\n"
+            "create (\"kite\")");
+    CHECK_STR(evals(in, "box.colour"), "blue");
+    CHECK(w.find("kite") != nullptr);
+
+    // Command 2 (its `start transaction` commits command 1's record).
+    run(in, "start transaction (\"break kite\")\n"
+            "box.colour = \"green\"\n"
+            "destroy (\"kite\")");
+    CHECK(w.find("kite") == nullptr);
+
+    // Undo command 2: destroyed element re-registered, field restored.
+    CHECK_STR(run(in, "undo"), "Undo: break kite");
+    CHECK_STR(evals(in, "box.colour"), "blue");
+    CHECK(w.find("kite") != nullptr);
+
+    // Undo command 1: added attr removed, list/dict mutations reversed,
+    // created element unregistered.
+    CHECK_STR(run(in, "undo"), "Undo: paint box");
+    CHECK_STR(evals(in, "box.colour"), "red");
+    CHECK_STR(evals(in, "HasAttribute(box, \"items\")"), "False");
+    CHECK_STR(evals(in, "ListCount(box.tags)"), "1");
+    CHECK_STR(evals(in, "box.tags[0]"), "old");
+    CHECK_STR(evals(in, "DictionaryContains(box.d, \"k\")"), "False");
+    CHECK(w.find("kite") == nullptr);
+
+    // Stack exhausted again.
+    CHECK_STR(run(in, "undo"), "Nothing to undo!");
+
+    // firsttime is undoable (UndoFirstTime): after a rollback the block
+    // fires again. The compiled statement is cached by source text, so the
+    // identical script re-runs through the same flag.
+    const char *ft = "start transaction (\"ft\")\nfirsttime { msg (\"FT\") }";
+    CHECK_STR(run(in, ft), "FT");
+    CHECK_STR(run(in, ft), "");                      // flag set, no output
+    CHECK_STR(run(in, "undo"), "Undo: ft");          // commits + rolls back
+    CHECK_STR(run(in, ft), "FT");                    // flag cleared: fires again
+
+    CHECK(w.errors.empty());
+
+    // An undone move does not put the object back where it was among its
+    // siblings: SetFromUndo is a parent write like any other, so it comes
+    // back as the last child.
+    run(in, "create (\"sack\")\n"
+            "create (\"purse\")\n"
+            "create (\"coin\")\n"
+            "create (\"ring\")\n"
+            "coin.parent = sack\n"
+            "ring.parent = sack");
+    CHECK_STR(evals(in, "GetDirectChildren(sack)[0].name"), "coin");
+    run(in, "start transaction (\"move\")\ncoin.parent = purse");
+    CHECK_STR(evals(in, "GetDirectChildren(sack)[0].name"), "ring");
+    run(in, "undo");
+    CHECK_STR(evals(in, "GetDirectChildren(sack)[0].name"), "ring");
+    CHECK_STR(evals(in, "GetDirectChildren(sack)[1].name"), "coin");
+    CHECK(evals(in, "ListCount(GetDirectChildren(purse))") == "0");
+}
+
+// Save/restore: the v1 snapshot format (aslx-state.cc). A restore reloads
+// the game file fresh and applies the snapshot, mirroring QuestViva's
+// saved-game boot (InitInterface re-runs, StartGame does not).
+static void test_save_restore() {
+    World w;
+    bool ok = load_file("../fixtures/command.aslx", w, "../../../quest5/aslx-core");
+    CHECK(ok);
+
+    Interp in(w);
+    std::string out;
+    in.print = [&](const std::string &s) { out += s; };
+
+    Context boot;
+    if (w.find("InitInterface")) in.call_function("InitInterface", {}, &boot);
+    if (w.find("StartGame")) in.call_function("StartGame", {}, &boot);
+    if (in.has_pending_on_ready()) in.drain_on_ready();
+    w.errors.clear();
+
+    // Mutate: move the player, take the apple, open the chest, create and
+    // destroy elements, flip a firsttime, touch a list and a dictionary.
+    in.send_command("take apple");
+    in.send_command("open chest");
+    in.send_command("north");
+    Context c;
+    in.run_script("create (\"souvenir\")\n"
+                  "souvenir.parent = player\n"
+                  "destroy (\"rose\")\n"
+                  "game.notes = NewStringDictionary()\n"
+                  "dictionary add (game.notes, \"day\", \"one\")", c);
+    // The firsttime state is keyed by its whole script body's source text
+    // (the compiled-script cache key), so run it as its own body -- the same
+    // text will be replayed against the restored world below.
+    const char *ft_src = "firsttime { msg (\"fresh eyes\") }";
+    out.clear();
+    in.run_script(ft_src, c);
+    CHECK(out.find("fresh eyes") != std::string::npos);
+    CHECK(w.errors.empty());
+    CHECK(w.find("rose") == nullptr);
+
+    std::string save = in.save_game("command.aslx");
+    CHECK(Interp::is_save_data(save.data(), save.size()));
+
+    // Round-trip stability: applying the snapshot to a fresh world and saving
+    // again reproduces it byte-identically.
+    {
+        World w2;
+        CHECK(load_file("../fixtures/command.aslx", w2, "../../../quest5/aslx-core"));
+        Interp in2(w2);
+        in2.print = [](const std::string &) {};
+        std::string err;
+        bool restored = in2.restore_game(save, err);
+        if (!restored) std::cerr << "  restore err: " << err << "\n";
+        CHECK(restored);
+
+        // Round-trip stability: re-saving straight after the restore (before
+        // anything else mutates state) reproduces the snapshot byte-for-byte.
+        CHECK_STR(in2.save_game("command.aslx"), save);
+
+        // Saved-game boot: InitInterface only (StartGame must NOT re-run).
+        Context b2;
+        if (w2.find("InitInterface")) in2.call_function("InitInterface", {}, &b2);
+        if (in2.has_pending_on_ready()) in2.drain_on_ready();
+        w2.errors.clear();
+
+        // State survived: location, inventory, open chest, created element,
+        // destroyed element, dictionary, firsttime flag.
+        CHECK_STR(Interp::to_string(in2.eval("player.parent", b2)), "garden");
+        CHECK_STR(Interp::to_string(in2.eval("apple.parent", b2)), "player");
+        CHECK_STR(Interp::to_string(in2.eval("chest.isopen", b2)), "True");
+        CHECK_STR(Interp::to_string(in2.eval("souvenir.parent", b2)), "player");
+        CHECK(w2.find("rose") == nullptr);
+        CHECK_STR(Interp::to_string(
+                      in2.eval("StringDictionaryItem(game.notes, \"day\")", b2)),
+                  "one");
+        // The already-run firsttime must NOT fire again.
+        std::string ftout;
+        in2.print = [&](const std::string &s) { ftout += s; };
+        Context c2;
+        in2.run_script(ft_src, c2);
+        CHECK(ftout.empty());
+
+        // The restored world still plays: a full command round-trip.
+        std::string out2;
+        in2.print = [&](const std::string &s) { out2 += s; };
+        in2.send_command("look");
+        CHECK(out2.find("garden") != std::string::npos);
+        CHECK(w2.errors.empty());
+    }
+
+    // Wrong-game and malformed saves are rejected without touching the world.
+    {
+        World w3;
+        CHECK(load_file("../fixtures/runtime.aslx", w3));
+        Interp in3(w3);
+        std::string err;
+        CHECK(!in3.restore_game(save, err));
+        CHECK(!err.empty());
+        std::string truncated = save.substr(0, save.size() / 2);
+        World w4;
+        CHECK(load_file("../fixtures/command.aslx", w4, "../../../quest5/aslx-core"));
+        Interp in4(w4);
+        CHECK(!in4.restore_game(truncated, err));
+        CHECK(!Interp::is_save_data("garbage", 7));
+    }
+}
+
+// Oracle-parity number parsing: ToInt/ToDouble are int.Parse/double.Parse
+// (visible script error on bad input, Int32 range), IsInt is int.TryParse
+// (range-checked). Silent-0 or wrapped garbage is a transcript divergence.
+static void test_number_parse_oracle() {
+    World w;
+    w.asl_version = 550;
+    Interp in(w);
+
+    CHECK_STR(evals(in, "ToInt(\"123\")"), "123");
+    CHECK_STR(evals(in, "ToInt(\" -42 \")"), "-42");
+    CHECK_STR(evals(in, "ToInt(\"2147483647\")"), "2147483647");
+    CHECK_STR(evals(in, "ToDouble(\"3.5\") * 2"), "7");
+    CHECK_STR(evals(in, "IsInt(\"123\")"), "True");
+    CHECK_STR(evals(in, "IsInt(\"-2147483648\")"), "True");
+    CHECK_STR(evals(in, "IsInt(\"2147483648\")"), "False");
+    CHECK_STR(evals(in, "IsInt(\"99999999999999999999\")"), "False");
+
+    auto throws_with = [&](const char *expr, const char *msg) {
+        try {
+            evals(in, expr);
+        } catch (const std::exception &e) {
+            return std::string(e.what()).find(msg) != std::string::npos;
+        }
+        return false;
+    };
+    CHECK(throws_with("ToInt(\"abc\")", "was not in a correct format"));
+    CHECK(throws_with("ToInt(\"3.5\")", "was not in a correct format"));
+    CHECK(throws_with("ToInt(\"3000000000\")",
+                      "too large or too small for an Int32"));
+    CHECK(throws_with("ToDouble(\"abc\")", "was not in a correct format"));
+
+    // -- shift operators, int-flavoured and/or, bool-vs-number comparison,
+    // one-argument Split. Every value below was read off the .NET oracle
+    // (NCalcAsync 6.3.2) with a probe fixture; Deeper's keyring bitmask
+    // ("player.keyring + (1 << n)", "(player.keyring and (1 << n)) > 0") is
+    // the corpus shape that needs all four.
+    CHECK_STR(evals(in, "1 << 3"), "8");
+    CHECK_STR(evals(in, "256 >> 4"), "16");
+    CHECK_STR(evals(in, "1 << 33"), "8589934592");          // 64-bit
+    CHECK_STR(evals(in, "70000 << 1"), "140000");            // not UInt16
+    CHECK_STR(evals(in, "2.5 << 1"), "4");                   // rounds to even
+    CHECK_STR(evals(in, "1 << \"3\""), "8");
+    CHECK_STR(evals(in, "2 << 1 + 1"), "8");                 // looser than +
+    CHECK_STR(evals(in, "1 << 2 > 3"), "True");              // tighter than >
+    CHECK_STR(evals(in, "1 << 1 << 2"), "8");                // left-assoc
+    CHECK_STR(evals(in, "16 >> 1 >> 1"), "4");
+    CHECK_STR(evals(in, "5 + (1 << 2)"), "9");
+    CHECK(throws_with("-1 << 1", "too large or too small for a UInt64"));
+    // and/or/xor are bitwise on two integers and logical otherwise (FLEE's
+    // rule, which QuestViva took back after NCalcAsync 6.3.2 made them all
+    // logical); and binds tighter than or, or tighter than xor. Read off the
+    // v6.0.0+69 oracle. ZORK1_beta's RANDOM is "seed and 0x7FFF".
+    CHECK_STR(evals(in, "5 and 8"), "0");
+    CHECK_STR(evals(in, "(5 and 8) > 0"), "False");
+    CHECK_STR(evals(in, "(0 and 8) > 0"), "False");
+    CHECK_STR(evals(in, "0 or 0"), "0");
+    CHECK_STR(evals(in, "5 or 2"), "7");
+    CHECK_STR(evals(in, "5 xor 3"), "6");
+    CHECK_STR(evals(in, "TypeOf(5 and 3)"), "int");
+    CHECK_STR(evals(in, "true and 5"), "True");
+    CHECK_STR(evals(in, "5 and true"), "True");
+    CHECK_STR(evals(in, "0 and true"), "False");
+    CHECK_STR(evals(in, "true or false and false"), "True");
+    CHECK_STR(evals(in, "false and true or true"), "True");
+    CHECK_STR(evals(in, "true or true xor true"), "False");
+    CHECK_STR(evals(in, "0x7FFF"), "32767");
+    CHECK_STR(evals(in, "0x10l"), "16");
+    CHECK_STR(evals(in, "40000 and 0x7FFF"), "7232");
+    CHECK_STR(evals(in, "not 5"), "False");
+    CHECK_STR(evals(in, "true > 0"), "True");
+    CHECK_STR(evals(in, "false > 0"), "False");
+    CHECK_STR(evals(in, "true < 2"), "True");
+    CHECK_STR(evals(in, "false = 0"), "True");
+    CHECK_STR(evals(in, "(6 and 8) = true"), "False");
+    CHECK_STR(evals(in, "StringListItem(Split(\"small;medium;large\"), 1)"),
+              "medium");
+    CHECK_STR(evals(in, "ListCount(Split(\"a,b;c\"))"), "2");
+    w.errors.clear();
+}
+
+// GetInput() -- the EXPRESSION form of `get input` (ExpressionOwner.GetInput):
+// the host hands over the next command line in place; ASL 540-580 refuse it
+// with QuestViva's script error. Escape from Byron Bay, System Restore and The
+// Last Survivor (all ASL 520) read their access codes / player name this way.
+static void test_getinput_expression() {
+    World w;
+    w.asl_version = 520;
+    Interp in(w);
+    in.input_provider = [](std::string &l) { l = "Robin"; return true; };
+    CHECK_STR(evals(in, "GetInput()"), "Robin");
+    CHECK_STR(evals(in, "\"Hi \" + GetInput() + \"!\""), "Hi Robin!");
+    in.input_provider = [](std::string &) { return false; };
+    CHECK_STR(evals(in, "GetInput()"), "");   // no line: string.Empty
+    w.asl_version = 550;
+    bool threw = false;
+    try {
+        evals(in, "GetInput()");
+    } catch (const std::exception &e) {
+        threw = std::string(e.what()).find(
+                    "not supported for games with WorldModel version 540") !=
+                std::string::npos;
+    }
+    CHECK(threw);
+    w.errors.clear();
+}
+
+// The version window QuestViva refuses the blocking forms in: the ShowMenu and
+// Ask expression functions throw only for 540-580, the Wait request for
+// 540-580 and the Pause request for 550-580. 600+ allows them all again, which
+// Thyme's ASL 600 re-save needs for the WaitForKeyPress in its intro.
+static void test_blocking_forms_version_window() {
+    World w;
+    Interp in(w);
+    in.menu_provider = [](const MenuData &, std::string &k) { k = "a"; return true; };
+    in.ask_provider = [](const std::string &, bool &a) { a = true; return true; };
+    // A script error either propagates or lands in w.errors; look in both.
+    auto refused = [&](const char *code, const char *what) {
+        w.errors.clear();
+        try {
+            run(in, code);
+        } catch (const std::exception &e) {
+            return std::string(e.what()).find(what) != std::string::npos;
+        }
+        for (const std::string &e : w.errors)
+            if (e.find(what) != std::string::npos) return true;
+        return false;
+    };
+    const char *menu = "x = ShowMenu (\"Pick\", Split(\"a;b\"), false)";
+    const char *ask = "x = Ask (\"Sure?\")";
+    for (int v : {550, 580}) {
+        w.asl_version = v;
+        CHECK(refused(menu, "'ShowMenu' function is not supported"));
+        CHECK(refused(ask, "'Ask' function is not supported"));
+        CHECK(refused("request (Wait, \"\")", "'Wait' request is not supported"));
+        CHECK(refused("request (Pause, \"10\")", "'Pause' request is not supported"));
+    }
+    w.asl_version = 540;
+    CHECK(!refused("request (Pause, \"10\")", "not supported"));
+    for (int v : {520, 600}) {
+        w.asl_version = v;
+        CHECK(!refused(menu, "not supported"));
+        CHECK(!refused(ask, "not supported"));
+        CHECK(!refused("request (Wait, \"\")", "not supported"));
+        CHECK(!refused("request (Pause, \"10\")", "not supported"));
+    }
+    w.errors.clear();
+}
+
+// firsttime flags live per script ATTRIBUTE, not per source text: QuestViva
+// compiles each attribute into its own FirstTimeScript (m_hasRun per
+// instance). Victorian Detective's 24 gamebook pages carry the identical
+// `firsttime { IncreaseCounter ("DR") }` and each must fire once.
+static void test_firsttime_per_attribute() {
+    World w;
+    w.asl_version = 550;
+    Interp in(w);
+    run(in, "create (\"a\")\ncreate (\"b\")\ncreate (\"cnt\")\ncnt.n = 0");
+    run(in, "a.greet => { firsttime { cnt.n = cnt.n + 1 } }");
+    run(in, "b.greet => { firsttime { cnt.n = cnt.n + 1 } }");
+    run(in, "do (a, \"greet\")\ndo (a, \"greet\")");
+    CHECK_STR(evals(in, "cnt.n"), "1");
+    run(in, "do (b, \"greet\")\ndo (b, \"greet\")");
+    CHECK_STR(evals(in, "cnt.n"), "2");
+    // A different attribute on the same object is its own instance too.
+    run(in, "a.wave => { firsttime { cnt.n = cnt.n + 1 } }");
+    run(in, "do (a, \"wave\")");
+    CHECK_STR(evals(in, "cnt.n"), "3");
+    // The snapshot save keeps the flags apart: after a round-trip, a's greet
+    // stays spent while a fresh c with the same text still fires.
+    std::string save = in.save_game("x.aslx");
+    run(in, "create (\"c\")");
+    run(in, "c.greet => { firsttime { cnt.n = cnt.n + 1 } }");
+    run(in, "do (c, \"greet\")");
+    CHECK_STR(evals(in, "cnt.n"), "4");
+    CHECK(w.errors.empty());
+
+    // The keyword-before-assignment rule (ScriptFactory tries the keyword
+    // constructors first): a `do`/`set` call whose arguments contain a bare
+    // `=` is a call, not an assignment. Core's drop command does exactly this
+    // (`do (object, "ondrop", QuickParams ("successful", not oldparent =
+    // object.parent))`).
+    run(in, "set (a, \"flag\", 1 = 1)");
+    CHECK_STR(evals(in, "a.flag"), "True");
+    run(in, "a.ondrop => { cnt.ok = successful }");
+    run(in, "d = NewDictionary()\ndictionary add (d, \"successful\", not a = b)\n"
+            "do (a, \"ondrop\", d)");
+    CHECK_STR(evals(in, "cnt.ok"), "True");
+    // ...while a plain variable that merely STARTS with a keyword's letters
+    // is still an assignment.
+    run(in, "done = 5\nsetting = 6\nerrors = 7");
+    CHECK(w.errors.empty());
+    (void)save;
+}
+
+// ...but ONE `=>` literal is one SetScriptScript instance, shared by every
+// object it is assigned to, and Clone shares the source's script instance
+// (Fields.Clone keeps the IScript). Golden Egg's cloned chests pay out once
+// between them, and SpawnSpider's searchscript money roll is one RNG stream.
+static void test_firsttime_shared_instance() {
+    World w;
+    w.asl_version = 550;
+    Interp in(w);
+    run(in, "create (\"a\")\ncreate (\"b\")\ncreate (\"maker\")\n"
+            "create (\"cnt\")\ncnt.n = 0");
+    // Every run of the loop assigns the same literal: one instance.
+    run(in, "maker.make => {\n"
+            "  foreach (o, Split(\"a;b\", \";\")) {\n"
+            "    obj = GetObject(o)\n"
+            "    obj.hello => { firsttime { cnt.n = cnt.n + 1 } }\n"
+            "  }\n"
+            "}");
+    run(in, "do (maker, \"make\")");
+    run(in, "do (a, \"hello\")\ndo (b, \"hello\")");
+    CHECK_STR(evals(in, "cnt.n"), "1");
+    // A clone runs its source's instance: spent on the source, spent here.
+    run(in, "a.wave => { firsttime { cnt.n = cnt.n + 10 } }");
+    run(in, "do (a, \"wave\")\nc = Clone (a)\ndo (c, \"wave\")");
+    CHECK_STR(evals(in, "cnt.n"), "11");
+    // The snapshot records which instance each value runs.
+    std::string save = in.save_game("x.aslx");
+    CHECK(save.find(std::string("make") + '\x1D') != std::string::npos);
+    CHECK(w.errors.empty());
+}
+
+// Pre-540 print of a text that is nothing but tags (a gamebook option with an
+// empty display text: `<command input="Murder2"></command>`) emits NOTHING --
+// qvh's Emit skips an empty stripped chunk without appending '\n'. Fun Tiemz
+// and minecraft adventure (ASL 520) each had a spurious blank line here.
+static void test_print_all_tags_empty() {
+    World w;
+    w.asl_version = 520;
+    Interp in(w);
+    Context ctx;
+    in.clear_output();
+    in.run_script("msg (\"<command input=\\\"Murder2\\\"></command>\")", ctx);
+    CHECK_STR(in.output(), "<command input=\"Murder2\"></command>");  // no '\n'
+    in.clear_output();
+    in.run_script("msg (\"<b></b><br/>\")", ctx);   // a br tail still yields its newline
+    CHECK_STR(in.output(), "<b></b><br/>");
+    in.clear_output();
+    in.run_script("msg (\"<b>x</b>\")", ctx);
+    CHECK_STR(in.output(), "<b>x</b>\n");
+    in.clear_output();
+    in.run_script("msg (\"<img src=\\\"a.png\\\" />\")", ctx);  // visible: keeps its line
+    CHECK_STR(in.output(), "<img src=\"a.png\" />\n");
+    CHECK(w.errors.empty());
+}
+
+// Parser recursion caps: pathological nesting must surface as a script/parse
+// error, not a stack overflow on first (lazy) compile. And Rng::between must
+// survive extreme spans without SIGFPE/UB.
+static void test_parser_depth_caps() {
+    World w;
+    w.asl_version = 550;
+    Interp in(w);
+
+    auto throws_any = [&](const std::string &expr) {
+        try {
+            evals(in, expr);
+        } catch (const std::exception &) {
+            return true;
+        }
+        return false;
+    };
+    CHECK(throws_any(std::string(100000, '(') + "1" + std::string(100000, ')')));
+    std::string nots;
+    for (int i = 0; i < 100000; ++i) nots += "not ";
+    CHECK(throws_any(nots + "true"));
+    CHECK(throws_any(std::string(100000, '-') + "1"));
+
+    // 20k nested blocks: parses to a ParseError statement at the cap, which
+    // reports a script error when run -- and the interpreter stays usable.
+    std::string s;
+    for (int i = 0; i < 20000; ++i) s += "if (true) {\n";
+    s += "msg (\"deep\")\n";
+    for (int i = 0; i < 20000; ++i) s += "}\n";
+    Context c;
+    in.run_script(s, c);
+    CHECK(!w.errors.empty());
+    w.errors.clear();
+    CHECK_STR(evals(in, "1 + 1"), "2");
+
+    // Extreme RNG spans: any value is fine, crashing is not.
+    CHECK_STR(evals(in, "GetRandomInt(-2147483648, 2147483647) >= "
+                        "-2147483648"), "True");
+}
+
+// GetAttributeNames(obj, true) walks the whole type chain (Fields.
+// GetAttributeNames recurses each inherited type), not just one level.
+static void test_attribute_names_deep() {
+    const char *xml =
+        "<asl version=\"550\">"
+        "<game name=\"g\"/>"
+        "<type name=\"base\"><deepattr type=\"int\">1</deepattr></type>"
+        "<type name=\"mid\"><inherit name=\"base\"/>"
+        "<midattr type=\"int\">2</midattr></type>"
+        "<object name=\"o\"><inherit name=\"mid\"/></object>"
+        "</asl>";
+    World w;
+    CHECK(load_aslx_buffer(xml, std::strlen(xml), w, "", ""));
+    Interp in(w);
+    // HasAttribute already saw the two-deep attribute; the names list must
+    // agree with it.
+    CHECK_STR(evals(in, "HasAttribute(o, \"deepattr\")"), "True");
+    CHECK_STR(evals(in, "ListContains(GetAttributeNames(o, true), \"midattr\")"),
+              "True");
+    CHECK_STR(evals(in, "ListContains(GetAttributeNames(o, true), \"deepattr\")"),
+              "True");
+    CHECK_STR(evals(in, "ListContains(GetAttributeNames(o, false), \"deepattr\")"),
+              "False");
+    CHECK(w.errors.empty());
+}
+
+// A pre-v580 command turn owes FinishTurn (Core's turnscripts) as a step after
+// HandleCommand. Legacy Quest 5.8.0 skipped it while ANY callback was
+// outstanding -- wait, get input, ask or show menu -- and ran it after the
+// callback (RunCallbackAndFinishTurn); Quest Viva #2177/#2182 restored that
+// order. The engine used to defer only across `wait`, which put Dream Pieces'
+// "type HELP" turnscript nag before its birthdate `get input` instead of after.
+static void test_finish_turn_deferred_across_prompts() {
+    const char *xml =
+        "<asl version=\"550\">"
+        "<game name=\"g\"/>"
+        "<function name=\"FinishTurn\">msg (\"FT\")</function>"
+        "<function name=\"HandleCommand\" parameters=\"command, metadata\">"
+        "if (command = \"input\") {\n"
+        "  get input {\n"
+        "    msg (\"cb:\" + result)\n"
+        "  }\n"
+        "}\n"
+        "else if (command = \"menu\") {\n"
+        "  options = NewStringList()\n"
+        "  list add (options, \"red\")\n"
+        "  show menu (\"Pick\", options, false) {\n"
+        "    msg (\"cb:\" + result)\n"
+        "  }\n"
+        "}\n"
+        "else if (command = \"ask\") {\n"
+        "  ask (\"Sure?\") {\n"
+        "    msg (\"cb:\" + result)\n"
+        "  }\n"
+        "}\n"
+        "else if (command = \"nap\") {\n"
+        "  wait {\n"
+        "    msg (\"cb\")\n"
+        "  }\n"
+        "}\n"
+        "else {\n"
+        "  msg (\"cmd:\" + command)\n"
+        "}\n"
+        "</function>"
+        "</asl>";
+    World w;
+    CHECK(load_aslx_buffer(xml, std::strlen(xml), w, "", ""));
+    Interp in(w);
+    auto out = [&] {
+        std::string o = in.output();
+        while (!o.empty() && o.back() == '\n') o.pop_back();
+        in.clear_output();
+        return o;
+    };
+    auto cmd = [&](const char *c) { in.clear_output(); in.send_command(c); return out(); };
+
+    // No prompt: FinishTurn follows the command, same turn.
+    CHECK_STR(cmd("plain"), "cmd:plain\nFT");
+    // get input: FinishTurn waits for the answer line.
+    CHECK_STR(cmd("input"), "");
+    CHECK(in.command_override());
+    CHECK_STR(cmd("hello"), "cb:hello\nFT");
+    CHECK(!in.command_override());
+    // show menu: the caption prints now; FinishTurn after the choice.
+    CHECK_STR(cmd("menu"), "Pick");
+    CHECK(in.pending_menu() != nullptr);
+    {
+        std::string key = "red";
+        in.set_menu_response(&key);
+        CHECK_STR(out(), " - red\ncb:red\nFT");
+    }
+    // ask: FinishTurn after the answer.
+    CHECK_STR(cmd("ask"), "");
+    CHECK(in.pending_question() != nullptr);
+    in.set_question_response(true);
+    CHECK_STR(out(), "cb:True\nFT");
+    // wait: FinishTurn after the keypress (the case Robin Hood proved).
+    CHECK_STR(cmd("nap"), "");
+    CHECK(in.pending_wait());
+    in.finish_wait();
+    CHECK_STR(out(), "cb\nFT");
+    // A cancelled prompt (a new one of the same kind replacing it) still
+    // discharges the deferred FinishTurn, once, at the boundary.
+    CHECK_STR(cmd("nap"), "");
+    CHECK_STR(cmd("nap"), "FT");  // the first wait's cancel ends its callback
+    in.finish_wait();
+    CHECK_STR(out(), "cb\nFT");
+    CHECK(w.errors.empty());
+}
+
+// Quest Viva #2189 (deliberate deviation, see chart_uncharted_room): a room
+// the CoreGrid pass never reached gets charted on arrival -- through a
+// now-visible exit from the room the player came from when there is one,
+// else alone at the origin of a fresh z layer -- instead of erroring out of
+// Grid_GetGridCoordinateForPlayer. The grid functions here are CoreGrid's own
+// bodies, with Grid_CalculateMapCoordinates cut down to eastward exits.
+static void test_uncharted_room_gets_map_coordinates() {
+    const char *xml =
+        "<asl version=\"550\">"
+        "<game name=\"g\"><pov type=\"object\">player</pov></game>"
+        "<object name=\"A\"><object name=\"player\"/>"
+        "<exit name=\"AtoB\" alias=\"east\" to=\"B\"><visible type=\"boolean\">false</visible></exit>"
+        "</object>"
+        "<object name=\"B\"/>"
+        "<object name=\"C\"/>"
+        "<function name=\"Grid_GetPlayerCoordinateDictionary\" parameters=\"playerobject\" type=\"dictionary\">"
+        "if (not HasAttribute(playerobject, \"grid_coordinates\")) {\n"
+        "  playerobject.grid_coordinates = NewDictionary()\n"
+        "  Grid_SetGridCoordinateForPlayer (playerobject, playerobject.parent, \"x\", 0)\n"
+        "  Grid_SetGridCoordinateForPlayer (playerobject, playerobject.parent, \"y\", 0)\n"
+        "  Grid_SetGridCoordinateForPlayer (playerobject, playerobject.parent, \"z\", 0)\n"
+        "  Grid_CalculateMapCoordinates (playerobject.parent, playerobject)\n"
+        "}\n"
+        "return (playerobject.grid_coordinates)\n"
+        "</function>"
+        "<function name=\"Grid_GetPlayerCoordinatesForRoom\" parameters=\"playerobject, room\" type=\"dictionary\">"
+        "coordinatedata = Grid_GetPlayerCoordinateDictionary(playerobject)\n"
+        "if (not DictionaryContains(coordinatedata, room.name)) {\n"
+        "  dictionary add (coordinatedata, room.name, NewDictionary())\n"
+        "}\n"
+        "return (DictionaryItem(coordinatedata, room.name))\n"
+        "</function>"
+        "<function name=\"Grid_GetGridCoordinateForPlayer\" parameters=\"playerobject, room, coordinate\" type=\"double\">"
+        "coordinates = Grid_GetPlayerCoordinatesForRoom(playerobject, room)\n"
+        "return (DictionaryItem(coordinates, coordinate))\n"
+        "</function>"
+        "<function name=\"Grid_SetGridCoordinateForPlayer\" parameters=\"playerobject, room, coordinate, value\">"
+        "coordinates = Grid_GetPlayerCoordinatesForRoom(playerobject, room)\n"
+        "if (DictionaryContains(coordinates, coordinate)) {\n"
+        "  dictionary remove (coordinates, coordinate)\n"
+        "}\n"
+        "dictionary add (coordinates, coordinate, value * 1.0)\n"
+        "</function>"
+        "<function name=\"Grid_CalculateMapCoordinates\" parameters=\"room, playerobject\">"
+        "foreach (exit, AllExits()) {\n"
+        "  if (exit.parent = room and exit.visible and exit.alias = \"east\") {\n"
+        "    Grid_SetGridCoordinateForPlayer (playerobject, exit.to, \"x\", Grid_GetGridCoordinateForPlayer(playerobject, room, \"x\") + 1)\n"
+        "    Grid_SetGridCoordinateForPlayer (playerobject, exit.to, \"y\", Grid_GetGridCoordinateForPlayer(playerobject, room, \"y\"))\n"
+        "    Grid_SetGridCoordinateForPlayer (playerobject, exit.to, \"z\", Grid_GetGridCoordinateForPlayer(playerobject, room, \"z\"))\n"
+        "  }\n"
+        "}\n"
+        "</function>"
+        "<function name=\"HandleCommand\" parameters=\"command, metadata\">"
+        "if (command = \"calc\") {\n"
+        "  Grid_CalculateMapCoordinates (player.parent, player)\n"
+        "}\n"
+        "else if (command = \"show\") {\n"
+        "  r = player.parent\n"
+        "  msg (Grid_GetGridCoordinateForPlayer(player, r, \"x\") + \" \" + Grid_GetGridCoordinateForPlayer(player, r, \"y\") + \" \" + Grid_GetGridCoordinateForPlayer(player, r, \"z\"))\n"
+        "}\n"
+        "else if (command = \"reveal\") {\n"
+        "  AtoB.visible = true\n"
+        "}\n"
+        "else {\n"
+        "  player.parent = GetObject(command)\n"
+        "}\n"
+        "</function>"
+        "</asl>";
+    World w;
+    CHECK(load_aslx_buffer(xml, std::strlen(xml), w, "", ""));
+    Interp in(w);
+    auto cmd = [&](const char *c) {
+        in.clear_output();
+        in.send_command(c);
+        std::string o = in.output();
+        while (!o.empty() && o.back() == '\n') o.pop_back();
+        return o;
+    };
+    // First pass: the library seeds the starting room itself.
+    cmd("calc");
+    CHECK_STR(cmd("show"), "0 0 0");
+    // An exit revealed after the player stood in A: arriving through it,
+    // the re-run of A's pass charts B east of A.
+    cmd("reveal");
+    cmd("B");
+    cmd("calc");
+    CHECK_STR(cmd("show"), "1 0 0");
+    // No exit leads to C: it gets the origin of a fresh layer.
+    cmd("C");
+    cmd("calc");
+    CHECK_STR(cmd("show"), "0 0 1");
+    // A charted room is untouched by a later pass.
+    cmd("A");
+    cmd("calc");
+    CHECK_STR(cmd("show"), "0 0 0");
+    CHECK(w.errors.empty());
+}
+
+// firsttime baking of one-line blocks: get_script strips the braces off a
+// single-line `{ ... }`, so the baker must find bodies the way the parser
+// does (after the keyword/parameter), not at the first '{' -- otherwise a
+// one-line firsttime/otherwise body is silently deleted from a native save.
+static void test_firsttime_bake_oneliners() {
+    World w;
+    CHECK(load_file("../fixtures/runtime.aslx", w));
+    Interp in(w);
+    std::string out;
+    in.print = [&](const std::string &s) { out += s; };
+    Context c;
+
+    // A ran multi-line firsttime with a one-line otherwise, plus an un-run
+    // one-line firsttime inside a one-line if.
+    const char *src =
+        "firsttime {\n  msg (\"A\")\n} otherwise { msg (\"C\") }\n"
+        "if (false) { firsttime { msg (\"B\") } }";
+    in.run_script(src, c);
+    CHECK(out.find("A") != std::string::npos);
+
+    std::string baked = in.bake_firsttime_source(src);
+    // The ran firsttime bakes down to its otherwise body...
+    CHECK(baked.find("msg (\"C\")") != std::string::npos);
+    CHECK(baked.find("msg (\"A\")") == std::string::npos);
+    // ...and the un-run one-line firsttime keeps body AND wrapper.
+    CHECK(baked.find("firsttime") != std::string::npos);
+    CHECK(baked.find("msg (\"B\")") != std::string::npos);
+
+    // A ran firsttime inside a fully one-line switch case is baked out (and
+    // its flag consumed in collect_firsttime order, keeping the stream
+    // aligned), not mangled by the case's braces.
+    const char *sw = "switch (1) { case (1) { firsttime { msg (\"S\") } } }";
+    out.clear();
+    in.run_script(sw, c);
+    CHECK(out.find("S") != std::string::npos);
+    std::string baked2 = in.bake_firsttime_source(sw);
+    CHECK(baked2.find("msg (\"S\")") == std::string::npos);
+    CHECK(baked2.find("case (1)") != std::string::npos);
+
+    // The bake finds blocks through the parser's own block_keyword table, so
+    // a ran firsttime is baked out from under each keyword the parser nests
+    // a block in (those that run without a host prompt, at any rate), and
+    // the statement around it survives.  (A branch after the first needs its
+    // own line: get_script takes one block per line.)
+    const char *nests[] = {
+        "if (true) { firsttime { msg (\"W0\") } }",
+        "if (false) {\n msg (\"n\")\n}\nelse if (true) { firsttime { msg (\"W1\") } }",
+        "if (false) {\n msg (\"n\")\n}\nelse { firsttime { msg (\"W2\") } }",
+        "for (i, 1, 1) { firsttime { msg (\"W3\") } }",
+        "foreach (x, Split (\"a\", \";\")) { firsttime { msg (\"W4\") } }",
+        "on ready { firsttime { msg (\"W5\") } }",
+        "switch (2) {\n case (1) {\n msg (\"n\")\n }\n default { firsttime { msg (\"W6\") } }\n}",
+    };
+    for (size_t i = 0; i < sizeof nests / sizeof *nests; ++i) {
+        std::string mark = "W" + std::to_string(i);
+        out.clear();
+        in.run_script(nests[i], c);
+        CHECK(out.find(mark) != std::string::npos);
+        std::string b = in.bake_firsttime_source(nests[i]);
+        CHECK(b.find(mark) == std::string::npos);
+        CHECK(b.find("firsttime") == std::string::npos);
+        CHECK(b.compare(0, 2, std::string(nests[i]), 0, 2) == 0);
+    }
+    CHECK(w.errors.empty());
+}
+
+// The bake reads each firsttime's flag off the statement the parser made of
+// it, so text the parser built nothing from -- a statement it rejected, an
+// `else` with no `if`, a `default` replaced by a later one -- cannot shift
+// the flags of the firsttimes after it, and never reaches the save as code
+// that the reload would attach to something else.
+static void test_firsttime_bake_rejected_statements() {
+    World w;
+    CHECK(load_file("../fixtures/runtime.aslx", w));
+    Interp in(w);
+    std::string out;
+    in.print = [&](const std::string &s) { out += s; };
+    Context c;
+
+    // Each of these holds a firsttime the parser never compiled (X). After it
+    // come one that runs (R) and one that does not (K): R must bake out and K
+    // must stay, and the baked script must still behave like the original.
+    const char *tail =
+        "\nfirsttime { msg (\"R\") }\nif (false) { firsttime { msg (\"K\") } }";
+    const char *heads[] = {
+        "msg (\"x\")\nelse { firsttime { msg (\"X\") } }",
+        "show menu (\"one parameter\") { firsttime { msg (\"X\") } }",
+        "ask () { firsttime { msg (\"X\") } }",
+        "if (false) { if (1 +) { firsttime { msg (\"X\") } } }",
+        ("switch (1) {\n default { firsttime { msg (\"X\") } }\n"
+         " default { msg (\"d\") }\n case (2) { msg (\"n\") }\n}"),
+    };
+    for (const char *head : heads) {
+        std::string src = std::string(head) + tail;
+        out.clear();
+        in.run_script(src, c);
+        CHECK(out.find("R") != std::string::npos);
+        CHECK(out.find("X") == std::string::npos);
+        std::string baked = in.bake_firsttime_source(src);
+        CHECK(baked.find("msg (\"R\")") == std::string::npos);
+        CHECK(baked.find("msg (\"K\")") != std::string::npos);
+        out.clear();
+        in.run_script(baked, c);
+        CHECK(out.find("R") == std::string::npos);
+        CHECK(out.find("X") == std::string::npos);
+        CHECK(out.find("K") == std::string::npos);
+    }
+
+    // An `else` after a firsttime continues nothing. Once the firsttime is
+    // baked out it would follow the `if` -- and run.
+    const char *dead =
+        "if (false) {\n msg (\"n\")\n}\nfirsttime { msg (\"R\") }\n"
+        "else { msg (\"DEAD\") }";
+    out.clear();
+    in.run_script(dead, c);
+    CHECK_STR(out, "R\n");
+    out.clear();
+    in.run_script(in.bake_firsttime_source(dead), c);
+    CHECK_STR(out, "");
+
+    // Of two `otherwise` blocks the parser keeps the last, so that is the one
+    // a run firsttime bakes down to.
+    const char *twice =
+        "firsttime { msg (\"R\") }\notherwise { msg (\"O1\") }\n"
+        "otherwise { msg (\"O2\") }";
+    out.clear();
+    in.run_script(twice, c);
+    CHECK_STR(out, "R\n");
+    out.clear();
+    in.run_script(twice, c);
+    CHECK_STR(out, "O2\n");
+    out.clear();
+    in.run_script(in.bake_firsttime_source(twice), c);
+    CHECK_STR(out, "O2\n");
+}
+
+// Save-writer robustness against degenerate runtime state: a `parent` cycle
+// must not drop elements from (or hang) the native save, and a
+// self-referential collection must not recurse the writers to death.
+static void test_save_degenerate_state() {
+    World w;
+    CHECK(load_file("../fixtures/runtime.aslx", w));
+    Interp in(w);
+    in.print = [](const std::string &) {};
+    Context c;
+
+    in.run_script("create (\"ca\")\n"
+                  "create (\"cb\")\n"
+                  "ca.parent = cb\n"
+                  "cb.parent = ca", c);
+    in.run_script("ca.selfref = NewList()\n"
+                  "list add (ca.selfref, ca.selfref)", c);
+    // The degenerate state actually exists (the setup scripts didn't error).
+    CHECK(w.errors.empty());
+    CHECK_STR(Interp::to_string(in.eval("ca.parent", c)), "cb");
+    CHECK_STR(Interp::to_string(in.eval("cb.parent", c)), "ca");
+    CHECK_STR(Interp::to_string(in.eval("ListCount(ca.selfref)", c)), "1");
+
+    // Both writers terminate; the cycle members are still in the native save.
+    std::string native = in.save_game_native("runtime.aslx");
+    CHECK(native.find("\"ca\"") != std::string::npos);
+    CHECK(native.find("\"cb\"") != std::string::npos);
+    std::string snap = in.save_game("runtime.aslx");
+    CHECK(Interp::is_save_data(snap.data(), snap.size()));
+
+    // Values are reference-counted, so a list holding itself is a cycle that
+    // is never freed; break it, or LeakSanitizer fails `make asan` on it.
+    in.run_script("list remove (ca.selfref, ca.selfref)", c);
+    CHECK_STR(Interp::to_string(in.eval("ListCount(ca.selfref)", c)), "0");
+}
+
+// Hostile save data: counts, lengths and nesting come from an untrusted file
+// and must fail closed -- no giant preallocation, no unbounded recursion, no
+// overwriting static elements -- all before anything mutates the world.
+static void test_save_hostile() {
+    World w;
+    CHECK(load_file("../fixtures/command.aslx", w, "../../../quest5/aslx-core"));
+    Interp in(w);
+    in.print = [](const std::string &) {};
+
+    auto blob = [](const std::string &s) {
+        return std::to_string(s.size()) + ":" + s;
+    };
+    auto num = [](long n) { return std::to_string(n) + ";"; };
+    // Valid header up to the element count, so each probe reaches its target.
+    const std::string head = "ASLXSAVE 1\n" + blob(w.game_name) +
+                             num(w.asl_version) + blob("x") + num(100);
+
+    std::string err;
+    // Absurd element count: rejected before any sized allocation.
+    CHECK(!in.restore_game(head + num(99999999999999L), err));
+
+    // A digit string long enough to wrap a long is malformed, not garbage.
+    CHECK(!in.restore_game(head + "999999999999999999999999999999;", err));
+
+    // Deep value nesting hits the reader's depth cap, not the stack limit.
+    std::string deep = head + num(1) + "E" + blob("chest") + blob("object") +
+                       "0" + num(1) + num(0) + num(1) + blob("f");
+    for (int i = 0; i < 100000; ++i) deep += "L0:01;";  // one list level each
+    deep += "n0:0";
+    CHECK(!in.restore_game(deep, err));
+
+    // A save-family record whose name collides with a static element is
+    // rejected (the writer never emits one), leaving the element intact.
+    std::string clobber = head + num(1) + "E" + blob("MoveObject") +
+                          blob("object") + "0" + num(1) + num(0) + num(0) +
+                          num(0) + "END";
+    CHECK(!in.restore_game(clobber, err));
+    CHECK(w.find("MoveObject") &&
+          w.find("MoveObject")->elem_type == "function");
+
+    // A record claiming a non-save-family elem_type is malformed.
+    std::string fn = head + num(1) + "E" + blob("zzz") + blob("function") +
+                     "0" + num(1) + num(0) + num(0) + num(0) + "END";
+    CHECK(!in.restore_game(fn, err));
+
+    // Still a working interpreter afterwards.
+    Context c;
+    CHECK_STR(Interp::to_string(in.eval("1 + 1", c)), "2");
+}
+
+// The native Quest/QuestViva `.quest-save` format: an ASLX re-serialization
+// overlaid onto a reloaded original. Same mutate/save/restore round-trip as
+// test_save_restore, exercising the writer and the overlay reader.
+static void test_save_restore_native() {
+    World w;
+    CHECK(load_file("../fixtures/command.aslx", w, "../../../quest5/aslx-core"));
+
+    Interp in(w);
+    std::string out;
+    in.print = [&](const std::string &s) { out += s; };
+
+    Context boot;
+    if (w.find("InitInterface")) in.call_function("InitInterface", {}, &boot);
+    if (w.find("StartGame")) in.call_function("StartGame", {}, &boot);
+    if (in.has_pending_on_ready()) in.drain_on_ready();
+    w.errors.clear();
+
+    in.send_command("take apple");
+    in.send_command("open chest");
+    in.send_command("north");
+    Context c;
+    in.run_script("create (\"souvenir\")\n"
+                  "souvenir.parent = player\n"
+                  "destroy (\"rose\")\n"
+                  "game.notes = NewStringDictionary()\n"
+                  "dictionary add (game.notes, \"day\", \"one\")\n"
+                  "game.tally = 7\n"
+                  "player.ratio = 1.5\n"
+                  // A nested dictionary (a dict whose value is a dict of typed
+                  // scalars) -- Quest's grid-coordinate save state, which the
+                  // native format must round-trip through the generic
+                  // "dictionary" form (a plain stringdictionary cannot hold it).
+                  "game.grid = NewDictionary()\n"
+                  "inner = NewDictionary()\n"
+                  "dictionary add (inner, \"x\", 3)\n"
+                  "dictionary add (inner, \"flag\", true)\n"
+                  "dictionary add (game.grid, \"room1\", inner)", c);
+    CHECK(w.errors.empty());
+
+    std::string save = in.save_game_native("command.aslx");
+    CHECK(Interp::is_native_save_data(save.data(), save.size()));
+    // A native save is NOT mistaken for a v1 snapshot, and vice versa.
+    CHECK(!Interp::is_save_data(save.data(), save.size()));
+    std::string v1 = in.save_game("command.aslx");
+    CHECK(!Interp::is_native_save_data(v1.data(), v1.size()));
+    // The document is well-formed ASLX that reloads through the loader.
+    CHECK(save.find("<asl") != std::string::npos);
+    CHECK(save.find("original=\"command.aslx\"") != std::string::npos);
+
+    {
+        World w2;
+        CHECK(load_file("../fixtures/command.aslx", w2, "../../../quest5/aslx-core"));
+        Interp in2(w2);
+        in2.print = [](const std::string &) {};
+        std::string err;
+        bool restored = in2.restore_game(save, err);  // auto-detects native
+        if (!restored) std::cerr << "  native restore err: " << err << "\n";
+        CHECK(restored);
+
+        // Re-serialising straight after the restore reproduces the save
+        // byte-for-byte (the DFS/field order is preserved across the overlay).
+        CHECK_STR(in2.save_game_native("command.aslx"), save);
+
+        Context b2;
+        if (w2.find("InitInterface")) in2.call_function("InitInterface", {}, &b2);
+        if (in2.has_pending_on_ready()) in2.drain_on_ready();
+        w2.errors.clear();
+
+        CHECK_STR(Interp::to_string(in2.eval("player.parent", b2)), "garden");
+        CHECK_STR(Interp::to_string(in2.eval("apple.parent", b2)), "player");
+        CHECK_STR(Interp::to_string(in2.eval("chest.isopen", b2)), "True");
+        CHECK_STR(Interp::to_string(in2.eval("souvenir.parent", b2)), "player");
+        CHECK(w2.find("rose") == nullptr);
+        CHECK_STR(Interp::to_string(in2.eval("game.tally", b2)), "7");
+        CHECK_STR(Interp::to_string(in2.eval("player.ratio", b2)), "1.5");
+        CHECK_STR(Interp::to_string(
+                      in2.eval("StringDictionaryItem(game.notes, \"day\")", b2)),
+                  "one");
+        // The nested dictionary survived with its typed scalars intact.
+        CHECK_STR(Interp::to_string(
+                      in2.eval("DictionaryItem(DictionaryItem(game.grid, "
+                               "\"room1\"), \"x\")", b2)),
+                  "3");
+        CHECK_STR(Interp::to_string(
+                      in2.eval("DictionaryItem(DictionaryItem(game.grid, "
+                               "\"room1\"), \"flag\")", b2)),
+                  "True");
+
+        std::string out2;
+        in2.print = [&](const std::string &s) { out2 += s; };
+        in2.send_command("look");
+        CHECK(out2.find("garden") != std::string::npos);
+        CHECK(w2.errors.empty());
+    }
+
+    // A native save for a different-version world is rejected up front.
+    {
+        std::string bogus = save;
+        size_t vp = bogus.find("version=\"");
+        CHECK(vp != std::string::npos);
+        size_t vq = bogus.find('"', vp + 9);
+        bogus.replace(vp, vq - vp + 1, "version=\"999\"");
+        World w5;
+        CHECK(load_file("../fixtures/command.aslx", w5, "../../../quest5/aslx-core"));
+        Interp in5(w5);
+        std::string err;
+        CHECK(!in5.restore_game(bogus, err));
+        CHECK(!err.empty());
+    }
+}
+
+int main() {
+    test_self_parent_guard();
+    test_parity_batch();
+    test_undo();
+    test_save_restore();
+    test_save_hostile();
+    test_number_parse_oracle();
+    test_getinput_expression();
+    test_blocking_forms_version_window();
+    test_firsttime_per_attribute();
+    test_firsttime_shared_instance();
+    test_print_all_tags_empty();
+    test_parser_depth_caps();
+    test_attribute_names_deep();
+    test_finish_turn_deferred_across_prompts();
+    test_uncharted_room_gets_map_coordinates();
+    test_firsttime_bake_oneliners();
+    test_firsttime_bake_rejected_statements();
+    test_save_degenerate_state();
+    test_save_restore_native();
+    test_expressions();
+    test_control_flow();
+    test_functions_and_objects();
+    test_script_commands();
+    test_new_builtins();
+    test_realgame_constructs();
+    test_typed_lists();
+    test_regex_primitives();
+    test_coreboot_runs();
+    test_command_driving();
+    test_input_model();
+    test_update_lists();
+    test_rng_determinism();
+    test_rng_streams_survive_capture();
+    test_undo_history_survives_capture();
+
+    if (g_failures == 0) {
+        std::cout << "aslx_runtime_test: all checks passed\n";
+        return 0;
+    }
+    std::cerr << "aslx_runtime_test: " << g_failures << " failure(s)\n";
+    return 1;
+}

@@ -1,0 +1,56 @@
+get ice
+e
+swim down
+press button
+e
+e
+get laser cutter
+get welding torch
+e
+look at man
+get small fuel canister
+w
+s
+fill small canister
+refill torch
+n
+w
+n
+n
+look at corpse
+get power cell
+look at desk
+get rope
+s
+e
+power laser
+cut panel with laser
+tie rope to spike
+d
+e
+e
+pluck officer's eye
+look at dead officer
+get glass of whiskey
+get grenade
+look at bookcase
+get silver key
+put ice in whiskey
+drink whiskey
+w
+n
+n
+unlock box with key
+open box with key
+plug cell into retinal scanner
+hold eye in front of scanner
+n
+n
+n
+d
+throw grenade
+e
+weld bike
+mount bike
+quit
+y

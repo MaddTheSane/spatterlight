@@ -1,0 +1,93 @@
+
+
+
+look
+buy 3 acid
+next day
+sell 3 acid
+buy 48 speed
+next day
+sell 48 speed
+buy 29 weed
+next day
+sell 29 weed
+buy 14 acid
+next day
+sell 14 acid
+buy 262 speed
+next day
+sell 262 speed
+buy 66 crack
+next day
+sell 66 crack
+buy 95 acid
+next day
+sell 95 acid
+buy 2673 speed
+next day
+sell 2673 speed
+buy 566 acid
+next day
+sell 566 acid
+buy 69 coke
+next day
+sell 69 coke
+buy 7568 speed
+next day
+sell 7568 speed
+buy 4995 weed
+next day
+sell 4995 weed
+buy 1725 acid
+next day
+sell 1725 acid
+buy 4488 crack
+next day
+sell 4488 crack
+buy 70253 speed
+next day
+sell 70253 speed
+buy 21240 crack
+next day
+sell 21240 crack
+buy 495063 speed
+next day
+sell 495063 speed
+buy 178492 hash
+next day
+sell 178492 hash
+buy 12729 coke
+next day
+sell 12729 coke
+buy 1708807 speed
+next day
+sell 1708807 speed
+buy 538931 crack
+next day
+sell 538931 crack
+buy 8245188 speed
+next day
+sell 8245188 speed
+buy 118200 hash
+next day
+sell 118200 hash
+buy 1 speed
+next day
+sell 1 speed
+buy 1 coke
+next day
+sell 1 coke
+buy 1 hash
+next day
+sell 1 hash
+buy 1 speed
+next day
+sell 1 speed
+buy 1 acid
+next day
+sell 1 acid
+buy 1 crack
+next day
+sell 1 crack
+pay back 56591
+next day

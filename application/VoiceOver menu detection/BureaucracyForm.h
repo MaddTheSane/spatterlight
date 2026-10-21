@@ -7,37 +7,32 @@
 
 #import <Foundation/Foundation.h>
 
+#import "VoiceOverMenu.h"
+
 @class GlkController;
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface BureaucracyForm : NSObject
+@interface BureaucracyForm : NSObject <VoiceOverHelper>
 
-@property(weak) GlkController *glkctl;
-@property NSAttributedString *attrStr;
-@property NSArray<NSValue *> *fields;
-@property NSArray<NSString *> *fieldstrings;
-@property NSString *titlestring;
+@property(weak, nullable) GlkController *glkctl;
 @property NSUInteger selectedField;
-@property NSUInteger lastField;
-@property NSUInteger lastCharacterPos;
-@property NSRange infoFieldRange;
-@property NSString *lastInfoString;
 
 @property BOOL haveSpokenForm;
 @property BOOL dontSpeakField;
 @property BOOL haveSpokenInstructions;
-@property BOOL speakingError;
-@property BOOL didNotMove;
 
 - (instancetype)initWithGlkController:(GlkController *)glkctl;
 
-@property (NS_NONATOMIC_IOSONLY, readonly) NSUInteger findCurrentField;
-
-@property (NS_NONATOMIC_IOSONLY, getter=isForm, readonly) BOOL form;
+// Looks for one of the Bureaucracy forms in the grid window. If one is
+// found, stores its fields and finds the current field. Returns NO if no
+// form is showing.
+- (BOOL)detectForm;
+// Adds the current field to the grid window's moves, or moves it last if
+// it is already there, so that stepping through moves reviews the form.
+- (void)addCurrentFieldToMoves;
 - (void)movedFromField;
 - (void)speakCurrentField;
-- (void)deferredSpeakCurrentField:(id)sender;
 - (void)speakError;
 - (NSString *)fieldStringWithTitle:(BOOL)useTitle andIndex:(BOOL)useIndex andTotal:(BOOL)useTotal;
 

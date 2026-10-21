@@ -1,0 +1,401 @@
+# Quest 5 corpus regression manifest: <game-basename> TAB <walkthrough-file> TAB <mode>
+# game-basename: matches "<name>.quest" in ~/Downloads/Quest 5 games/
+# walkthrough-file: in ~/Downloads/Quest 5 walkthroughs/
+# mode: welbourn | commands | hints
+#   welbourn/commands -> extract_walkthrough.py drives the oracle
+#   hints             -> Q&A/prose only, no linear command script; runner skips
+# walkthrough-file "-": override-only row — no source walkthrough exists at all;
+#   the game is driven purely by its overrides/<Game>.cmd (derived from source).
+# optional 4th column (preamble): ";"-separated commands prepended before the
+#   walkthrough, for a game whose walkthrough assumes a title-screen menu was
+#   already dismissed (e.g. Dream Pieces needs "new game" or every command fails).
+# The 25 games with a walkthrough (of 50), plus Dracula (walkthrough sourced
+# externally from CASA solutionarchive — for the ORIGINAL 1986 CRL game, not
+# this 2014 remake, hence a heavily-adapted override), The Brutal Murder of
+# Jenny Lee (PDF-only walkthrough) and the two override-only wt="-" rows
+# (The Shack, The Tree) = 28 driven rows. Filename mismatches vs the
+# .quest names (Guttersnipe spacing, Jacqueline, Hawk suffix, bare .txt, The
+# Deer Trail's walkthrough named after its working title "The Deer Blind") are
+# why a naive "<Game> - walkthrough.txt" match silently misses several — hence
+# this table.
+# The six formerly hints-only games (Q&A/prose walkthroughs with no linear
+# command list) are driven by hand-derived winning scripts in overrides/.
+A Christmas Game - The Sequel	A Christmas Game - The Sequel - walkthrough.txt	welbourn
+A Christmas Game	A Christmas Game - walkthrough.txt	welbourn
+A Hobbit Trek	A Hobbit Trek - walkthrough.txt	welbourn
+Basilica de Sangre	Basilica de Sangre - walkthrough.txt	welbourn
+Dracula	Dracula - walkthrough.txt	commands
+Dream Pieces 2 - The Lego Box	Dream Pieces 2 - The Lego Box - walkthrough.txt	welbourn
+Dream Pieces	Dream Pieces - walkthrough.txt	welbourn	new game
+Escape From the Mechanical Bathhouse	Escape From the Mechanical Bathhouse - walkthrough.txt	welbourn
+Guttersnipe- Carnival of Regrets	Guttersnipe - Carnival of Regrets - walkthrough.txt	welbourn
+Guttersnipe- St. Hesper's Asylum for the Criminally Mischievous	Guttersnipe - St Hesper's Asylum for the Criminally Mischievous - walkthrough.txt	welbourn
+Guttersnipe- The Baleful Backwash	Guttersnipe - The Baleful Backwash - walkthrough.txt	welbourn
+Guttersnipe- The Baleful Backwash (2018 re-release)	Guttersnipe - The Baleful Backwash - walkthrough.txt	welbourn
+I Contain Multitudes	I Contain Multitudes - walkthrough.txt	commands
+Jacqueline, Jungle Queen!	Jacqueline Jungle Queen - walkthrough.txt	welbourn
+One Night Stand	One Night Stand - walkthrough.txt	welbourn
+The Bony King of Nowhere	The Bony King of Nowhere - walkthrough.txt	welbourn
+The Deer Trail	The Deer Blind Walkthrough.txt	commands
+The Mouse Who Woke Up For Christmas	The Mouse Who Woke Up For Christmas - walkthrough.txt	welbourn
+The Myothian Falcon	The Myothian Falcon.txt	commands
+Poppet	Poppet - Walkthrough and map.txt	welbourn
+Eight characters, a number, and a happy ending	Eight characters, a number, and a happy ending.txt	commands
+What Once Was	What Once Was - walkthrough.txt	commands
+The Brutal Murder of Jenny Lee	The Brutal Murder of Jenny Lee.pdf	commands
+Night House	Night House - Walkthrough.txt	commands
+Quest for the Serpent's Eye	Quest for the Serpent's Eye - walkthrough.txt	commands
+Hawk the Hunter	Hawk the Hunter - hints-walkthrough.txt	commands
+The Shack	-	commands
+The Tree	-	commands
+Whitefield Academy of Witchcraft	Whitefield Academy of Witchcraft - walkthrough.txt	welbourn
+The Zen Garden	-	commands
+# (No hints-only rows remain: the six formerly-hints games and the PDF-only
+#  Brutal Murder of Jenny Lee are all driven by curated overrides/ scripts.)
+# The Brutal Murder of Jenny Lee: PDF-only walkthrough (its walkthrough column
+#   points at the PDF, which run_corpus.sh only existence-checks; the game is
+#   actually driven by overrides/, like every other formerly-hints row).
+Iron John	-	commands
+La Aventura de Parodi	-	commands
+Warriors	-	commands
+Bear's Epic Quest	-	commands
+Sueña un pequeño sueño	-	commands
+El asesino durmiente (Micky)	-	commands
+Medievalist's Quest	-	commands
+Balaclava	-	commands
+cuttings	-	commands
+Everyman	-	commands
+Exit the Room	-	commands
+The Gift of the Magi	-	commands
+Welcome to the Paris Hotel!	-	commands
+Texture	-	commands
+Quest for Loot and Something Else	-	commands
+Attack On Frightside	-	commands
+Its election time in Pakistan- Go rich boy, go!	-	commands
+Nearco II (Remake) - La perdición de la Ninfa - Vr Offline	-	commands
+Caught!	-	commands
+The Last Hero	-	commands
+First Times	-	commands
+To Kindle A Light	-	commands
+Tombs and Mummies	-	commands
+The Acreage	-	commands
+ARC II	-	commands
+Xanadu - The World's Only Hope	-	commands
+spondre	-	commands
+Xanadu - In the Compound - Revenge	-	commands
+WAKE	-	commands
+HMS Victory	-	commands
+Lost in the Shadows of Time	-	commands
+The Legend of Robin Hood	-	commands
+Beowulf	-	commands
+Defeating The Monster The Ranking Of The Class	-	commands
+Fountain of Eternal Youth v1.3	-	commands
+EELTAIL	-	commands
+Great Depression Man (Middle Class)	-	commands
+L Too (2.17)	-	commands
+Lost Cavern	-	commands
+Santa Carcossa Nights	-	commands
+Sword and Spell	-	commands
+MOUNTAIN SKI 2.0	-	commands
+Oracle Feels Confused	-	commands
+The Lunastone	-	commands
+Train2019	-	commands
+Woo Rebooted 3.6	-	commands
+Moquette	-	commands
+Signos	-	commands
+Behind the Door	-	commands
+All Visitors Welcome	-	commands
+Frankenstein's Tomb	-	commands
+Treasure of the Ghost-King	-	commands
+The Eye of Mandival	-	commands
+Gilleholmen	-	commands
+Welcome to Pineview	-	commands
+The Acreage (pub 6.29 revision)	-	commands
+A UFO Landing	-	commands
+Mystery Box Of Awesome Adventure Chapter 1	-	commands
+Fun Tiemz	-	commands
+Journey to The Center of the Avocado	-	commands
+MARIO CARDS	-	commands
+Natura Oh Shoot the Gamejam is in two Hours Accel	-	commands
+Victorian Detective	-	commands
+minecraft adventure	-	commands
+Espigeonage - Escape!	-	commands
+Ten Pin Panic	-	commands
+San Bernardino	-	commands
+An Amical Bet	-	commands
+At Least it was Here	-	commands
+The Imaginaughts of Mochadia	-	commands
+Death by Discord	-	commands
+Royal Conspiracy	-	commands
+Willie and the Cludgie	-	commands
+The Last Survivor	-	commands
+Mr. Reliey Midterm	-	commands
+Settler of the Wastes	-	commands
+Escape from Byron Bay	-	commands
+Sleuth - SpringThing 2012 Edition	-	commands
+Zurculous 2	-	commands
+RandomCats	-	commands
+El Secreto de las Tres Fuentes	-	commands
+The Interlopers	-	commands
+Pirate Adventure Quest	-	commands
+Cham	-	commands
+Furby McQuack	-	commands
+Uncharted 4.5	-	commands
+Sir Loin - Coming of Age	-	commands
+First Times (alternate build)	-	commands
+Dragon	-	commands
+Alice and the Wishing Tree	-	commands
+Geocaching on the bridleway	-	commands
+Good Night	-	commands
+Now You See Me	-	commands
+Sea Lion Caves	-	commands
+Switch	-	commands
+The Hammer of God	-	commands
+The Piskie	-	commands
+The Yellow Wallpaper	-	commands
+Thyme	-	commands
+Trapped in Tomorrow, Today!	-	commands
+Washed Ashore...	-	commands
+Lord of the Rings	-	commands
+disneys time machine	-	commands
+Woo Rebooted 3.7	-	commands
+Strength to Leave	-	commands
+The Snow	-	commands
+Osterhase	-	commands
+System Restore	-	commands
+Day Of Honor	-	commands
+Into the Dragon's Den	-	commands
+Dr. Science Mouth	-	commands
+Escape from the Forbidden City	-	commands
+Twisted Tales	-	commands
+The Witch's Apprentice	-	commands
+The Lost Scroll	-	commands
+The House of Dom Orre	-	commands
+Mermaid Bay	-	commands
+Marooned	-	commands
+The Encyclopedia of Elementals	-	commands
+Shoddy and Pigears	-	commands
+The Legend of the Secret of the Smelly, Stinky Fish	-	commands
+The Curse of Gazaroth	-	commands
+Pixie's Quest	-	commands
+Deeper	-	commands
+A Story of Salvation	-	commands
+Find Andy	-	commands
+GiantKiller Too 2.15	-	commands
+GiantKiller Too 2.14	-	commands
+Mt. Underlook	-	commands
+A Stranger, Unregarded	-	commands
+Sir Loin - Coming of Age (ASL 600 build)	-	commands
+Another Puzzle	-	commands
+She Cried Against Strangling Hands	-	commands
+The Day the Sky Fell Down	-	commands
+Sleuth - Public Beta 1.7	-	commands
+Quest for the Fountain	-	commands
+The Quest for Granny's Hat	-	commands
+Story of Captain Kent	-	commands
+Dream of a Tumour	-	commands
+Weekend At Ruby's	-	commands
+Project Sparkle	-	commands
+Murder on the Hill	-	commands
+Shop Shaper	-	commands
+Island of the Magi	-	commands
+Why Now The Brown House_	-	commands
+Great Stories	-	commands
+Romancing the Throne- King's Quest II for Text	-	commands
+The 12 x 12 Deadly Rooms	-	commands
+Spectrum	-	commands
+Labyrinth	-	commands
+Then Who did it _	-	commands
+A Galaxy Consumed	-	commands
+A Night In Quasit Manor	-	commands
+A Pirate's Quest for Treasure	-	commands
+A Tiny Furry In A Huge World	-	commands
+Adventure	-	commands
+Bad Juju	-	commands
+Bestiary	-	commands
+Blech- Kogasux edition	-	commands
+Carrion Fire	-	commands
+Dark Mirrors	-	commands
+Das Haus des Todes	-	commands
+Death at Woodsbane	-	commands
+Silver Mountain	-	commands
+Sburb [A Sburb (Homestuck) Game]	-	commands
+Of Sisters and Thieves	-	commands
+Fighting Sim	-	commands
+Fatalonia	-	commands
+Pirate	-	commands
+Snow	-	commands
+House in the Forest v1.4	-	commands
+Kate's Uni Days	-	commands
+Fishvale Remake	-	commands
+Rich Uncle Skeleton's Treasure Hunt	-	commands
+Summoner	-	commands
+There is no name for such awesomeness as this	-	commands
+Gr.OWL.r	-	commands
+The Ultimate Museum	-	commands
+The Fat House	-	commands
+Giantess-Shrunk Dimensions (W.I.P)	-	commands
+The Lost Princess	-	commands
+Furry diaper adventure	-	commands
+Geocaching in the park	-	commands
+Mentor's Secrets	-	commands
+Shadowed	-	commands
+Sword Warrior Adventure	-	commands
+Giantess Shrinking	-	commands
+Spook Slayer 600	-	commands
+Small	-	commands
+Spy Games ( Episode I )	-	commands
+Vore Inc	-	commands
+The Quest for the Golden Egg	-	commands
+Fing game	-	commands
+Pest	-	commands
+So fun to be a Scientist	-	commands
+SPACE ADVENTURE CHAPTER I- THE DASTERDLY JAGLINS	-	commands
+The Story of MLJesus	-	commands
+Pathway to Destruction	-	commands
+Fantastic Dungeon Extender for American Audiences (TM)	-	commands
+Window	-	commands
+Pokemon Type Harley Gold And Silver	-	commands
+Deeper Test	-	commands
+Doctor Incognitus and the Scorpion's Sting	-	commands
+Drumsticks	-	commands
+Enter The Double Dare	-	commands
+Escape the mushrooms!	-	commands
+Exhibit Yourself	-	commands
+Fishvale	-	commands
+Friedrich Nietzsche- Übermensch	-	commands
+I want to Isekai	-	commands
+Improvised Star Trek	-	commands
+Midnight	-	commands
+Omega	-	commands
+Patrick vs. the UChicago Vampires	-	commands
+Quest for the Serpent's Eye v1.1.3	-	commands
+Cloak of Darkness (DavyB)	-	commands
+Cloak of Darkness (2013)	-	commands
+Ghost Town	-	commands
+Worship the Pig	-	commands
+Retorno	-	commands
+Rise of Death	-	commands
+Rogues Adventure	-	commands
+SPACE ADVENTURE CHAPTER II- WHERE NO ONE CAN SAVE YOU	-	commands
+Scav Hunt! Item 178	-	commands
+Shrunk at High-School	-	commands
+Snack	-	commands
+Space Scums 2	-	commands
+Spyre	-	commands
+Star Wars - A Root of Darkness	-	commands
+THE 39 STEPS	-	commands
+The Enchanted Glade	-	commands
+The Great Something _br_Act I	-	commands
+The Lodge	-	commands
+The Lost Orb	-	commands
+The Order of the Swan	-	commands
+The Swan	-	commands
+The Programming Room	-	commands
+The Witches Daughter	-	commands
+Tickle My Goose! v1.7	-	commands
+Under Shadows	-	commands
+What Dragons Need	-	commands
+Woo Goes Further	-	commands
+Xanadu 3 - The Death of Xanadu	-	commands
+speakeasy5	-	commands
+the Sirra sandbox game	-	commands
+A Cup of Tea	-	commands
+Agoraphobia	-	commands
+Bears in the Woods	-	commands
+Big Bang Theory	-	commands
+Blood room	-	commands
+Bumerang Jack 1-1	-	commands
+Carnival of Shadows	-	commands
+Charlie the Wombat's Election Voting Game	-	commands
+Cloak of Darkness (The Pixie)	-	commands
+Cowboy Adventure	-	commands
+Cradle	-	commands
+Detective	-	commands
+Easter Egg Hunt	-	commands
+Escape The Room	-	commands
+Explosions, Ahoy!	-	commands
+Filbert and the Broccoli Escape	-	commands
+Flat	-	commands
+Heliacal Hostility	-	commands
+History of the Trumpet	-	commands
+Inquiry 4	-	commands
+Investigation at Helson Manor	-	commands
+Jogo da Morte	-	commands
+Journey to the Center of Earl Clash of the Cells	-	commands
+Klein Collins High School	-	commands
+Let's Play!	-	commands
+Library	-	commands
+Life as a cat	-	commands
+Mathematicism	-	commands
+Missao Espacial_rev04	-	commands
+Night of the Creeper	-	commands
+O Livro da Verdade	-	commands
+Oh no!	-	commands
+On that Farm there was a Corpse	-	commands
+Physics Adventure	-	commands
+Pilgrims of Earth 7	-	commands
+Pit Ponies	-	commands
+Playme	-	commands
+Quest For The Golden Lunchbox	-	commands
+Ransom	-	commands
+Rubicon Street	-	commands
+Shock in the Cinema	-	commands
+Shriek	-	commands
+Space Quest!	-	commands
+Survival	-	commands
+TabblewoopGOTY	-	commands
+Technology for Breakfast!	-	commands
+Test	-	commands
+Testing This Out	-	commands
+The Four Elements	-	commands
+The Haunting	-	commands
+The Lost Valve	-	commands
+The Minimalist	-	commands
+The Obelisk Part 1	-	commands
+The Possessed vs. Donald Defoe	-	commands
+The Quest for the Orb of Knowledge by CL	-	commands
+The Tome of Power!	-	commands
+The facility	-	commands
+TheBloodyDay	-	commands
+TheEventHorizonFinal	-	commands
+Thy Dungeonman	-	commands
+Try out	-	commands
+Und wieder ein typischer Fall von Amnesie	-	commands
+Untitled Doctor Who Adventure	-	commands
+done now	-	commands
+jj	-	commands
+magicmathmine	-	commands
+nearco2	-	commands
+premier jeu	-	commands
+to the toilet	-	commands
+zombiedeathgauntlet	-	commands
+Captain Jumbo	-	commands
+Lost Hearts	-	commands
+First game	-	commands
+Despair	-	commands
+Quills	-	commands
+Heavy Rain	-	commands
+Ursake The Text Adventure	-	commands
+coolhigh1.0	-	commands
+Moonstone Falls	-	commands
+ZORK1_beta	-	commands
+The Shortest 10	-	commands
+NecroKnight	-	commands
+A Bind in Eternity's Wake	-	commands
+luna at the moon	-	commands
+The Mold Cage	-	commands
+Corgi Adventure	-	commands
+Final Hours	-	commands
+A Day in the Life as the CEO of NerdSquirrel	-	commands
+Johnny Blue Man	-	commands
+Indy Wrestler	-	commands
+Star Trek Wrath of the Romulans	-	commands
+TVGM 01 The Return of the Game Master	-	commands
+Beyond The Gloom	-	commands
+Thyme (ASL 600 build)	-	commands
+Signos (aslx build)	-	commands
+What Once Was (aslx build)	-	commands
+Chicken Farm	-	commands
+RollingDice	-	commands
+Mystery Musical	-	commands

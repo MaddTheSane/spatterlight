@@ -1,0 +1,82 @@
+use print pod
+e
+d
+n
+e
+s
+open door
+sw
+open trunk
+x clothes trunk
+get all from clothes trunk
+take clothes
+ne
+n
+w
+z
+z
+z
+z
+z
+z
+give id pass to jeriah
+x pdd
+x stainless steel lab table
+get all from stainless steel lab table
+get sample from me
+get sample from limb
+perform dna analysis
+e
+n
+e
+take grenade
+w
+s
+w
+s
+u
+w
+talk to mark
+ask mark to follow me
+e
+d
+n
+x mark
+x mark
+z
+z
+z
+z
+z
+z
+z
+z
+z
+z
+take rifle
+get sample from skyrv
+get sample from orgaan soldier
+get sample from guard
+get sample from mark
+s
+get sample from jeriah
+get sample from orgaan soldier
+u
+w
+answer vidcom
+open drawer
+take data chip
+download data
+w
+throw grenade
+n
+e
+get sample from nadine
+e
+talk to malthew
+get sample from malthew
+w
+w
+s
+shoot windows
+w

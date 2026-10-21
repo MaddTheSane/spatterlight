@@ -1,0 +1,26 @@
+# build.sh products (the standalone deterministic scare builds).
+/scare
+/scare_prof
+/scproj_det
+*.dSYM/
+
+# Makefile.headless build products (ADRIFT 4 unit harnesses and dump tools).
+battle_test_hl
+precedence_test_hl
+badparent_test_hl
+corrupt_test_hl
+quit_test_hl
+expr_test_hl
+capacity_test_hl
+scmap_dump
+
+# Probe .taf generators also emit a plaintext sidecar for eyeballing.
+*.taf.plain
+
+# Probe worlds.  The generator is the artefact, not the .taf it writes: every
+# make_*probe.py rebuilds its p<version><TAG>.taf from scratch, and the 4.00
+# ones are packed against a donor that IS tracked (p4TAKE.taf and the handful
+# of other p*.taf committed before this rule).  New probe files stay out of
+# the tree -- see "Probes and offline oracles" in
+# ../notes/WINE-TRANSCRIPTS-TODO.md.
+p[0-9]*.taf

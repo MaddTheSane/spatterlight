@@ -4,8 +4,10 @@
 
 #import <CoreSpotlight/CoreSpotlight.h>
 
-#import "main.h"
+#import "AppDelegate.h"
 #import "Constants.h"
+#import "GlkController.h"
+#import "Preferences.h"
 #import "CoreDataManager.h"
 #import "NSString+Categories.h"
 #import "AttributeDictionaryTransformer.h"
@@ -16,15 +18,21 @@
 #import "FolderAccess.h"
 #import "LibController.h"
 #import "TableViewController.h"
+#import "TableViewController+DragDrop.h"
+#import "TableViewController+LibraryManagement.h"
+#import "GameLauncher.h"
+#import "Metadatahandler.h"
 #import "Game.h"
 #import "Theme.h"
 
+#import "DebugLog.h"
+#import "NSAlert+Spatterlight.h"
+
+// Debug builds log to stderr without the NSLog timestamp prefix.
 #ifdef DEBUG
 #define NSLog(FORMAT, ...)                                                     \
     fprintf(stderr, "%s\n",                                                    \
-            [[NSString stringWithFormat:FORMAT, ##__VA_ARGS__] UTF8String]);
-#else
-#define NSLog(...)
+            [[NSString stringWithFormat:FORMAT, ##__VA_ARGS__] UTF8String])
 #endif
 
 @interface AppDelegate () <NSWindowDelegate, NSWindowRestoration> {
@@ -35,22 +43,6 @@
 @end
 
 @implementation AppDelegate
-
-NSArray *gGameFileTypes;
-NSArray *gDocFileTypes;
-NSArray *gSaveFileTypes;
-
-NSArray *gBufferStyleNames;
-NSArray *gGridStyleNames;
-
-NSDictionary *gExtMap;
-NSDictionary *gFormatMap;
-NSMutableDictionary<NSURL *, FolderAccess *> *globalBookmarks;
-
-
-NSPasteboardType PasteboardFileURLPromise,
-PasteboardFilePromiseContent,
-PasteboardFilePasteLocation;
 
 - (void)awakeFromNib {
     [super awakeFromNib];
@@ -75,74 +67,7 @@ PasteboardFilePasteLocation;
                                         forName:@"NSSecureUnarchiveFromData"];
     }
 
-    gGameFileTypes = @[
-        @"d$$", @"dat", @"sna",  @"z80",  @"tap",   @"tzx",   @"advsys",
-        @"l9",  @"mag", @"a3c",  @"acd",  @"agx",   @"gam",   @"t3",
-        @"hex", @"taf", @"z1",   @"z2",   @"z3",    @"z4",    @"z5",
-        @"z6",  @"z7",  @"z8",   @"cas",  @"asl",   @"saga",  @"jacl",
-        @"j2",  @"ulx", @"blb",  @"zlb",  @"blorb", @"glb",   @"gblorb",
-        @"d64", @"t64", @"fiad", @"dsk",  @"quill", @"zblorb",@"atr",
-        @"st",  @"msa", @"woz",  @"sag",  @"plus",  @"plu",   @"tay",
-        @"taylor"
-    ];
-
-    gDocFileTypes = @[@"rtf", @"rtfd", @"html", @"doc", @"docx", @"odt", @"xml", @"webarchive", @"txt"];
-
-    gSaveFileTypes = @[@"glksave", @"sav", @"qut", @"qzl"];
-
-    // To map the Glk style indices onto our Core Data relation names
-    gBufferStyleNames = @[
-                       @"bufferNormal",
-                       @"bufEmph",
-                       @"bufPre",
-                       @"bufHead",
-                       @"bufSubH",
-                       @"bufAlert",
-                       @"bufNote",
-                       @"bufBlock",
-                       @"bufInput",
-                       @"bufUsr1",
-                       @"bufUsr2",
-                       ];
-
-    gGridStyleNames = @[
-                       @"gridNormal",
-                       @"gridEmph",
-                       @"gridPre",
-                       @"gridHead",
-                       @"gridSubH",
-                       @"gridAlert",
-                       @"gridNote",
-                       @"gridBlock",
-                       @"gridInput",
-                       @"gridUsr1",
-                       @"gridUsr2",
-                       ];
-
-    gExtMap = @{@"acd" : @"alan2", @"a3c" : @"alan3", @"d$$" : @"agility"};
-
-    gFormatMap = @{
-                   @"adrift" : @"scare",
-                   @"advsys" : @"advsys",
-                   @"agt" : @"agility",
-                   @"glulx" : @"glulxe",
-                   @"hugo" : @"hugo",
-                   @"level9" : @"level9",
-                   @"magscrolls" : @"magnetic",
-                   @"quill" : @"unquill",
-                   @"tads2" : @"tadsr",
-                   @"tads3" : @"tadsr",
-                   @"zcode" : @"bocfel",
-                   @"quest4" : @"geas",
-                   @"jacl" : @"jacl",
-                   @"sagaplus" : @"plus",
-                   @"scott" : @"scott",
-                   @"taylor" : @"taylor"
-                   };
-
-    PasteboardFileURLPromise = (NSPasteboardType)kPasteboardTypeFileURLPromise;
-    PasteboardFilePromiseContent = (NSPasteboardType)kPasteboardTypeFilePromiseContent;
-    PasteboardFilePasteLocation = (NSPasteboardType)@"com.apple.pastelocation";
+    InitializeConstants();
 
     if (![[NSUserDefaults standardUserDefaults] boolForKey:@"HasDeletedSecurityBookmarks"]) {
         [FolderAccess deleteBookmarks];
@@ -156,6 +81,13 @@ PasteboardFilePasteLocation;
     if (!self.coreDataManager.persistentContainer) {
         NSLog(@"No persistentContainer?");
         abort();
+    }
+
+    // Repair libraries migrated by an early IfidToHashMigrationPolicy that
+    // could cross a game's title with a same-ifid sibling's filename.
+    if (![[NSUserDefaults standardUserDefaults] boolForKey:@"HasRepairedCrossedTitles"]) {
+        [self.coreDataManager repairCrossedFilenameTitles];
+        [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"HasRepairedCrossedTitles"];
     }
 
     NSStoryboard *storyboard = [NSStoryboard storyboardWithName:@"SplitView" bundle:nil];
@@ -228,23 +160,24 @@ PasteboardFilePasteLocation;
         window = appDelegate.helpLicenseWindow.window;
     } else if ([identifier isEqualToString:@"preferences"]) {
         window = appDelegate.prefctl.window;
-    } else {
-        NSString *firstLetters = [identifier substringToIndex:7];
-        NSString *ifid = [identifier substringFromIndex:7];
+    } else if ([identifier hasPrefix:@"infoWin"] || [identifier hasPrefix:@"gameWin"]) {
+        NSString *hashTag = [identifier substringFromIndex:7];
 
-        if ([firstLetters isEqualToString:@"infoWin"]) {
+        if ([identifier hasPrefix:@"infoWin"]) {
             InfoController *infoctl =
-            [[InfoController alloc] initWithIfid:ifid];
+            [[InfoController alloc] initWithHash:hashTag];
             infoctl.libcontroller = appDelegate.libctl.tableViewController;
             NSWindow *infoWindow = infoctl.window;
             infoWindow.restorable = YES;
             infoWindow.restorationClass = [AppDelegate class];
             infoWindow.identifier =
-            [NSString stringWithFormat:@"infoWin%@", ifid];
-            (appDelegate.libctl.tableViewController.infoWindows)[ifid] = infoctl;
+            [NSString stringWithFormat:@"infoWin%@", hashTag];
+            (appDelegate.libctl.tableViewController.infoWindows)[hashTag] = infoctl;
             window = infoctl.window;
-        } else if ([firstLetters isEqualToString:@"gameWin"]) {
-            window = [appDelegate.libctl.tableViewController playGameWithIFID:ifid];
+        } else {
+            window = [appDelegate.libctl.tableViewController.gameLauncher playGameWithHash:hashTag restorationHandler:[completionHandler copy]];
+            if (window)
+                return;
         }
     }
     completionHandler(window, nil);
@@ -301,14 +234,13 @@ PasteboardFilePasteLocation;
         }
     }
 
-    NSURL *directory =
-    [NSURL fileURLWithPath:[[NSUserDefaults standardUserDefaults]
-                            objectForKey:@"GameDirectory"]
-               isDirectory:YES];
+    NSString *directoryPath = [[NSUserDefaults standardUserDefaults] stringForKey:@"GameDirectory"];
+    NSURL *directory = directoryPath.length ?
+    [NSURL fileURLWithPath:directoryPath isDirectory:YES] : nil;
 
     NSOpenPanel *panel = [NSOpenPanel openPanel];
     NSMutableArray *allowedTypes = gGameFileTypes.mutableCopy;
-    if ([_tableViewController hasActiveGames]) {
+    if ([_tableViewController.gameLauncher hasActiveGames]) {
         [allowedTypes addObjectsFromArray:gDocFileTypes];
         [allowedTypes addObjectsFromArray:gSaveFileTypes];
     }
@@ -319,14 +251,14 @@ PasteboardFilePasteLocation;
     panel.accessoryView = _tableViewController.addToLibraryCheckBox;
     NSButton *addToLibraryCheckBox = (NSButton *)panel.accessoryView;
     addToLibraryCheckBox.state = [[NSUserDefaults standardUserDefaults]
-                      boolForKey:@"AddToLibrary"];
+                      boolForKey:kAddToLibraryKey];
 
     [panel beginWithCompletionHandler:^(NSInteger result) {
         NSButton *blockAddToLibraryCheckBox = (NSButton*)panel.accessoryView;
         if (result == NSModalResponseOK) {
             BOOL addToLibrary = (blockAddToLibraryCheckBox.state == NSOnState); ;
             [[NSUserDefaults standardUserDefaults]
-             setBool:addToLibrary forKey:@"AddToLibrary"];
+             setBool:addToLibrary forKey:kAddToLibraryKey];
             [Preferences instance].addToLibraryCheckbox.state = blockAddToLibraryCheckBox.state;
 
             NSURL *theDoc = panel.URLs.firstObject;
@@ -354,14 +286,13 @@ PasteboardFilePasteLocation;
     NSString *extension = path.pathExtension.lowercaseString;
 
     if ([extension isEqualToString:@"ifiction"]) {
-        [_tableViewController waitToReportMetadataImport];
-        [_tableViewController importMetadataFromFile:path inContext:_libctl.managedObjectContext];
+        [_tableViewController.metadataHandler importMetadataFromFile:path inContext:_libctl.managedObjectContext];
     } else if ([gDocFileTypes indexOfObject:extension] != NSNotFound) {
-        [_tableViewController runCommandsFromFile:path];
+        [_tableViewController.gameLauncher runCommandsFromFile:path];
     } else if ([gSaveFileTypes indexOfObject:extension] != NSNotFound) {
-        [_tableViewController restoreFromSaveFile:path];
+        [_tableViewController.gameLauncher restoreFromSaveFile:path];
     } else {
-        [_tableViewController importAndPlayGame:path];
+        [_tableViewController.gameLauncher importAndPlayGame:path];
     }
 
     return YES;
@@ -370,12 +301,17 @@ PasteboardFilePasteLocation;
 - (BOOL)applicationOpenUntitledFile:(NSApplication *)theApp {
     NSLog(@"appdel: applicationOpenUntitledFile");
 
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"ShowLibrary"]) {
+    return [self showLibraryOrOpenDocument];
+}
+
+// Shows the library if the user prefers it, otherwise the Open panel.
+// Returns YES if the library was shown.
+- (BOOL)showLibraryOrOpenDocument {
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:kShowLibraryKey]) {
         [self showLibrary:nil];
         return YES;
-    } else {
-        [self openDocument:nil];
     }
+    [self openDocument:nil];
     return NO;
 }
 
@@ -397,7 +333,10 @@ continueUserActivity:(NSUserActivity *)userActivity
         }
 
         NSURL *uri = [NSURL URLWithString:searchableItemIdentifier];
-        NSManagedObjectID *objectID = [context.persistentStoreCoordinator managedObjectIDForURIRepresentation:uri];
+        NSManagedObjectID *objectID = uri ? [context.persistentStoreCoordinator managedObjectIDForURIRepresentation:uri] : nil;
+        if (!objectID) {
+            return NO;
+        }
 
         id object = [context objectWithID:objectID];
 
@@ -405,7 +344,7 @@ continueUserActivity:(NSUserActivity *)userActivity
             return NO;
         }
 
-        [_tableViewController handleSpotlightSearchResult:object];
+        [_tableViewController.metadataHandler handleSpotlightSearchResult:object];
     }
 
     return YES;
@@ -493,7 +432,7 @@ continueUserActivity:(NSUserActivity *)userActivity
         }
     }
 
-    if ([defaults boolForKey:@"TerminationAlertSuppression"]) {
+    if ([defaults boolForKey:kTerminationAlertSuppressionKey]) {
         NSLog(@"Termination alert suppressed");
     } else {
         if (alive > 0) {
@@ -510,22 +449,12 @@ continueUserActivity:(NSUserActivity *)userActivity
                            @"\n(There are also %ld autorestorable games running.)",
                        restorable];
 
-            NSAlert *anAlert = [[NSAlert alloc] init];
-            anAlert.messageText = NSLocalizedString(@"Do you really want to quit?", nil);
+            NSAlert *anAlert = [NSAlert alertWithMessage:NSLocalizedString(@"Do you really want to quit?", nil)
+                                                    info:msg
+                                                 buttons:@[NSLocalizedString(@"Quit", nil), NSLocalizedString(@"Cancel", nil)]];
+            [anAlert showSuppressionButtonWithTitle:nil];
 
-            anAlert.informativeText = msg;
-            anAlert.showsSuppressionButton = YES; // Uses default checkbox title
-
-            [anAlert addButtonWithTitle:NSLocalizedString(@"Quit", nil)];
-            [anAlert addButtonWithTitle:NSLocalizedString(@"Cancel", nil)];
-
-            NSInteger choice = [anAlert runModal];
-
-            if (anAlert.suppressionButton.state == NSOnState) {
-                // Suppress this alert from now on
-                [defaults setBool:YES forKey:@"TerminationAlertSuppression"];
-            }
-            if (choice == NSAlertSecondButtonReturn) {
+            if ([anAlert runModalSuppressingWithKey:kTerminationAlertSuppressionKey] == NSAlertSecondButtonReturn) {
                 return NSTerminateCancel;
             }
         }
@@ -533,7 +462,7 @@ continueUserActivity:(NSUserActivity *)userActivity
 
     // We remember which window is key on termination
     // in order to make it key on restoration
-    [defaults setObject:key.game.ifid forKey:@"KeyWindowController"];
+    [defaults setObject:key.game.hashTag forKey:@"KeyWindowController"];
 
     return NSTerminateNow;
 }
@@ -543,10 +472,6 @@ continueUserActivity:(NSUserActivity *)userActivity
 }
 
 - (void)applicationWillTerminate:(NSNotification *)notification {
-
-    for (GlkController *glkctl in (_tableViewController.gameSessions).allValues) {
-        [glkctl autoSaveOnExit];
-    }
 
     NSManagedObjectContext *mainContext = _coreDataManager.mainManagedObjectContext;
 
@@ -577,13 +502,8 @@ continueUserActivity:(NSUserActivity *)userActivity
         for (NSWindow *win in app.windows)
             if (win.visible)
                 visibleWindows = YES;
-        if (!visibleWindows) {
-            if ([[NSUserDefaults standardUserDefaults] boolForKey:@"ShowLibrary"]) {
-                [self showLibrary:nil];
-            } else {
-                [self openDocument:nil];
-            }
-        }
+        if (!visibleWindows)
+            [self showLibraryOrOpenDocument];
     });
 }
 

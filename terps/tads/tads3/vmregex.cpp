@@ -1565,10 +1565,6 @@ re_status_t CRegexParser::compile(const char *expr_str, size_t exprlen,
                         if (var_id >= pat->loop_var_cnt)
                             pat->loop_var_cnt = var_id + 1;
 
-                        /* presume neither min nor max will be specified */
-                        min_val = -1;
-                        max_val = -1;
-                        
                         /* skip the current character and the '{' */
                         expr.inc();
                         expr.inc();
@@ -3947,7 +3943,7 @@ int CRegexSearcher::search(const char *entirestr, const char *str, size_t len,
      *   pattern or run out of string to test. 
      */
     utf8_ptr p;
-    for (p.set((char *)str) ; p.getptr() <= max_start_pos ; p.inc(&len))
+    for (p.set((char *)str) ; ; )
     {
         /* check for a match */
         int matchlen = match(entirestr, entirelen, p.getptr(), len,
@@ -4062,6 +4058,13 @@ int CRegexSearcher::search(const char *entirestr, const char *str, size_t len,
                 }
             }
         }
+
+        /* stop if we've reached the end of the string */
+        if (p.getptr() == max_start_pos)
+            break;
+
+        /* advance by one character and try again */
+        p.inc(&len);
     }
 
     /* if we found a previous match, return it */

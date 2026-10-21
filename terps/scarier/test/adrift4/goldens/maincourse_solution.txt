@@ -1,0 +1,30 @@
+
+
+north
+north
+take catnip
+south
+west
+drop catnip
+east
+attack cat
+attack cat
+eat cat
+take cat fur
+open door
+east
+close door
+open loo
+use toilet
+wear cat fur
+push button
+open door
+west
+look
+look
+attack human
+attack human
+eat human
+remove cat fur
+north
+main course

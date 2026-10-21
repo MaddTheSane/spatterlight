@@ -8,67 +8,11 @@
 
 #import "HelpPanelController.h"
 #import <AppKit/AppKit.h>
+#import "NSView+Categories.h"
 
-#ifdef DEBUG
-#define NSLog(FORMAT, ...)                                                     \
-fprintf(stderr, "%s\n",                                                    \
-[[NSString stringWithFormat:FORMAT, ##__VA_ARGS__] UTF8String]);
-#else
-#define NSLog(...)
-#endif
-
-@interface HelpTextView () <NSTextFinderClient> {
-    NSTextFinder *_textFinder; // define your own text finder
-}
-@end
+#import "DebugLog.h"
 
 @implementation HelpTextView
-
-// Text finder command validation (could also be done in method
-// validateUserInterfaceItem: if you prefer)
-
-- (BOOL)validateMenuItem:(NSMenuItem *)menuItem {
-    BOOL isValidItem = NO;
-
-    if (menuItem.action == @selector(performTextFinderAction:)) {
-        isValidItem = [self.textFinder validateAction:menuItem.tag];
-    }
-    // validate other menu items if needed
-    // ...
-    // and don't forget to call the superclass
-    else {
-        isValidItem = [super validateMenuItem:menuItem];
-    }
-
-    return isValidItem;
-}
-
-// Text Finder
-
-- (NSTextFinder *)textFinder {
-    // Create the text finder on demand
-    if (_textFinder == nil) {
-        _textFinder = [[NSTextFinder alloc] init];
-        _textFinder.client = self;
-        _textFinder.findBarContainer = self.enclosingScrollView;
-        _textFinder.incrementalSearchingEnabled = YES;
-        _textFinder.incrementalSearchingShouldDimContentView = NO;
-    }
-
-    return _textFinder;
-}
-
-- (void)resetTextFinder {
-    if (_textFinder != nil) {
-        [_textFinder noteClientStringWillChange];
-    }
-}
-
-// This is where the commands are actually sent to the text finder
-- (void)performTextFinderAction:(id<NSValidatedUserInterfaceItem>)sender {
-    [self.textFinder performAction:sender.tag];
-}
-
 @end
 
 @implementation HelpPanelController
@@ -167,7 +111,7 @@ fprintf(stderr, "%s\n",                                                    \
 
     NSTextStorage *textStorage = [[NSTextStorage alloc] initWithString:string];
     NSTextContainer *textContainer = [[NSTextContainer alloc]
-        initWithContainerSize:NSMakeSize(textWidth + padding * 2, FLT_MAX)];
+        initWithContainerSize:NSMakeSize(textWidth + padding * 2, CGFLOAT_MAX)];
     NSLayoutManager *layoutManager = [[NSLayoutManager alloc] init];
     [layoutManager addTextContainer:textContainer];
     [textStorage addLayoutManager:layoutManager];
@@ -213,27 +157,6 @@ fprintf(stderr, "%s\n",                                                    \
     return _textView;
 }
 
-- (NSSearchField *)findSearchFieldIn:
-    (NSView *)theView // search the subviews for a view of class NSSearchField
-{
-    NSSearchField __block __weak  *(^weak_findSearchField)(NSView *);
-    NSSearchField *(^findSearchField)(NSView *);
-    weak_findSearchField = findSearchField = ^(NSView *view) {
-        if ([view isKindOfClass:[NSSearchField class]])
-            return (NSSearchField *)view;
-        NSSearchField __block *foundView = nil;
-        [view.subviews enumerateObjectsUsingBlock:^(
-                           NSView *subview, NSUInteger idx, BOOL *stop) {
-            foundView = weak_findSearchField(subview);
-            if (foundView)
-                *stop = YES;
-        }];
-        return foundView;
-    };
-
-    return findSearchField(theView);
-}
-
 #pragma mark -
 #pragma mark Windows restoration
 
@@ -241,8 +164,12 @@ fprintf(stderr, "%s\n",                                                    \
     return @[ @"textView.string" ];
 }
 
++ (NSArray<Class> *) allowedClassesForRestorableStateKeyPath:(NSString *) keyPath {
+    return @[[NSString class]];
+}
+
 - (void)window:(NSWindow *)window willEncodeRestorableState:(NSCoder *)state {
-    NSSearchField *searchField = [self findSearchFieldIn:window.contentView];
+    NSSearchField *searchField = window.contentView.firstSearchField;
     if (searchField) {
         [state encodeObject:searchField.stringValue forKey:@"searchString"];
     }
@@ -255,8 +182,7 @@ fprintf(stderr, "%s\n",                                                    \
     if (searchString) {
         NSTextFinder *newFinder = _textView.textFinder;
         [newFinder performAction:NSTextFinderActionShowFindInterface];
-        NSSearchField *searchField =
-            [self findSearchFieldIn:window.contentView];
+        NSSearchField *searchField = window.contentView.firstSearchField;
         if (searchField) {
             searchField.stringValue = searchString;
             [newFinder cancelFindIndicator];

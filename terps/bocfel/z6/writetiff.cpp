@@ -4,123 +4,126 @@
 //
 //  Created by Administrator on 2023-05-22.
 //
+//  Minimal TIFF writer that emits a single-strip, uncompressed, big-endian
+//  baseline TIFF containing an RGBA image. The layout is fixed: an 8-byte
+//  header, the raw pixel data, then a 15-entry IFD describing it, then the
+//  four per-channel arrays the IFD points to.
+//
 
-#include "writetiff.h"
+#include <cstdio>
 
-static void writehexstring(FILE *fptr, const char *s)
-{
-    unsigned int i,c;
-    char hex[3];
+#include "writetiff.hpp"
 
-    for (i = 0; i < strlen(s);i += 2) {
-        hex[0] = s[i];
-        hex[1] = s[i+1];
-        hex[2] = '\0';
-        sscanf(hex,"%X",&c);
-        putc(c, fptr);
-    }
+// TIFFs here are emitted as MM (big-endian) regardless of host byte order.
+static void write16BE(FILE *fptr, uint16_t value) {
+    putc(value >> 8, fptr);
+    putc(value & 0xff, fptr);
 }
 
-static void write32BE(FILE *fptr, uint32_t offset) {
-    putc(offset >> 24, fptr);
-    putc((offset >> 16) & 0xff, fptr);
-    putc((offset >> 8) & 0xff, fptr);
-    putc(offset & 0xff, fptr);
+static void write32BE(FILE *fptr, uint32_t value) {
+    putc(value >> 24, fptr);
+    putc((value >> 16) & 0xff, fptr);
+    putc((value >> 8) & 0xff, fptr);
+    putc(value & 0xff, fptr);
 }
 
-void writetiff(FILE *fptr, uint8_t *pixarray, uint32_t pixarraysize, int width) {
+// IFD field types.
+static const uint16_t kShort = 3;
+static const uint16_t kLong = 4;
 
-    uint16_t height = pixarraysize / (width * 4);
+static const uint32_t kHeaderBytes = 8;
+static const uint16_t kIfdEntries = 15;
+// Entry count, twelve bytes per entry, offset of the next IFD.
+static const uint32_t kIfdBytes = 2 + kIfdEntries * 12 + 4;
+// Each of the per-channel arrays after the IFD holds four SHORTs.
+static const uint32_t kChannels = 4;
+static const uint32_t kChannelArrayBytes = kChannels * 2;
 
-    /* Write the header */
-    writehexstring(fptr, "4d4d002a");    /* Big endian & TIFF identifier */
-    uint32_t offset = pixarraysize + 8;
+// An IFD entry is 12 bytes: tag id (2), field type (2), count (4), and a
+// 4-byte field that holds the value itself, left-justified, when it fits,
+// and otherwise the file offset of the values.
+static void write_short_entry(FILE *fptr, uint16_t tag, uint16_t value) {
+    write16BE(fptr, tag);
+    write16BE(fptr, kShort);
+    write32BE(fptr, 1);
+    write16BE(fptr, value);
+    write16BE(fptr, 0);
+}
+
+static void write_long_entry(FILE *fptr, uint16_t tag, uint32_t value) {
+    write16BE(fptr, tag);
+    write16BE(fptr, kLong);
+    write32BE(fptr, 1);
+    write32BE(fptr, value);
+}
+
+// An entry for one SHORT per channel, stored at file offset `offset`.
+static void write_channel_array_entry(FILE *fptr, uint16_t tag, uint32_t offset) {
+    write16BE(fptr, tag);
+    write16BE(fptr, kShort);
+    write32BE(fptr, kChannels);
     write32BE(fptr, offset);
+}
 
-    /* Write the binary data */
+static void write_channel_array(FILE *fptr, uint16_t value) {
+    for (uint32_t i = 0; i < kChannels; i++)
+        write16BE(fptr, value);
+}
+
+// Write a complete baseline TIFF describing an RGBA bitmap:
+//   - `pixarray` points to width * height interleaved RGBA bytes
+//     (4 bytes per pixel), totaling `pixarraysize` bytes.
+//   - `width` is in pixels; height is derived as pixarraysize / (width * 4).
+// Writes nothing if the dimensions cannot be represented, and stops early
+// if the pixel write fails.
+void writetiff(FILE *fptr, const uint8_t *pixarray, uint32_t pixarraysize, int width) {
+
+    // The width and height are written as 16-bit SHORTs, so neither may
+    // exceed 65535; bail rather than emit a truncated, malformed file. A
+    // zero or negative width would also divide by zero below.
+    if (width <= 0 || width > 0xffff)
+        return;
+    uint32_t full_height = pixarraysize / ((uint32_t)width * 4);
+    if (full_height > 0xffff)
+        return;
+    uint16_t height = full_height;
+
+    // Header: big-endian byte order mark, the TIFF identifier (42), and the
+    // offset of the IFD, which follows the pixel data.
+    write16BE(fptr, 0x4d4d);
+    write16BE(fptr, 42);
+    write32BE(fptr, kHeaderBytes + pixarraysize);
+
     if (fwrite(pixarray, 1, pixarraysize, fptr) != pixarraysize)
         return;
 
-    /* Write the footer */
-    writehexstring(fptr, "000f");  /* The number of directory entries (15) */
+    // The per-channel arrays follow the IFD, in this order.
+    const uint32_t bits_per_sample_offset = kHeaderBytes + pixarraysize + kIfdBytes;
+    const uint32_t min_sample_offset = bits_per_sample_offset + kChannelArrayBytes;
+    const uint32_t max_sample_offset = min_sample_offset + kChannelArrayBytes;
+    const uint32_t sample_format_offset = max_sample_offset + kChannelArrayBytes;
 
-    /* Width tag, short int */
-    writehexstring(fptr, "0100000300000001");
-    fputc((width >> 8) & 0xff, fptr);    /* Image width */
-    fputc(width & 0xff, fptr);
-    writehexstring(fptr, "0000");
+    // The IFD. Entries must be in ascending tag order.
+    write16BE(fptr, kIfdEntries);
+    write_short_entry(fptr, 0x0100, (uint16_t)width);   // ImageWidth
+    write_short_entry(fptr, 0x0101, height);            // ImageLength
+    write_channel_array_entry(fptr, 0x0102, bits_per_sample_offset); // BitsPerSample
+    write_short_entry(fptr, 0x0103, 1);                 // Compression: none
+    write_short_entry(fptr, 0x0106, 2);                 // PhotometricInterpretation: RGB
+    write_long_entry(fptr, 0x0111, kHeaderBytes);       // StripOffsets
+    write_short_entry(fptr, 0x0112, 1);                 // Orientation: top left
+    write_short_entry(fptr, 0x0115, kChannels);         // SamplesPerPixel
+    write_short_entry(fptr, 0x0116, height);            // RowsPerStrip
+    write_long_entry(fptr, 0x0117, pixarraysize);       // StripByteCounts
+    write_channel_array_entry(fptr, 0x0118, min_sample_offset); // MinSampleValue
+    write_channel_array_entry(fptr, 0x0119, max_sample_offset); // MaxSampleValue
+    write_short_entry(fptr, 0x011c, 1);                 // PlanarConfiguration: chunky
+    write_short_entry(fptr, 0x0152, 1);                 // ExtraSamples: associated alpha
+    write_channel_array_entry(fptr, 0x0153, sample_format_offset); // SampleFormat
+    write32BE(fptr, 0);                                 // No further IFDs.
 
-    /* Height tag, short int */
-    writehexstring(fptr, "0101000300000001");
-    fputc((height >> 8) & 0xff, fptr);    /* Image height */
-    fputc(height & 0xff, fptr);
-    writehexstring(fptr, "0000");
-
-    /* Bits per sample tag, short int */
-    writehexstring(fptr, "0102000300000004");
-
-    /* Offset of first byte after directory entries */
-    offset = pixarraysize + 194;
-    write32BE(fptr, offset);
-
-    /* Compression flag, short int */
-    writehexstring(fptr, "010300030000000100010000");
-
-    /* Photometric interpolation tag, short int */
-    writehexstring(fptr, "010600030000000100020000");
-
-    /* Strip offset tag, long int */
-    writehexstring(fptr, "011100040000000100000008");
-
-    /* Orientation flag, short int */
-    writehexstring(fptr, "011200030000000100010000");
-
-    /* Sample per pixel tag, short int */
-    writehexstring(fptr, "011500030000000100040000");
-
-    /* Rows per strip tag, short int */
-    writehexstring(fptr, "0116000300000001");
-    fputc((height >> 8) & 0xff, fptr);    /* Image height */
-    fputc(height & 0xff, fptr);
-    writehexstring(fptr, "0000");
-
-    /* Strip byte count flag, long int */
-    writehexstring(fptr, "0117000400000001");
-    write32BE(fptr, pixarraysize);
-
-    /* Minimum sample value flag, short int */
-    writehexstring(fptr, "0118000300000004");
-    offset += 8;
-    write32BE(fptr, offset);
-
-    /* Maximum sample value tag, short int */
-    writehexstring(fptr, "0119000300000004");
-    offset += 8;
-    write32BE(fptr, offset);
-
-    /* Planar configuration tag, short int */
-    writehexstring(fptr, "011c00030000000100010000");
-
-    /* Extra samples tag, short int */
-    writehexstring(fptr, "015200030000000100010000");
-
-    /* Sample format tag, short int */
-    writehexstring(fptr, "0153000300000004");
-    offset += 8;
-    write32BE(fptr, offset);
-
-    /* End of the directory entry */
-    writehexstring(fptr, "00000000");
-
-    /* Bits for each colour channel */
-    writehexstring(fptr, "0008000800080008");
-
-    /* Minimum value for each component */
-    writehexstring(fptr, "0000000000000000");
-
-    /* Maximum value per channel */
-    writehexstring(fptr, "00ff00ff00ff00ff");
-
-    /* Samples per pixel for each channel */
-    writehexstring(fptr, "0001000100010001");
+    write_channel_array(fptr, 8);       // BitsPerSample
+    write_channel_array(fptr, 0);       // MinSampleValue
+    write_channel_array(fptr, 0xff);    // MaxSampleValue
+    write_channel_array(fptr, 1);       // SampleFormat: unsigned integer
 }

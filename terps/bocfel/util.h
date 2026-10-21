@@ -5,6 +5,8 @@
 
 #include <cstdarg>
 #include <functional>
+#include <istream>
+#include <optional>
 #include <string>
 
 #include "types.h"
@@ -14,9 +16,9 @@
 // Gcc appears to default to ms_printf on MinGW, even when it is
 // providing standards-conforming printf() functionality (i.e. if
 // __USE_MINGW_ANSI_STDIO is defined), so force gnu_printf there.
-#define zprintflike(f, a)	__attribute__((__format__(__gnu_printf__, f, a)))
+#define zprintflike(f, a)	[[gnu::format(__gnu_printf__, f, a)]]
 #else
-#define zprintflike(f, a)	__attribute__((__format__(__printf__, f, a)))
+#define zprintflike(f, a)	[[gnu::format(__printf__, f, a)]]
 #endif
 #else
 #define zprintflike(f, a)
@@ -45,12 +47,13 @@ zprintflike(1, 2)
 void die(const char *fmt, ...);
 void help();
 
-long parseint(const std::string &s, int base, bool &valid);
+std::optional<long> parseint(const std::string &s, int base);
 std::string vstring(const char *fmt, std::va_list ap);
 zprintflike(1, 2)
 std::string fstring(const char *fmt, ...);
 std::string ltrim(const std::string &s);
 std::string rtrim(const std::string &s);
-void parse_grouped_file(std::ifstream &f, const std::function<void(const std::string &line, int lineno)> &callback);
+void parse_grouped_file(std::istream &f, const std::function<void(const std::string &line, int lineno)> &callback);
+std::optional<std::string> zterp_getenv(const std::string &name);
 
 #endif

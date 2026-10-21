@@ -13,13 +13,16 @@
 
 @implementation Game
 
++ (NSFetchRequest<Game *> *)fetchRequest {
+	return [NSFetchRequest fetchRequestWithEntityName:@"Game"];
+}
+
 @dynamic added;
 @dynamic autosaved;
 @dynamic blorbFile;
 @dynamic checksum;
 @dynamic compiler;
 @dynamic detectedFormat;
-@dynamic like;
 @dynamic fileLocation;
 @dynamic found;
 @dynamic group;
@@ -28,13 +31,17 @@
 @dynamic hidden;
 @dynamic ifid;
 @dynamic lastPlayed;
+@dynamic like;
 @dynamic path;
 @dynamic releaseNumber;
 @dynamic serialString;
 @dynamic version;
 @dynamic metadata;
-@dynamic override;
 @dynamic theme;
+
+- (nullable NSString *)fileBaseName {
+    return self.path.lastPathComponent.stringByDeletingPathExtension;
+}
 
 - (nullable NSURL *)urlForBookmark {
     BOOL bookmarkIsStale = NO;
@@ -54,18 +61,19 @@
                                        bookmarkDataIsStale:&bookmarkIsStale
                                                      error:&theError];
 
-    if (bookmarkIsStale) {
-        NSLog(@"Bookmark is stale! New location: %@", bookmarkURL.path);
-        [self bookmarkForPath:bookmarkURL.path];
-    }
-    if (theError != nil) {
-
+    // Check the resolve result before acting on staleness, so a failed
+    // resolve never rewrites the bookmark or path.
+    if (bookmarkURL == nil) {
         NSLog(@"Game urlForBookmark: Error! %@", theError);
         if (self.path.length) {
             NSLog(@"Path: %@", self.path);
         }
         self.found = NO;
         return nil;
+    }
+    if (bookmarkIsStale) {
+        NSLog(@"Bookmark is stale! New location: %@", bookmarkURL.path);
+        [self bookmarkForPath:bookmarkURL.path];
     }
     self.path = bookmarkURL.path;
     return bookmarkURL;

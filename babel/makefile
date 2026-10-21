@@ -45,19 +45,22 @@ ifndef VERBOSE
   MAKEFLAGS+=--no-print-directory
 endif
 
-treaty_objs = zcode${OBJ} magscrolls${OBJ} blorb${OBJ} glulx${OBJ} hugo${OBJ} agt${OBJ} level9${OBJ} html${OBJ} executable${OBJ} advsys${OBJ} tads${OBJ} tads2${OBJ} tads3${OBJ} adrift${OBJ} alan${OBJ}
+treaty_objs = zcode${OBJ} magscrolls${OBJ} blorb${OBJ} glulx${OBJ} hugo${OBJ} agt${OBJ} level9${OBJ} html${OBJ} executable${OBJ} advsys${OBJ} tads${OBJ} tads2${OBJ} tads3${OBJ} adrift${OBJ} alan${OBJ} jacl${OBJ} quest4${OBJ} quest5${OBJ} quill${OBJ} archetype${OBJ} comprehend${OBJ} sagaplus${OBJ} scott${OBJ} taylor${OBJ} twine${OBJ}
 bh_objs = babel_handler${OBJ} register${OBJ} misc${OBJ} md5${OBJ} ${treaty_objs}
 ifiction_objs = ifiction${OBJ} register_ifiction${OBJ}
 babel_functions =  babel_story_functions${OBJ} babel_ifiction_functions${OBJ} babel_multi_functions${OBJ}
 babel_objs = babel${OBJ} $(BABEL_FLIB) $(IFICTION_LIB) $(BABEL_LIB)
 
 babel: ${babel_objs}
-	${COMPILER} ${OUTPUT_BABEL} ${babel_objs}
+	${COMPILER} ${OUTPUT_BABEL} ${babel_objs} -lz
 
 %${OBJ} : %.c
-	${COMPILER} -c $^
+	${COMPILER} -c $<
 
-register${OBJ}: modules.h
+# No automatic header dependencies: list the headers every file uses.
+${bh_objs} ${ifiction_objs} ${babel_functions} babel${OBJ}: treaty.h treaty_builder.h
+${bh_objs}: babel_util.h
+register${OBJ} register_ifiction${OBJ}: modules.h
 
 babel.lib: ${foreach dep,${bh_objs},${dep}.bl}
 
@@ -91,7 +94,7 @@ test:
 
 dist:
 	# MANIFEST filenames cannot contain spaces.
-	-rm rf babel.zip
+	-rm -f babel.zip
 	cut -c1-31 MANIFEST | sed -e "s/ //g" | zip babel.zip -@
 
 clean:

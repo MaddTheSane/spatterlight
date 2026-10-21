@@ -6,7 +6,7 @@
 
 #define FORMAT scott
 #define HOME_PAGE "https://github.com/cspiegel/scottfree-glk"
-#define FORMAT_EXT ".dat,.saga,.sna,.tzx,.tap,.z80,.d64,.t64,.dsk,.woz,.fiad,.atr,.sag"
+#define FORMAT_EXT ".dat,.saga,.sna,.tzx,.tap,.z80,.d64,.t64,.dsk,.woz,.fiad,.atr,.sag,.cart,.rpk,.zip"
 #define NO_METADATA
 #define NO_COVER
 
@@ -17,6 +17,7 @@
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 #include "treaty_builder.h"
+#include "babel_util.h"
 #include <ctype.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -40,24 +41,26 @@ static const char *ifids[] = {
     "DAEE386546CE71831DC365B0FF10F233", // Questprobe featuring Spider-Man
     "13EA7A22731E90598456D13311923833", // Buckaroo Banzai
 
-    "186efec3-b22e-49af-b751-6b84f04b6957", // The Golden Baton
-    "59121f68-6194-4b26-975a-b1b98598930c", // The Time Machine
-    "2f527feb-1c68-4e83-8ec7-062f5f3de3a3", // Arrow of Death part 1
-    "e1161865-90af-44c0-a706-acf069d5327a", // Arrow of Death part 2
-    "5b92a1fd-03f9-43b3-8d93-f8034ae02534", // Escape from Pulsar 7
-    "38a97e57-a465-4fb6-baad-835973b64b3a", // Circus
-    "18f3167b-93c9-4323-8195-7b9166c9a304", // Feasibility Experiment
-    "258b5da1-180c-48be-928e-add508478301", // The Wizard of Akyrz
-    "0fa37e50-60ba-48eb-97ac-f4379a5f0096", // Perseus and Andromeda
-    "c25e70bd-120a-4cfd-95b7-60d2faca026b", // Ten Little Indians
-    "c3753c92-a85e-4bf1-8578-8b3623be8fca", // Waxworks
+    "9BEB5E4FD89BB8368C2B6962CC4D3EF1", // The Golden Baton
+    "49B3EBDB42CDF7EF81F79A5BEFB2C0B1", // The Time Machine
+    "6EB620344F2139194AAD464191DE7957", // Arrow of Death part 1
+    "D28C4608062FDA5CB2708607C9542FF6", // Arrow of Death part 2
+    "FA8382CBD402531D2FCFD8661A5519AA", // Escape from Pulsar 7
+    "94A1C699FEDBF677F6DBC16B4AB89973", // Circus
+    "AE0A5A85AC0B9B18E3A60BF2BECBDC73", // Feasibility Experiment
+    "4DEBBC71B92554789E3DB80B2F68BFB9", // The Wizard of Akyrz
+    "99D9BD730F603BBA54ACF20D2267FC2A", // Perseus and Andromeda
+    "487CF8350C5DF5A65F878507DE6FDAA2", // Ten Little Indians
+    "D0D41CFBE35F7840D0D803B9648E0291", // Waxworks
 
     "D0723E8E-9C03-4DEF-BE4F-A4B594AD930A", // Gremlins
     "C9C5B722-D87E-46B4-9092-4DCA978A4668", // Gremlins - The Adventure (Spanish)
     "AA9FF03F-FBE3-4767-8ACD-29FBFDCD3A91", // Gremlins - The Adventure (German)
     "75EE0452-0A6A-4100-9185-A79316812E0B", // Super Gran - The Adventure
     "E8021308-8719-4A34-BDF9-C6F388129E53", // Robin Of Sherwood
-    "8A23C0CB-2DB3-4A19-A87E-E511477D2CDB"  // Seas Of Blood
+    "8A23C0CB-2DB3-4A19-A87E-E511477D2CDB", // Seas Of Blood
+
+    "9EA259B4FEAAF392815A79C3CECB936F"  // Return to Pirate's Isle
 };
 
 typedef enum {
@@ -95,6 +98,7 @@ typedef enum {
     SUPERGRAN_IFID,
     ROBIN_OF_SHERWOOD_IFID,
     SEAS_OF_BLOOD_IFID,
+    RETURN_TO_PIRATES_ISLE_IFID
 } IfidType;
 
 struct scottrec {
@@ -140,6 +144,10 @@ static const struct scottrec scott_registry[] = {
     { 0xb80d, 0x12c2, TIME_MACHINE_IFID }, // The Time Machine TAP
     { 0x5032, 0x5635, TIME_MACHINE_IFID }, // The Time Machine C64
    { 0x2ab00, 0xed21, TIME_MACHINE_IFID }, // The Time Machine D64 2
+   { 0x2ab00, 0x6ed7, TIME_MACHINE_IFID }, // The Time Machine D64, Supersoft
+   { 0x2ab00, 0x446e, TIME_MACHINE_IFID }, // The Time Machine D64, Cream Crackers
+   { 0x2ab00, 0x4c9e, TIME_MACHINE_IFID }, // The Time Machine D64, Megabyte
+   { 0x2ab00, 0x37c1, TIME_MACHINE_IFID }, // The Time Machine D64, BASIC loader and TIME2
     { 0x8539, 0xad02, ARROW_OF_DEATH_PART_1_IFID }, // Arrow of Death part 1 z80
     { 0x8699, 0xbb7b, ARROW_OF_DEATH_PART_1_IFID }, // Arrow of Death part 1 z80 alt
     { 0x7844, 0xd892, ARROW_OF_DEATH_PART_1_IFID }, // Arrow of Death part 1 z80 alt 2
@@ -198,7 +206,7 @@ static const struct scottrec scott_registry[] = {
     { 0x911c, 0x067e, PERSEUS_AND_ANDROMEDA_IFID }, // Perseus and Andromeda.tzx
     { 0x502b, 0x913b, PERSEUS_AND_ANDROMEDA_IFID }, // Perseus and Andromeda C64
    { 0x2ab00, 0xdc5e, PERSEUS_AND_ANDROMEDA_IFID }, // Perseus and Andromeda C64 D64
-    { 0x6fce, 0x4bac, PERSEUS_AND_ANDROMEDA_IFID }, // Perseus and Andromeda Italian
+    { 0x6fce, 0x4bac, PERSEUS_AND_ANDROMEDA_IFID }, // Antica Grecia (Perseus and Andromeda Italian)
     { 0x7bb0, 0x3877, TEN_LITTLE_INDIANS_IFID }, // Ten Little Indians z80
     { 0x7c16, 0xe269, TEN_LITTLE_INDIANS_IFID }, // Ten Little Indians z80 alt
     { 0x6fdc, 0xa77e, TEN_LITTLE_INDIANS_IFID }, // Ten Little Indians z80 alt 1
@@ -226,6 +234,8 @@ static const struct scottrec scott_registry[] = {
 
     { 0xbcd5, 0xae3f, QUESTPROBE_HULK_IFID }, // Questprobe 1 - The Hulk.tzx
     { 0xbc1e, 0xb4b6, QUESTPROBE_HULK_IFID }, // Questprobe 1 - The Hulk (Americana).tzx
+    { 0xbd72, 0xb8b3, QUESTPROBE_HULK_IFID }, // Questprobe 1 - The Hulk - Alternate.tzx
+    { 0xbbf8, 0x68c7, QUESTPROBE_HULK_IFID }, // Questprobe 1 - The Hulk (Americana) TAP image
     { 0xafba, 0xb69b, QUESTPROBE_HULK_IFID }, // Questprobe 1 - The Hulk Z80
     { 0x9f17, 0x4dae, QUESTPROBE_HULK_IFID }, // Questprobe 1 - The Hulk Z80 alt
     { 0x9ef5, 0x8082, QUESTPROBE_HULK_IFID }, // Questprobe 1 - The Hulk Z80 alt 2
@@ -234,8 +244,17 @@ static const struct scottrec scott_registry[] = {
     { 0xc01e, 0x2f60, QUESTPROBE_HULK_IFID }, // Questprobe 1 - The Hulk Z80 alt 5
     { 0x9f36, 0x4b91, QUESTPROBE_HULK_IFID }, // Questprobe 1 - The Hulk Z80 alt 6
    { 0x2ab00, 0xcdd8, QUESTPROBE_HULK_IFID }, // Questprobe 1 - The Hulk C64 (D64)
+   { 0x2ab00, 0x3d57, QUESTPROBE_HULK_IFID }, // Questprobe 1 - The Hulk C64 (D64) www.c64hq.com crack 1
+   { 0x2ab00, 0x910b, QUESTPROBE_HULK_IFID }, // Questprobe 1 - The Hulk C64 (D64) www.c64hq.com crack 2
+   { 0x2ab00, 0xaadc, QUESTPROBE_HULK_IFID }, // Questprobe 1 - The Hulk C64 (D64) www.c64hq.com crack 3
+   { 0x2ab00, 0x01c9, QUESTPROBE_HULK_IFID }, // Questprobe 1 - The Hulk C64 (D64) www.c64hq.com crack 4
+   { 0x2ab00, 0x0332, QUESTPROBE_HULK_IFID }, // Questprobe 1 - The Hulk C64 (D64) www.c64hq.com crack 5
     { 0x8534, 0x623a, QUESTPROBE_HULK_IFID }, // Questprobe 1 - The Hulk C64 (T64)
    { 0x2ab00, 0x2918, QUESTPROBE_HULK_IFID }, // Questprobe 1 - The Hulk US (D64)
+   { 0x2adab, 0x5eeb, QUESTPROBE_HULK_IFID }, // Questprobe 1 - The Hulk US [cbm_1984](D64)
+   { 0x2ab00, 0xdcfe, QUESTPROBE_HULK_IFID }, // Questprobe 1 - The Hulk US [gvp_1986](D64)
+   { 0x2ab00, 0x14e7, QUESTPROBE_HULK_IFID }, // Questprobe 1 - The Hulk US [sharedata_1987](D64)
+
    { 0x3954c, 0x8626, QUESTPROBE_HULK_IFID }, // Questprobe 1 - The Hulk US (WOZ)
    { 0x3954c, 0x9126, QUESTPROBE_HULK_IFID }, // Questprobe 1 - The Hulk US (WOZ) Graphics disk
    { 0x23000, 0x0160, QUESTPROBE_HULK_IFID }, // Questprobe 1 - The Hulk US (DSK) pre-release
@@ -258,7 +277,7 @@ static const struct scottrec scott_registry[] = {
    { 0x2adab, 0x751f, ADVENTURELAND_IFID }, // Adventureland C64 (D64) alt
    { 0x2adab, 0x64a4, ADVENTURELAND_IFID }, // Adventureland C64 (D64) alt 2
    { 0x2adab, 0x8847, ADVENTURELAND_IFID }, // Adventureland C64 (D64) alt 3
-
+   { 0x2ab00, 0x78fa, ADVENTURELAND_IFID }, // Scott Adams Adventure Pack (1983)(Adventure International)
     { 0x23000, 0x7e22, ADVENTURELAND_IFID }, // Adventureland Apple 2 (DSK)
     { 0x23000, 0x510b, ADVENTURELAND_IFID }, // Adventureland Apple 2 (DSK) Graphics disk
     { 0x23000, 0x81de, ADVENTURELAND_IFID }, // Adventureland Apple 2 (DSK) alt
@@ -277,12 +296,19 @@ static const struct scottrec scott_registry[] = {
     { 0x39567, 0xcf60, PIRATE_ADVENTURE_IFID }, // Pirate Adventure v2.1-408 (WOZ) boot
     { 0x23000, 0x2615, PIRATE_ADVENTURE_IFID }, // Pirate Adventure v2.1-408 (4am crack) (DSK) graphics disk
     { 0x23000, 0x0530, PIRATE_ADVENTURE_IFID }, // Pirate Adventure v2.1-408 (4am crack) (DSK) boot
+    { 0x23000, 0x35c5, PIRATE_ADVENTURE_IFID }, // cple__compil3_Scott_Adams__Saga_2__Pirate_Adventure_disk_1_Of_2.do
+    { 0x23000, 0xd7f2, PIRATE_ADVENTURE_IFID }, // Pcple__compil3_Scott_Adams__Saga_2__Pirate_Adventure_disk_2_Of_2.do
 
     { 0x16810, 0x65a1, PIRATE_ADVENTURE_IFID }, // Pirate Adventure v5.0-408 Atari 8 boot disk
     { 0x16810, 0x3074, PIRATE_ADVENTURE_IFID }, // Pirate Adventure v5.0-408 Atari 8 boot disk alt
     { 0x16810, 0x82c5, PIRATE_ADVENTURE_IFID }, // Pirate Adventure v5.0-408 Atari 8 boot disk alt 2
 
     { 0x2adab, 0x04c5, PIRATE_ADVENTURE_IFID }, // Pirate Adventure C64 S.A.G.A version
+    { 0x2adab, 0xbea0, PIRATE_ADVENTURE_IFID }, // Pirate Adventure C64 S.A.G.A version (c64.com)
+    { 0x2ab00, 0xac87, PIRATE_ADVENTURE_IFID }, // Pirate Adventure C64 S.A.G.A version (tape)
+    { 0x57c6, 0x82ab, PIRATE_ADVENTURE_IFID }, // Pirate Adventure C64 S.A.G.A version (tape)
+
+    { 0x16644, 0x3982, PIRATE_ADVENTURE_IFID }, // Scott Adams Scoops (1987)(U.S. Gold).tzx compilation (Pirate Adventure, Voodoo Castle, Strange Odyssey, Buckaroo Banzai; ScottFree plays the first, Pirate Adventure)
 
     { 0xbae1, 0x0ec0, SECRET_MISSION_IFID }, // Secret Mission.tzx
     { 0xbaa7, 0xfc85, SECRET_MISSION_IFID }, // Secret Mission TAP image
@@ -290,6 +316,7 @@ static const struct scottrec scott_registry[] = {
     { 0x88be, 0xa122, SECRET_MISSION_IFID }, // Secret Mission  C64 (T64)
    { 0x2ab00, 0x04d6, SECRET_MISSION_IFID }, // Secret Mission  C64 (D64)
    { 0x2adab, 0x3ca3, SECRET_MISSION_IFID }, // Secret Mission  C64 (D64) alt
+   { 0x2ab00, 0x167b, SECRET_MISSION_IFID }, // Secret Mission C64 (D64) (c64.com)
 
     { 0x23000, 0xc813, SECRET_MISSION_IFID }, // Secret Mission (DSK)
     { 0x23000, 0xa264, SECRET_MISSION_IFID }, // Secret Mission (DSK) alt
@@ -297,6 +324,7 @@ static const struct scottrec scott_registry[] = {
     { 0x39554, 0x361a, SECRET_MISSION_IFID }, // Mission Impossible v2.1-306 (WOZ) boot
     { 0x23000, 0x9f10, SECRET_MISSION_IFID }, // Mission Impossible v2.1-306 (4am crack)(DSK) graphics disk
     { 0x23000, 0x83e2, SECRET_MISSION_IFID }, // Mission Impossible v2.1-306 (4am crack)(DSK) boot
+    { 0x23000, 0xde07, SECRET_MISSION_IFID }, // Mission Impossible single-disk version
 
     { 0x16810, 0xae5d, SECRET_MISSION_IFID }, // Mission Impossible v5.0-306 Atari 8-bit boot
 
@@ -309,6 +337,7 @@ static const struct scottrec scott_registry[] = {
 
     { 0x16810, 0xc2f5, THE_COUNT_IFID }, // The Count US v5.1-115 Atari 8-bit boot disk
     { 0x16810, 0xa736, THE_COUNT_IFID }, // The Count US Atari 8-bit alt
+    { 0x2ab00, 0x2827, THE_COUNT_IFID }, // The Count US C64 (D64) (c64.com)
 
     { 0x39558, 0xff6a, VOODOO_CASTLE_IFID }, // Voodoo Castle US (WOZ)
     { 0x39558, 0x958f, VOODOO_CASTLE_IFID }, // Voodoo Castle US (WOZ) graphics disk
@@ -322,6 +351,8 @@ static const struct scottrec scott_registry[] = {
     { 0x2ab00, 0x8969, VOODOO_CASTLE_IFID }, // Voodoo Castle US C64 packed
     { 0x2ab00, 0x2682, VOODOO_CASTLE_IFID }, // Voodoo Castle US C64 packed 2
     { 0x2ab00, 0xac79, VOODOO_CASTLE_IFID }, // Voodoo Castle US C64 packed 3 (toko)
+    { 0x2ab00, 0x7822, VOODOO_CASTLE_IFID }, // Voodoo Castle US C64 packed 4 (c64.com)
+    { 0x05f91, 0x04fc, VOODOO_CASTLE_IFID }, // Voodoo Castle US T64
 
     { 0x38f00, 0xf8eb, STRANGE_ODYSSEY_IFID }, // Strange Odyssey US (WOZ)
     { 0x39559, 0x4c17, STRANGE_ODYSSEY_IFID }, // Strange Odyssey US (WOZ) alt
@@ -330,6 +361,7 @@ static const struct scottrec scott_registry[] = {
     { 0x23000, 0xd8ca, STRANGE_ODYSSEY_IFID }, // Strange Odyssey US v2.1-119  (DSK)(4am crack) graphics
 
     { 0x16810, 0xdb2a, STRANGE_ODYSSEY_IFID }, // Strange Odyssey US v5.0-119 Atari 8-bit boot disk
+    { 0x2ab00, 0x12d2, STRANGE_ODYSSEY_IFID }, // Strange Odyssey US C64 (D64) (c64.com)
 
     { 0xbae1, 0x83e9, SORCERER_OF_CLAYMORGUE_CASTLE_IFID }, // Sorcerer Of Claymorgue Castle.tzx
     { 0xbc2e, 0x4d84, SORCERER_OF_CLAYMORGUE_CASTLE_IFID }, // Sorcerer Of Claymorgue Castle - Alternate.tzx
@@ -344,6 +376,21 @@ static const struct scottrec scott_registry[] = {
    { 0x2ab00, 0x7ece, SORCERER_OF_CLAYMORGUE_CASTLE_IFID }, // Sorcerer Of Claymorgue Castle C64 (D64) alt
    { 0x2ab00, 0x0b54, SORCERER_OF_CLAYMORGUE_CASTLE_IFID }, // Sorcerer Of Claymorgue Castle C64 (D64) alt 2
    { 0x2ab00, 0xf70c, SORCERER_OF_CLAYMORGUE_CASTLE_IFID }, // Sorcerer Of Claymorgue Castle C64 (D64) alt 2
+   { 0x2ab00, 0x2c7a, SORCERER_OF_CLAYMORGUE_CASTLE_IFID }, // Sorcerer Of Claymorgue Castle C64 (D64), Dr. Bakterius & Mr. L, Section8 Packer
+   { 0x2ab00, 0xc349, SORCERER_OF_CLAYMORGUE_CASTLE_IFID }, // Sorcerer Of Claymorgue Castle C64 (D64), All Stars, Time Cruncher v3.x -> MC-Cracken Compressor
+   { 0x2ab00, 0x7ea6, SORCERER_OF_CLAYMORGUE_CASTLE_IFID }, // Sorcerer Of Claymorgue Castle C64 (D64), Trilogic Expert v2.7
+   { 0x2ab00, 0x2e5d, SORCERER_OF_CLAYMORGUE_CASTLE_IFID }, // Sorcerer Of Claymorgue Castle C64 (D64), Cracked by ABC, MasterCompressor / Relax -> ECA Compacker -> MegaByte Cruncher v1.x, missing 17 pictures
+   { 0x2ab00, 0x188f, SORCERER_OF_CLAYMORGUE_CASTLE_IFID }, // Sorcerer Of Claymorgue Castle C64 (D64), NICS, not packed, loads at $0801
+   { 0x2ab00, 0x95c1, SORCERER_OF_CLAYMORGUE_CASTLE_IFID }, // Sorcerer Of Claymorgue Castle C64 (D64), Doctor Mabuse, Section8 Packer
+   { 0x2ab00, 0x5592, SORCERER_OF_CLAYMORGUE_CASTLE_IFID }, // Sorcerer Of Claymorgue Castle C64 (D64), Danish Crackers, not packed
+   { 0x2ab00, 0x10a5, SORCERER_OF_CLAYMORGUE_CASTLE_IFID }, // Sorcerer Of Claymorgue Castle C64 (D64), Danish Crackers behind a "773 - 695" menu
+   { 0x2ab00, 0xf8c2, SORCERER_OF_CLAYMORGUE_CASTLE_IFID }, // Sorcerer Of Claymorgue Castle C64 (D64), Slam compilation with English Civil War
+   { 0x2ab00, 0x6dbd, SORCERER_OF_CLAYMORGUE_CASTLE_IFID }, // Sorcerer Of Claymorgue Castle C64 (D64), The Phantoms / SCS
+   { 0x2ab00, 0x0975, SORCERER_OF_CLAYMORGUE_CASTLE_IFID }, // Sorcerer Of Claymorgue Castle US (D64), Section 8
+   { 0x2ab00, 0x3bd6, SORCERER_OF_CLAYMORGUE_CASTLE_IFID }, // Sorcerer Of Claymorgue Castle US (D64), TIF
+   { 0x2ab00, 0x3f2b, SORCERER_OF_CLAYMORGUE_CASTLE_IFID }, // Sorcerer Of Claymorgue Castle US (D64), e=mc2, disk A
+   { 0x30300, 0x8ef3, SORCERER_OF_CLAYMORGUE_CASTLE_IFID }, // Sorcerer Of Claymorgue Castle US (D64, 40 tracks), OLICS
+   { 0x2ab00, 0x4224, SORCERER_OF_CLAYMORGUE_CASTLE_IFID }, // Sorcerer Of Claymorgue Castle US (D64), Florasoft, Section8 Packer
 
    { 0x2adab, 0x1fac, SORCERER_OF_CLAYMORGUE_CASTLE_IFID }, // Sorcerer Of Claymorgue Castle US (D64)
    { 0x2ab00, 0xfbb6, SORCERER_OF_CLAYMORGUE_CASTLE_IFID }, // Sorcerer Of Claymorgue Castle US (D64)
@@ -359,6 +406,7 @@ static const struct scottrec scott_registry[] = {
     { 0x16810, 0x7c32, SORCERER_OF_CLAYMORGUE_CASTLE_IFID }, // Sorcerer Of Claymorgue Castle Atari 8-bit (boot disk)
     { 0x16810, 0xac42, SORCERER_OF_CLAYMORGUE_CASTLE_IFID }, // Sorcerer Of Claymorgue Castle Atari 8-bit v5.1-125 (boot disk)
     { 0x16810, 0x28d7, SORCERER_OF_CLAYMORGUE_CASTLE_IFID }, // Sorcerer Of Claymorgue Castle Atari 8-bit v5.1-125 (boot disk)
+    { 0x5210, 0x9115, SORCERER_OF_CLAYMORGUE_CASTLE_IFID }, // Sorcerer Of Claymorgue Castle Atari 8-bit v3.9_123 (boot disk)
 
     { 0xb36e, 0xbe5d, QUESTPROBE_SPIDERMAN_IFID }, // Questprobe 2 - Spiderman.tzx
     { 0xb280, 0x196d, QUESTPROBE_SPIDERMAN_IFID }, // Questprobe 2 - Spiderman - Alternate.tzx
@@ -372,6 +420,7 @@ static const struct scottrec scott_registry[] = {
    { 0x2ab00, 0x2736, QUESTPROBE_SPIDERMAN_IFID }, // Spiderman C64 (D64) alt
    { 0x2ab00, 0x490a, QUESTPROBE_SPIDERMAN_IFID }, // Spiderman C64 (D64) alt 2
    { 0x2ab00, 0xc4c4, QUESTPROBE_SPIDERMAN_IFID }, // Spiderman C64 (D64) alt 3
+    { 0x3710, 0x6a02, QUESTPROBE_SPIDERMAN_IFID }, // Questprobe 2 - Spiderman Atari 8-bit 16K (UK) boot disk
 
     { 0x9e51, 0x8be7, SAVAGE_ISLAND_PART_I_IFID }, // Savage Island Part 1.tzx
     { 0x9e46, 0x7792, SAVAGE_ISLAND_PART_I_IFID }, // Savage Island Part 1 - Alternate.tzx
@@ -381,6 +430,10 @@ static const struct scottrec scott_registry[] = {
     { 0x9a4c, 0xf104, SAVAGE_ISLAND_PART_I_IFID }, // Savage Island Part 1 Z80 image
    { 0x2ab00, 0xc361, SAVAGE_ISLAND_PART_I_IFID }, // Savage Island C64 (D64)
    { 0x2ab00, 0x8801, SAVAGE_ISLAND_PART_I_IFID }, // Savage Island C64 (D64) alt
+   { 0x2ab00, 0x1a2e, SAVAGE_ISLAND_PART_I_IFID }, // Savage Island C64 US (D64)
+   { 0x2ab00, 0xeea6, SAVAGE_ISLAND_PART_II_IFID }, // Savage Island II C64 US (D64)
+    { 0x2812, 0xd13a, SAVAGE_ISLAND_PART_I_IFID }, // Savage Island C64 US (T64)
+    { 0x2825, 0xa5b1, SAVAGE_ISLAND_PART_II_IFID }, // Savage Island II C64 US (T64)
 
     { 0x9d9e, 0x4d76, SAVAGE_ISLAND_PART_II_IFID }, // Savage Island Part 2.tzx
     { 0x9e59, 0x79f4, SAVAGE_ISLAND_PART_II_IFID }, // Savage Island Part 2 - Alternate.tzx
@@ -441,6 +494,13 @@ static const struct scottrec scott_registry[] = {
    { 0x2ab00, 0xe308, SEAS_OF_BLOOD_IFID }, // Seas of Blood C64 (D64) alt
    { 0x2ab00, 0x3df2, SEAS_OF_BLOOD_IFID }, // Seas of Blood C64 (D64) alt 2
 
+   { 0x755f, 0x7113, RETURN_TO_PIRATES_ISLE_IFID }, // Return to Pirate's Isle (cartridge rpk format)
+   { 0x5e5c, 0x6d21, RETURN_TO_PIRATES_ISLE_IFID }, // Return to Pirate's Isle (cartridge MAME zip format)
+    { 0x2d000, 0x41bf, RETURN_TO_PIRATES_ISLE_IFID }, // Return to Pirate's Isle (DSK format, Pirate1.dsk)
+    { 0x2d000, 0x41c0, RETURN_TO_PIRATES_ISLE_IFID }, // Return to Pirate's Isle (DSK format, Pirate2.dsk)
+    { 0x2d000, 0x54d7, RETURN_TO_PIRATES_ISLE_IFID }, // Return to Pirate's Isle (DSK format, RTNPIRAT.DSK)
+    { 0x16800, 0xd4ad, RETURN_TO_PIRATES_ISLE_IFID }, // Return to Pirate's Isle (DSK format, ReturnToPiratesIsle_EA.DSK)
+
    { 0, 0, 0 }
 };
 
@@ -467,16 +527,8 @@ static const struct scottrec TI994A_registry[] = {
     { 0, 0, 0 }
 };
 
-static uint16_t checksum(unsigned char *sf, int32 extent)
-{
-    uint16_t c = 0;
-    for (int i = 0; i < extent; i++)
-        c+=sf[i];
-    return c;
-}
 
-
-static int32 find_in_database(unsigned char *sf, int32 extent, char **ifid) {
+static int32 find_in_database(unsigned char *sf, int32 extent, char *ifid) {
     if (extent > MAX_LENGTH || extent < MIN_LENGTH)
         return INVALID_STORY_FILE_RV;
 
@@ -486,15 +538,12 @@ static int32 find_in_database(unsigned char *sf, int32 extent, char **ifid) {
     for (int i = 0; scott_registry[i].length != 0; i++) {
         if (extent == scott_registry[i].length) {
             if (!calculated_checksum) {
-                chksum = checksum(sf, extent);
+                chksum = babel_sum16(sf, extent);
                 calculated_checksum  = 1;
             }
             if (chksum == scott_registry[i].chk) {
-                if (ifid != NULL) {
-                    size_t length = strlen(ifids[scott_registry[i].ifid]);
-                    strncpy(*ifid, ifids[scott_registry[i].ifid], length);
-                    (*ifid)[length] = 0;
-                }
+                if (ifid != NULL)
+                    babel_copy_ifid(ifid, ifids[scott_registry[i].ifid]);
                 return VALID_STORY_FILE_RV;
             }
         }
@@ -502,35 +551,20 @@ static int32 find_in_database(unsigned char *sf, int32 extent, char **ifid) {
     return INVALID_STORY_FILE_RV;
 }
 
-static int32 find_in_TI994Adatabase(uint16_t chksum, char **ifid) {
+static int32 find_in_TI994Adatabase(uint16_t chksum, char *ifid) {
 
     for (int i = 0; TI994A_registry[i].length != 0; i++) {
         if (chksum == TI994A_registry[i].chk) {
-            if (ifid != NULL) {
-                strncpy(*ifid, ifids[TI994A_registry[i].ifid], 32);
-                (*ifid)[32] = '\0';
-            }
+            if (ifid != NULL)
+                babel_copy_ifid(ifid, ifids[TI994A_registry[i].ifid]);
             return VALID_STORY_FILE_RV;
         }
     }
     return INVALID_STORY_FILE_RV;
 }
 
-static int find_code(char *x, int codelen, unsigned char *sf, int32 extent) {
-    if (codelen >= extent)
-        return -1;
-    unsigned const char *p = sf;
-    while (p < sf + extent - codelen) {
-        if (memcmp(p, x, codelen) == 0) {
-            return p - sf;
-        }
-        p++;
-    }
-    return -1;
-}
-
 static int detect_ti994a(unsigned char *sf, int32 extent) {
-    return find_code("\x30\x30\x30\x30\x00\x30\x30\x00\x28\x28", 10, sf, extent);
+    return babel_memfind(sf, extent, "\x30\x30\x30\x30\x00\x30\x30\x00\x28\x28", 10);
 }
 
 static int SanityCheckHeader(int ni, int na, int nw, int nr)
@@ -546,22 +580,18 @@ static int SanityCheckHeader(int ni, int na, int nw, int nr)
     return 1;
 }
 
-static int header[15];
-
-static uint8_t *ReadHeader(uint8_t *ptr)
+static void ReadHeader(uint8_t *ptr, int header[15])
 {
-    int i, value;
-    for (i = 0; i < 15; i++) {
-        value = *ptr + 256 * *(ptr + 1);
-        header[i] = value;
+    for (int i = 0; i < 15; i++) {
+        header[i] = ptr[0] + 256 * ptr[1];
         ptr += 2;
     }
-    return ptr - 1;
 }
 
 static int detect_atari(unsigned char *sf, int32 extent) {
-    if (extent == 0x16810 && find_code("\x96\x02\x80\x16\x80\x00", 6, sf, 7) != -1) {
-        ReadHeader(&sf[0x04f9]);
+    if (extent == 0x16810 && memcmp(sf, "\x96\x02\x80\x16\x80\x00", 6) == 0) {
+        int header[15];
+        ReadHeader(&sf[0x04f9], header);
         int ni = header[3];
         int na = header[2];
         int nw = header[1];
@@ -577,7 +607,7 @@ static int read_next_number(unsigned char *text, int32_t extent, int32_t *offset
     int i;
     bool number_found = false;
     for (i = 0; i < extent - *offset && i < 99; i++) {
-        char c = text[*offset + i];
+        unsigned char c = text[*offset + i];
         numstring[i] = c;
         if (isspace(c)) {
             if (number_found == true)
@@ -594,7 +624,8 @@ static int read_next_number(unsigned char *text, int32_t extent, int32_t *offset
         *failure = true;
         return 0;
     }
-    numstring[i+1] = '\0';
+    /* i is either at the delimiter or one past the last character read */
+    numstring[i] = '\0';
     *offset += i;
     int result = atoi(numstring);
     if (result > INT16_MAX || result < INT16_MIN)
@@ -608,14 +639,22 @@ static int read_string(unsigned char *text, int32_t extent, int32_t *offset, boo
     int c,nc;
     int ct=0;
     do {
+        if(*offset >= extent) {
+            *failure = true;
+            return 0;
+        }
         c=text[(*offset)++];
-    } while(*offset < extent && isspace(c));
+    } while(isspace(c));
     
     if(c!='"') {
         *failure = true;
         return 0;
     }
     do {
+        if(*offset >= extent) {
+            *failure = true;
+            return 0;
+        }
         c=text[(*offset)++];
         if(*offset >= extent) {
             *failure = true;
@@ -685,10 +724,10 @@ static int32 claim_story_file(void *storyvp, int32 extent)
     unsigned char *storystring = (unsigned char *)storyvp;
 
 #ifdef DEBUG
-    fprintf(stderr, "The length of this file is %x, and its checksum %x\n", extent, checksum(storystring, extent));
+    fprintf(stderr, "The length of this file is %x, and its checksum %x\n", extent, babel_sum16(storystring, extent));
 #endif
 
-    if (extent < 24 || extent > 300000)
+    if (extent < MIN_LENGTH || extent > MAX_LENGTH)
         return INVALID_STORY_FILE_RV;
 
     if (detect_atari(storystring, extent))
@@ -723,9 +762,7 @@ static int32 get_story_file_IFID(void *storyvp, int32 extent, char *output, int3
         }
         const char *ifid = ifids[index];
         if (ifid != NULL) {
-            int len = strlen(ifid);
-            strncpy(output, ifid, len);
-            output[len] = '\0';
+            babel_copy_ifid(output, ifid);
             return VALID_STORY_FILE_RV;
         }
 
@@ -738,24 +775,19 @@ static int32 get_story_file_IFID(void *storyvp, int32 extent, char *output, int3
         /* Calculate checksum using 3 Kb after the title screen */
         int checksum_length = MIN(3072, extent - title_screen_offset);
 
-        int sum = checksum(storyvp + title_screen_offset, checksum_length);
-        if (find_in_TI994Adatabase(sum, &output) == VALID_STORY_FILE_RV) {
+        int sum = babel_sum16(storystring + title_screen_offset, checksum_length);
+        if (find_in_TI994Adatabase(sum, output) == VALID_STORY_FILE_RV) {
             return VALID_STORY_FILE_RV;
         }
     }
 
-    if (find_in_database(storystring, extent, &output) == VALID_STORY_FILE_RV) {
-        size_t length = strlen(output);
-        for (int i = 0; i< length; i++)
-            output[i] = toupper(output[i]);
-        output[length] = 0;
+    if (find_in_database(storystring, extent, output) == VALID_STORY_FILE_RV)
         return VALID_STORY_FILE_RV;
-    }
 
     if (detect_scottfree(storystring, extent) == VALID_STORY_FILE_RV
      || ti99offset != -1)
     {
-        strcpy(output, "\0");
+        output[0] = '\0';
         return INCOMPLETE_REPLY_RV;
     }
     return INVALID_STORY_FILE_RV;

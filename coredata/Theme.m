@@ -10,13 +10,16 @@
 #import "Theme.h"
 #import "Game.h"
 #import "GlkStyle.h"
-#import "Interpreter.h"
-#import "Theme.h"
+#import "Fetches.h"
 
 #include "glk.h"
 #include "glkimp.h"
 
 @implementation Theme
+
++ (NSFetchRequest<Theme *> *)fetchRequest {
+	return [NSFetchRequest fetchRequestWithEntityName:@"Theme"];
+}
 
 @dynamic autosave;
 @dynamic autosaveOnTimer;
@@ -36,8 +39,8 @@
 @dynamic bZTerminator;
 @dynamic cellHeight;
 @dynamic cellWidth;
+@dynamic comprehendGraphicsType;
 @dynamic coverArtStyle;
-@dynamic cursorShape;
 @dynamic dashes;
 @dynamic defaultCols;
 @dynamic defaultRows;
@@ -65,23 +68,24 @@
 @dynamic sADisplayStyle;
 @dynamic sAInventory;
 @dynamic sAPalette;
+@dynamic scrollbackLimit;
 @dynamic slowDrawing;
 @dynamic smartQuotes;
 @dynamic smoothScroll;
 @dynamic spaceFormat;
 @dynamic spacingColor;
-@dynamic winSpacingX;
-@dynamic winSpacingY;
-@dynamic zMachineTerp;
-@dynamic zMachineLetter;
-@dynamic zMachineNoErrWin;
-@dynamic vOHackDelay;
 @dynamic vODelayOn;
+@dynamic vOHackDelay;
 @dynamic vOSpeakCommand;
 @dynamic vOSpeakImages;
 @dynamic vOSpeakMenu;
-@dynamic z6GraphicsType;
+@dynamic winSpacingX;
+@dynamic winSpacingY;
 @dynamic z6Colorize1Bit;
+@dynamic z6GraphicsType;
+@dynamic zMachineLetter;
+@dynamic zMachineNoErrWin;
+@dynamic zMachineTerp;
 @dynamic bufAlert;
 @dynamic bufBlock;
 @dynamic bufEmph;
@@ -108,27 +112,39 @@
 @dynamic gridSubH;
 @dynamic gridUsr1;
 @dynamic gridUsr2;
-@dynamic interpreter;
 @dynamic lightTheme;
-@dynamic overrides;
+
++ (NSString *)unusedNameBasedOn:(NSString *)name inContext:(NSManagedObjectContext *)context {
+    NSString *candidate = name;
+    NSUInteger counter = 2;
+    while ([Fetches findTheme:candidate inContext:context])
+        candidate = [NSString stringWithFormat:@"%@ %lu", name, (unsigned long)counter++];
+    return candidate;
+}
+
+- (nullable Theme *)ancestor {
+    NSRange modifiedRange = [self.name rangeOfString:@" (modified)"];
+    if (modifiedRange.location != NSNotFound && modifiedRange.location > 1) {
+        NSString *baseName = [self.name substringToIndex:modifiedRange.location];
+        Theme *named = [Fetches findTheme:baseName inContext:self.managedObjectContext];
+        if (named != nil)
+            return named;
+    }
+    Theme *root = self.defaultParent;
+    while (root.defaultParent != nil)
+        root = root.defaultParent;
+    if (root == nil)
+        NSLog(@"Found no ancestor theme!");
+    return root;
+}
 
 - (Theme *)clone {
-
-    NSLog(@"Creating a clone of theme %@", self.name);
-
 	//create new object in data store
 	Theme *cloned = [NSEntityDescription
                      insertNewObjectForEntityForName:@"Theme"
                      inManagedObjectContext:self.managedObjectContext];
 
 	[cloned copyAttributesFrom:self];
-
-    NSString *trimmedString = [cloned.name substringFromIndex:(NSUInteger)MAX((int)[cloned.name length] - 7, 0)]; //in case string is less than 7 characters long.
-    if ([trimmedString isEqualToString:@" cloned"])
-        cloned.name = [cloned.name stringByAppendingString:@" 2"];
-    else
-        cloned.name = [cloned.name stringByAppendingString:@" cloned"];
-
     cloned.defaultParent = self;
 	return cloned;
 }
@@ -140,7 +156,6 @@
                                 inManagedObjectContext:self.managedObjectContext].attributesByName;
 
 	for (NSString *attr in attributes) {
-        //NSLog(@"Setting my %@ to %@", attr, [theme valueForKey:attr]);
         [self setValue:[theme valueForKey:attr] forKey:attr];
 	}
 
@@ -152,21 +167,13 @@
 
     //Loop through all relationships, and clone them if nil in target.
 
-    NSString *keyName;
-    GlkStyle *clonedStyle;
     for (NSUInteger i = 0; i < style_NUMSTYLES; i++) {
-        //Clone it, and add clone to set
-        keyName = gBufferStyleNames[i];
-        clonedStyle = [(GlkStyle * )[theme valueForKey:keyName] clone];
-        //NSLog(@"Setting my %@ to a clone of the %@ of %@", keyName, keyName, theme.name);
-        [self setValue:clonedStyle forKey:keyName];
-        if ([clonedStyle valueForKey:keyName] != self)
-            NSLog(@"copyAttributesFrom error! Reciprocal relationship did not work as expected");
-        keyName = gGridStyleNames[i];
-        clonedStyle = [(GlkStyle * )[theme valueForKey:keyName] clone];
-        [self setValue:clonedStyle forKey:keyName];
-        if ([clonedStyle valueForKey:keyName] != self)
-            NSLog(@"copyAttributesFrom error! Reciprocal relationship did not work as expected");
+        for (NSString *keyName in @[gBufferStyleNames[i], gGridStyleNames[i]]) {
+            GlkStyle *clonedStyle = [(GlkStyle *)[theme valueForKey:keyName] clone];
+            [self setValue:clonedStyle forKey:keyName];
+            if ([clonedStyle valueForKey:keyName] != self)
+                NSLog(@"copyAttributesFrom error! Reciprocal relationship did not work as expected");
+        }
 	}
 }
 
@@ -198,57 +205,25 @@
     }
 
     // We skip the first element (0), i.e. the Normal styles here
-    for (NSUInteger i = 1; i < style_NUMSTYLES; i++)
-	{
-        GlkStyle *style = [self valueForKey:gGridStyleNames[i]];
-        // Delete all old GlkStyle objects that we do not want to keep
-        if (style && style.autogenerated) {
-            [self.managedObjectContext deleteObject:style];
-            style = nil;
-        }
-
-        if (!style) {
-            style = self.gridNormal.clone;
-            style.autogenerated = YES;
-        }
-
-        [self setValue:style forKey:gGridStyleNames[i]];
-        style.index = (NSInteger)i;
-
-        style = [self valueForKey:gBufferStyleNames[i]];
-
-        if (style && style.autogenerated) {
-            // Delete all old GlkStyle objects that we do not want to keep
-            [self.managedObjectContext deleteObject:style];
-            style = nil ;
-        }
-
-        if (!style) {
-            style = self.bufferNormal.clone;
-            style.autogenerated = YES;
-        }
-
-        [self setValue:style forKey:gBufferStyleNames[i]];
-        style.index = (NSInteger)i;
-	}
+    for (NSUInteger i = 1; i < style_NUMSTYLES; i++) {
+        [self replaceAutogeneratedStyleForKey:gGridStyleNames[i] withCloneOf:self.gridNormal index:i];
+        [self replaceAutogeneratedStyleForKey:gBufferStyleNames[i] withCloneOf:self.bufferNormal index:i];
+    }
 
     /* make italic, bold, bolditalic font variants */
 
-    NSFont *bufroman, *bufbold, *bufitalic, *bufbolditalic, *bufheader, *bufFixed;
-    NSFont *gridroman, *gridbold, *griditalic, *gridbolditalic;
+    NSFont *bufroman  = self.bufferNormal.font;
+    NSFont *gridroman = self.gridNormal.font;
 
-    bufroman  = self.bufferNormal.font;
-    gridroman = self.gridNormal.font;
+    NSFont *gridbold = [mgr convertWeight:YES ofFont:gridroman];
+    NSFont *griditalic = [mgr convertFont:gridroman toHaveTrait:NSItalicFontMask];
+    NSFont *gridbolditalic = [mgr convertFont:gridbold toHaveTrait:NSItalicFontMask];
 
-    gridbold = [mgr convertWeight:YES ofFont:gridroman];
-    griditalic = [mgr convertFont:gridroman toHaveTrait:NSItalicFontMask];
-    gridbolditalic = [mgr convertFont:gridbold toHaveTrait:NSItalicFontMask];
-
-    bufbold = [mgr convertWeight:YES ofFont:bufroman];
-    bufitalic = [mgr convertFont:bufroman toHaveTrait:NSItalicFontMask];
-    bufbolditalic = [mgr convertFont:bufbold toHaveTrait:NSItalicFontMask];
-    bufheader = [mgr convertFont:bufbold toSize:bufbold.pointSize + 2];
-    bufFixed = [mgr convertFont:gridroman toHaveTrait:NSFixedPitchFontMask];
+    NSFont *bufbold = [mgr convertWeight:YES ofFont:bufroman];
+    NSFont *bufitalic = [mgr convertFont:bufroman toHaveTrait:NSItalicFontMask];
+    NSFont *bufbolditalic = [mgr convertFont:bufbold toHaveTrait:NSItalicFontMask];
+    NSFont *bufheader = [mgr convertFont:bufbold toSize:bufbold.pointSize + 2];
+    NSFont *bufFixed = [mgr convertFont:gridroman toHaveTrait:NSFixedPitchFontMask];
 
     // If this does not work, we hack it to use Source Code Pro
     if (([mgr traitsOfFont:bufFixed] & NSFixedPitchFontMask) != NSFixedPitchFontMask) {
@@ -261,54 +236,61 @@
     }
     bufFixed = [mgr convertFont:bufFixed toSize:bufroman.pointSize];
 
-    if (self.bufInput.autogenerated)
-        (self.bufInput).font = [bufbold copy];
-    if (self.bufEmph.autogenerated)
-        (self.bufEmph).font = [bufitalic copy];
-    if (self.bufHead.autogenerated)
-        (self.bufHead).font = [bufheader copy];
-    if (self.bufSubH.autogenerated)
-        (self.bufSubH).font = [bufbold copy];
-    if (self.bufAlert.autogenerated)
-        (self.bufAlert).font = [bufbolditalic copy];
-    if (self.bufPre.autogenerated)
-        (self.bufPre).font = [bufFixed copy];
+    // Only autogenerated styles get the variants: the user may have changed
+    // the others. The styles not listed keep the font of their Normal style.
+    NSDictionary<NSString *, NSFont *> *variants = @{
+        @"bufInput": bufbold,
+        @"bufEmph": bufitalic,
+        @"bufHead": bufheader,
+        @"bufSubH": bufbold,
+        @"bufAlert": bufbolditalic,
+        @"bufPre": bufFixed,
 
-    if (self.gridInput.autogenerated)
-        (self.gridInput).font = [gridbold copy];
-    if (self.gridEmph.autogenerated)
-        (self.gridEmph).font = [griditalic copy];
-    if (self.gridHead.autogenerated)
-        (self.gridHead).font = [gridbold copy];
-    if (self.gridSubH.autogenerated)
-        (self.gridSubH).font = [gridbold copy];
-    if (self.gridAlert.autogenerated)
-        (self.gridAlert).font = [gridbolditalic copy];
+        @"gridInput": gridbold,
+        @"gridEmph": griditalic,
+        @"gridHead": gridbold,
+        @"gridSubH": gridbold,
+        @"gridAlert": gridbolditalic
+    };
+
+    for (NSString *key in variants) {
+        GlkStyle *style = [self valueForKey:key];
+        if (style.autogenerated)
+            style.font = [variants[key] copy];
+    }
+}
+
+// Deletes the style at key if it was autogenerated, and gives the theme a
+// fresh autogenerated clone of normal there unless the user's own style is
+// still in place.
+- (void)replaceAutogeneratedStyleForKey:(NSString *)key withCloneOf:(GlkStyle *)normal index:(NSUInteger)index {
+    GlkStyle *style = [self valueForKey:key];
+    if (style && style.autogenerated) {
+        [self.managedObjectContext deleteObject:style];
+        style = nil;
+    }
+
+    if (!style) {
+        style = normal.clone;
+        style.autogenerated = YES;
+    }
+
+    [self setValue:style forKey:key];
+    style.index = (NSInteger)index;
 }
 
 - (NSArray *)allStyles {
-    return @[ self.bufAlert,
-              self.bufBlock,
-              self.bufEmph,
-              self.bufferNormal,
-              self.bufHead,
-              self.bufInput,
-              self.bufNote,
-              self.bufPre,
-              self.bufSubH,
-              self.bufUsr1,
-              self.bufUsr2,
-              self.gridAlert,
-              self.gridBlock,
-              self.gridEmph,
-              self.gridHead,
-              self.gridInput,
-              self.gridNormal,
-              self.gridNote,
-              self.gridPre,
-              self.gridSubH,
-              self.gridUsr1,
-              self.gridUsr2 ];
+    // Skips missing styles: a theme whose styles have not been populated yet
+    // would otherwise raise when building the array.
+    NSMutableArray<GlkStyle *> *styles = [NSMutableArray arrayWithCapacity:style_NUMSTYLES * 2];
+    for (NSUInteger i = 0; i < style_NUMSTYLES; i++) {
+        for (NSString *key in @[gBufferStyleNames[i], gGridStyleNames[i]]) {
+            GlkStyle *style = [self valueForKey:key];
+            if (style)
+                [styles addObject:style];
+        }
+    }
+    return styles;
 }
 
 // These are values that should be the same in all
@@ -328,7 +310,7 @@
 
     self.minTimer = 5;
     self.smoothScroll = YES;
-    self.vOSpeakCommand = YES;
+    self.vOSpeakCommand = 1;
     self.vOSpeakImages = kVOImageWithDescriptionOnly;
     self.vOSpeakMenu = kVOMenuTextOnly;
     self.vODelayOn = YES;
@@ -344,19 +326,7 @@
     self.bufLinkStyle = NSUnderlineStyleSingle;
     self.bufLinkColor = nil;
     self.gridLinkColor = nil;
-
-// These values are not currently used
-
-//    self.maxCols = 1000;
-//    self.maxRows = 1000;
-//    self.minCols = 32;
-//    self.minRows = 5;
-//    self.cursorShape = 0;
-//    self.imageSizing = NO;
-//    self.justify = NO;
-//    self.vOExtraElements = NO;
-//    self.vOSpeakInputType = 0;
-
+    self.slowDrawing = YES;
 }
 
 - (BOOL)hasCustomStyles {

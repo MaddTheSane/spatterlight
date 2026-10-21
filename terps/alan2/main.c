@@ -6,6 +6,8 @@
 
 \*----------------------------------------------------------------------*/
 
+#define V25COMPATIBLE
+#define V26COMPATIBLE
 #define V27COMPATIBLE
 
 #include "sysdep.h"
@@ -13,6 +15,7 @@
 #include "types.h"
 #include "main.h"
 
+#include <errno.h>
 #include <time.h>
 #ifdef USE_READLINE
 #include "readline.h"
@@ -39,6 +42,8 @@
 #ifdef GLK
 #include "glk.h"
 #include "glkio.h"
+#include "glkmedia.h"
+#include "randomness.h"
 
 extern glui32 gli_determinism;
 #endif
@@ -116,6 +121,7 @@ static jmp_buf jmpbuf;		/* Error return long jump buffer */
 
  */
 #ifdef _PROTOTYPES_
+void terminate(int code) __attribute__((noreturn));
 void terminate(int code)
 #else
 void terminate(code)
@@ -157,6 +163,9 @@ void terminate(code)
 #endif
 
 #ifdef GLK
+#ifdef SPATTERLIGHT
+  glkmedia_flush_output();      /* the last picture may still be holding */
+#endif
   glk_exit();
 #else
   exit(code);
@@ -201,6 +210,7 @@ void usage()
 
  */
 #ifdef _PROTOTYPES_
+void syserr(char *str) __attribute__((noreturn));
 void syserr(char *str)
 #else
 void syserr(str)
@@ -355,7 +365,9 @@ void newline()
 #endif
 {
 #ifdef GLK
-  glk_put_char('\n');
+  /* Through printf(), not glk_put_char(), so that paragraph breaks reach
+     the media layer's output filter along with everything else */
+  printf("\n");
 #else
   char buf[256];
   
@@ -703,6 +715,27 @@ void prmsg(msg)
      MsgKind msg;		/* IN - message number */
 #endif
 {
+#ifdef V26COMPATIBLE
+  if (header->vers[0] == 2 && header->vers[1] < 7) {
+    /* Up to 2.6 the message table held (fpos, len) pairs pointing straight
+       into the text file, instead of addresses to statement code. */
+    MsgElem26 *msgs26 = (MsgElem26 *) msgs;
+
+    if (msg == M_QUITACTION) {	/* Did not exist before 2.7 */
+      output("Do you want to RESTART, RESTORE or QUIT? ");
+      return;
+    }
+    if (msg == M_ARTICLE) {	/* Moved when M_QUITACTION was inserted */
+#ifdef V25COMPATIBLE
+      if (header->vers[1] < 6)	/* Did not exist at all before 2.6 */
+	return;
+#endif
+      msg = M_ARTICLE26;
+    }
+    print(msgs26[msg].fpos, msgs26[msg].len);
+    return;
+  }
+#endif
   interpret(msgs[msg].stms);
 }
 
@@ -1189,7 +1222,7 @@ static void do_it(void)
 static void do_it()
 #endif
 {
-  AltElem *alt[MAXPARAMS+2];	/* List of alt-pointers, one for each param */
+  AltElem *alt[MAXPARAMS+2] = {0};	/* List of alt-pointers, one for each param */
   Boolean done[MAXPARAMS+2];	/* Is it done */
   int i;			/* Parameter index */
   char trace[80];		/* Trace string buffer */
@@ -1423,6 +1456,47 @@ static char txtfnm[256] = "";
 static char logfnm[256] = "";
 
 
+#ifdef V25COMPATIBLE
+/*----------------------------------------------------------------------
+
+  c25to26ACD()
+
+  Convert a loaded 2.5 object table to the 2.6 format, which added the
+  'art' field for the ARTICLE clause. Rather than expanding the table in
+  place, which would move every following table and require relocating all
+  addresses in the image, build the wider table in the spare memory above
+  the loaded code and point the header at it.
+
+ */
+#ifdef _PROTOTYPES_
+static void c25to26ACD(void)
+#else
+static void c25to26ACD()
+#endif
+{
+  int i;
+  int noOfObjs = header->objmax - header->objmin + 1;
+  ObjElem25 *old = (ObjElem25 *) addrTo(header->objs);
+  ObjElem *new = (ObjElem *) addrTo(memTop);
+
+  for (i = 0; i < noOfObjs; i++) {
+    new[i].loc = old[i].loc;
+    new[i].describe = old[i].describe;
+    new[i].atrs = old[i].atrs;
+    new[i].cont = old[i].cont;
+    new[i].vrbs = old[i].vrbs;
+    new[i].dscr1 = old[i].dscr1;
+    new[i].art = 0;		/* No ARTICLE clause before 2.6 */
+    new[i].dscr2 = old[i].dscr2;
+  }
+
+  header->objs = memTop;
+  memTop += noOfObjs*sizeof(ObjElem)/sizeof(Aword);
+  memory[memTop++] = (Aword) EOF;	/* End of table marker */
+}
+#endif
+
+
 /*----------------------------------------------------------------------
 
   checkvers()
@@ -1456,10 +1530,16 @@ static void checkvers(header)
   }
 
   /* Compatible if version and revision match... */
+  errno = 0;
   if (strncmp(header->vers, vers, 2) != 0) {
 #ifdef V25COMPATIBLE
     if (header->vers[0] == 2 && header->vers[1] == 5) /* Check for 2.5 version */
       /* This we can convert later if needed... */;
+    else
+#endif
+#ifdef V26COMPATIBLE
+    if (header->vers[0] == 2 && header->vers[1] == 6) /* Check for 2.6 version */
+      /* Handled by runtime version checks in prmsg() and reverseMsgs() */;
     else
 #endif
 #ifdef V27COMPATIBLE
@@ -1497,9 +1577,17 @@ static void load()
   int i,tmp;
   char err[100];
 
+  errno = 0;
   rewind(codfil);
+  if (errno != 0)
+    syserr("Could not rewind ACD file.");
   tmp = fread(&tmphdr, sizeof(tmphdr), 1, codfil);
+  if (tmp != 1)
+    syserr("Could not read ACD header.");
+  errno = 0;
   rewind(codfil);
+  if (errno != 0)
+    syserr("Could not rewind ACD file.");
   checkvers(&tmphdr);
 
   /* Allocate and load memory */
@@ -1512,8 +1600,10 @@ static void load()
   if (memory == NULL) {
 #ifdef V25COMPATIBLE
     if (tmphdr.vers[0] == 2 && tmphdr.vers[1] == 5)
-      /* We need some more memory to expand 2.5 format*/
-      memory = allocate((tmphdr.size+tmphdr.objmax-tmphdr.objmin+1+2)*sizeof(Aword));
+      /* We need room for a rebuilt, wider object table above the code */
+      memory = allocate((tmphdr.size
+			 + (tmphdr.objmax-tmphdr.objmin+1)*sizeof(ObjElem)/sizeof(Aword)
+			 + 1)*sizeof(Aword));
     else
 #endif
       memory = allocate(tmphdr.size*sizeof(Aword));
@@ -1589,12 +1679,15 @@ static void checkdebug()
     stpflg = FALSE;
   }
 
-  if (dbgflg)			/* If debugging */
-    srand(0);			/* use no randomization */
-  else if (gli_determinism)
-    srand(1234);
+  /* Seed the shared erkyrath_random() generator (terps/common_utils/
+     randomness.c), as the Scott/TaylorMade/Plus/Comprehend ports do.  A
+     non-zero seed is reproducible; seed 0 lets it pick a platform-native one.
+     Debugging ("no randomization") and the user's determinism testing theme
+     both want a fixed, replayable sequence, so both use 1234. */
+  if (dbgflg || gli_determinism)
+    set_erkyrath_random(1234);
   else
-    srand(time(0));		/* seed random generator */
+    set_erkyrath_random(0);	/* platform-native seed */
 }
 
 
@@ -1694,6 +1787,12 @@ static void init()
   etop = 0;			/* No pending events */
   looking = FALSE;		/* Not looking now */
   dscrstkp = 0;			/* No describe in progress */
+
+#ifdef SPATTERLIGHT
+  /* run() longjmps back here to restart, and the start section shows the
+     title screens again */
+  glkmedia_reset();
+#endif
 
   load();
 
@@ -1828,12 +1927,12 @@ static void openFiles()
   time_t tick;
 
   /* Open Acode file */
-  strcpy(codfnm, advnam);
-  strcat(codfnm, ".acd");
+  strncpy(codfnm, advnam, sizeof(codfnm) - 1);
+  strncat(codfnm, ".acd", sizeof(codfnm) - strlen(codfnm) - 1);
   if ((codfil = fopen(codfnm, READ_MODE)) == NULL) {
-    strcpy(str, "Can't open adventure code file '");
-    strcat(str, codfnm);
-    strcat(str, "'.");
+    strncpy(str, "Can't open adventure code file '", sizeof(str) - 1);
+    strncat(str, codfnm, sizeof(str) - strlen(str) - 1);
+    strncat(str, "'.", sizeof(str) - strlen(str) - 1);
     syserr(str);
   }
 
@@ -1846,12 +1945,12 @@ static void openFiles()
 #endif
 
   /* Open Text file */
-  strcpy(txtfnm, advnam);
-  strcat(txtfnm, ".dat");
+  strncpy(txtfnm, advnam, sizeof(txtfnm) - 1);
+  strncat(txtfnm, ".dat", sizeof(txtfnm) - strlen(txtfnm) - 1);
   if ((txtfil = fopen(txtfnm, READ_MODE)) == NULL) {
-    strcpy(str, "Can't open adventure text data file '");
-    strcat(str, txtfnm);
-    strcat(str, "'.");
+    strncpy(str, "Can't open adventure text data file '", sizeof(str) - 1);
+    strncat(str, txtfnm, sizeof(str) - strlen(str) - 1);
+    strncat(str, "'.", sizeof(str) - strlen(str) - 1);
     syserr(str);
   }
 

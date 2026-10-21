@@ -86,6 +86,10 @@
 #include "glk.h"
 
 extern glui32 gli_determinism;
+extern int gli_sa_delays;
+
+/* Synthesised square-wave tone (glkimp/connect.c); used by agt_tone() below. */
+extern void win_beep_freq(int frequency, int millisecs);
 
 /*
  * True and false definitions -- usually defined in glkstart.h, but we need
@@ -115,6 +119,19 @@ static const glui32 GAGT_PORT_VERSION = 0x00010701;
  */
 static winid_t gagt_main_window = NULL,
                gagt_status_window = NULL;
+
+/*
+ * State for showing the title screen in the (temporarily enlarged) status
+ * grid window, so it can be drawn frame-first then filled in, the way the
+ * original AGT runner does.  While gagt_title_in_grid is set, the title
+ * "owns" the grid and the normal status line is suppressed; gagt_title_paint
+ * repaints it (used both for the initial animation and on resize/redraw).
+ * See the gagt_title_* functions further down.
+ */
+static int gagt_title_in_grid = FALSE;
+static int gagt_title_animating = FALSE;
+static void gagt_title_paint (int animate);
+static void gagt_title_collapse (void);
 
 /*
  * Transcript stream and input log.  These are NULL if there is no current
@@ -329,38 +346,33 @@ gagt_debug (const char *function, const char *format, ...)
 /*
  * agt_tone()
  *
- * Produce a hz-Hertz sound for ms milliseconds.
+ * Produce a hz-Hertz sound for ms milliseconds.  The Tone(hz,ms) opcode is
+ * already gated engine-side by PURE_TONE && sound_on (token.c); the app gates
+ * playback further on theme.doSound.  We reuse the same synthesised square-wave
+ * BEEP path the ZX Spectrum tones ride.  This is non-blocking (the original DOS
+ * agt_tone blocked for the duration), but consecutive Tone calls are chained
+ * back-to-back by the app, which preserves AGT melodies.
  */
 void
 agt_tone (int hz, int ms)
 {
   gagt_debug ("agt_tone", "hz=%d, ms=%d", hz, ms);
+  win_beep_freq (hz, ms);
 }
 
 
 /*
  * agt_rand()
  *
- * Return random number from a to b inclusive.  The random number generator
- * is seeded on the first call, to a reproducible sequence if stable_random,
- * otherwise using time().
+ * Return random number from a to b inclusive.  All randomness now flows
+ * through get_random() (token.c), which draws from the shared
+ * erkyrath_random() generator and handles deterministic seeding; agt_rand()
+ * remains only as the os-layer entry point declared by interp.h.
  */
 int
 agt_rand (int a, int b)
 {
-  static int is_initialized = FALSE;
-
-  int result;
-
-  if (!is_initialized)
-    {
-      srand ((stable_random || gli_determinism) ? 6 : time (0));
-
-      is_initialized = TRUE;
-      gagt_debug ("agt_rand", "[initialized]");
-    }
-
-  result = a + (rand () >> 2) % (b - a + 1);
+  int result = get_random (a, b);
   gagt_debug ("agt_rand", "a=%d, b=%d -> %d", a, b, result);
   return result;
 }
@@ -964,6 +976,10 @@ gagt_status_update (void)
   int index;
   assert (gagt_status_window);
 
+  /* While the title screen owns the grid window, leave it untouched. */
+  if (gagt_title_in_grid)
+    return;
+
   glk_window_get_size (gagt_status_window, &width, &height);
   if (height > 0)
     {
@@ -1121,7 +1137,19 @@ gagt_status_redraw (void)
                                       winmethod_Above | winmethod_Fixed,
                                       height, NULL);
 
-          gagt_status_update ();
+          /*
+           * If the title screen is occupying the grid, repaint it rather
+           * than the status line.  During the initial animation we leave it
+           * alone, so an arrange event (including the one from growing the
+           * window) doesn't paint the whole title at once.
+           */
+          if (gagt_title_in_grid)
+            {
+              if (!gagt_title_animating)
+                gagt_title_paint (FALSE);
+            }
+          else
+            gagt_status_update ();
         }
     }
 }
@@ -2755,6 +2783,49 @@ gagt_assign_paragraph_font_hints (const gagt_paragraphref_t paragraph)
     }
 
   /*
+   * Phase 4.5 -- preserve line breaks in indented lists.
+   *
+   * If any remaining line is indented more deeply than the paragraph's
+   * first line, then the paragraph isn't flowing prose; it's structured
+   * output such as an inventory or other nested list.  AGT hard-wraps real
+   * prose with uniform indentation, so a more deeply indented line is a
+   * reliable signal of a list rather than a wrapped paragraph.
+   *
+   * Phase 5 below only keeps the newline significant for the single line
+   * that returns to the first-line indentation after a nested block, so
+   * sibling list items at the first-line indentation that follow such a
+   * block get run together (for example the top-level inventory items
+   * "sharp switchblade" and "two dollars" after a containing item's
+   * contents).  Phase 8's "all lines short" safeguard doesn't rescue this
+   * when a deeper line happens to be long.  So when we recognize a list,
+   * honour every line's newline and return.
+   */
+  {
+    int is_list;
+
+    is_list = FALSE;
+    for (line = gagt_get_next_paragraph_line (first_line);
+         line; line = gagt_get_next_paragraph_line (line))
+      {
+        if (line->indent > first_line->indent)
+          {
+            is_list = TRUE;
+            break;
+          }
+      }
+
+    if (is_list)
+      {
+        for (line = first_line;
+             line; line = gagt_get_next_paragraph_line (line))
+          gagt_set_font_hint_proportional_newline (line);
+
+        /* Nothing more to do. */
+        return;
+      }
+  }
+
+  /*
    * Phase 5 -- try to identify lists by a simple initial look at line
    *            indentations.
    *
@@ -3747,6 +3818,14 @@ agt_clrscr (void)
 {
   if (!BATCH_MODE)
     {
+      /*
+       * If the title screen is showing in the grid window, this clear marks
+       * the point where it is dismissed (the game, instructions, or info is
+       * about to be shown), so collapse it back to the normal status line.
+       */
+      if (gagt_title_in_grid)
+        gagt_title_collapse ();
+
       /* Update the apparent (virtual) window x position. */
       curr_x = 0;
 
@@ -3953,6 +4032,361 @@ gagt_delay_resume (void)
 }
 
 
+/*
+ * Per-line pause, in milliseconds, used to reveal the title screen one line
+ * at a time, the way the original AGT runner does.  Kept short so the whole
+ * title appears briskly; halved again in DELAY_SHORT mode.
+ */
+static const glui32 GAGT_TITLE_REVEAL_MS = 120;
+
+/*
+ * gagt_title_reveal_wanted()
+ *
+ * Return TRUE if the title screen should be revealed line by line.  This
+ * requires the Spatterlight slow-draw/delays option (gli_sa_delays) to be
+ * enabled, and otherwise follows the same gating as agt_delay() -- a usable
+ * Glk timer, delays not turned off, and not replaying or batching.
+ */
+static int
+gagt_title_reveal_wanted (void)
+{
+  return gli_sa_delays
+         && glk_gestalt (gestalt_Timer, 0)
+         && gagt_delay_mode != DELAY_OFF
+         && !fast_replay && !BATCH_MODE;
+}
+
+/*
+ * gagt_title_delay()
+ *
+ * Pause for GAGT_TITLE_REVEAL_MS between title lines.  Like agt_delay(),
+ * the pause can be cut short by a keypress; the return value is TRUE if the
+ * pause ran to completion, or FALSE if the user pressed a key to skip it.
+ */
+static int
+gagt_title_delay (void)
+{
+  glui32 milliseconds, delayed;
+  int completed;
+
+  milliseconds = GAGT_TITLE_REVEAL_MS
+                 / (gagt_delay_mode == DELAY_SHORT ? 2 : 1);
+
+  glk_request_char_event (gagt_main_window);
+  glk_request_timer_events (GAGT_DELAY_TIMEOUT);
+
+  completed = TRUE;
+  for (delayed = 0; delayed < milliseconds; delayed += GAGT_DELAY_TIMEOUT)
+    {
+      event_t event;
+
+      gagt_event_wait_2 (evtype_CharInput, evtype_Timer, &event);
+      if (event.type == evtype_CharInput)
+        {
+          completed = FALSE;
+          break;
+        }
+    }
+
+  if (completed)
+    glk_cancel_char_event (gagt_main_window);
+  glk_request_timer_events (0);
+
+  return completed;
+}
+
+/*
+ * Saved copy of the title screen lines, kept while the title occupies the
+ * grid window so it can be repainted on resize/redraw.
+ */
+static glui32 **gagt_title_lines = NULL;
+static int *gagt_title_line_length = NULL;
+static int gagt_title_line_count = 0;
+
+/*
+ * gagt_title_is_frame_char()
+ *
+ * Return TRUE for the box-drawing characters that make up a title's frame
+ * and borders, so they can be drawn before the text inside.  AGT titles are
+ * undifferentiated ASCII art -- frame and text live in the same lines -- so
+ * we separate them heuristically: these characters (and spaces) are "frame",
+ * everything else is "content".
+ */
+static int
+gagt_title_is_frame_char (glui32 c)
+{
+  /*
+   * ASCII art frame characters, as seen when CP 437 is rendered as plain
+   * ASCII (for example in the headless build).
+   */
+  if (c == '#' || c == '|' || c == '+' || c == '-'
+      || c == '=' || c == '/' || c == '\\')
+    return TRUE;
+
+  /*
+   * The Unicode Box Drawing block (U+2500..U+257F) and Block Elements
+   * block (U+2580..U+259F, which includes the light/medium/dark shade
+   * characters used for borders).  agt_puts() maps the CP 437 box-drawing
+   * and shade characters to these, so in the Glk build the title's frame is
+   * built from them rather than ASCII art.
+   */
+  if (c >= 0x2500 && c <= 0x259F)
+    return TRUE;
+
+  return FALSE;
+}
+
+/*
+ * gagt_title_line_is_blank()
+ *
+ * Return TRUE if a saved title line contains only spaces.
+ */
+static int
+gagt_title_line_is_blank (int row)
+{
+  int i;
+
+  for (i = 0; i < gagt_title_line_length[row]; i++)
+    if (gagt_title_lines[row][i] != ' ')
+      return FALSE;
+  return TRUE;
+}
+
+/*
+ * gagt_title_free()
+ *
+ * Release the saved title lines.
+ */
+static void
+gagt_title_free (void)
+{
+  int row;
+
+  for (row = 0; row < gagt_title_line_count; row++)
+    free (gagt_title_lines[row]);
+  free (gagt_title_lines);
+  free (gagt_title_line_length);
+
+  gagt_title_lines = NULL;
+  gagt_title_line_length = NULL;
+  gagt_title_line_count = 0;
+}
+
+/*
+ * gagt_title_capture()
+ *
+ * Copy the buffered title box from the page buffer into the saved title
+ * lines, trimming trailing blank lines, then empty the output buffers so
+ * the title isn't also shown in the main window.
+ */
+static void
+gagt_title_capture (void)
+{
+  gagt_lineref_t line;
+  int count, row;
+
+  count = 0;
+  for (line = gagt_get_first_page_line (); line;
+       line = gagt_get_next_page_line (line))
+    count++;
+
+  gagt_title_lines = gagt_malloc (count * sizeof (*gagt_title_lines));
+  gagt_title_line_length =
+      gagt_malloc (count * sizeof (*gagt_title_line_length));
+
+  row = 0;
+  for (line = gagt_get_first_page_line (); line;
+       line = gagt_get_next_page_line (line))
+    {
+      int len = line->buffer.length;
+
+      gagt_title_lines[row] = gagt_malloc ((len > 0 ? len : 1)
+                                           * sizeof (glui32));
+      memcpy (gagt_title_lines[row], line->buffer.data,
+              len * sizeof (glui32));
+      gagt_title_line_length[row] = len;
+      row++;
+    }
+  gagt_title_line_count = row;
+
+  /* Trim trailing blank lines so the grid is sized to the visible title. */
+  while (gagt_title_line_count > 0
+         && gagt_title_line_is_blank (gagt_title_line_count - 1))
+    {
+      gagt_title_line_count--;
+      free (gagt_title_lines[gagt_title_line_count]);
+    }
+
+  /* The title is now saved, so discard it from the output buffers. */
+  gagt_output_delete ();
+}
+
+/*
+ * gagt_title_split_row()
+ *
+ * Find the row that ends the immediately-drawn header, so that the credits
+ * below it can be revealed one at a time.  The original AGT runner draws the
+ * box, the title, and the "Created by..." line at once, then prints the
+ * credits incrementally; that "..." line is the conventional marker, so we
+ * split on the first row whose text ends with "...".  Returns -1 if there is
+ * no such row, in which case all interior text is revealed incrementally.
+ */
+static int
+gagt_title_split_row (void)
+{
+  int row, i, dots, last;
+
+  for (row = 0; row < gagt_title_line_count; row++)
+    {
+      /* Find the last non-frame, non-space character, counting a trailing
+         run of dots as we go. */
+      last = -1;
+      dots = 0;
+      for (i = 0; i < gagt_title_line_length[row]; i++)
+        {
+          glui32 c = gagt_title_lines[row][i];
+
+          if (c == ' ' || gagt_title_is_frame_char (c))
+            continue;
+          last = i;
+          dots = (c == '.') ? dots + 1 : 0;
+        }
+
+      if (last >= 0 && dots >= 3)
+        return row;
+    }
+
+  return -1;
+}
+
+/*
+ * gagt_title_paint()
+ *
+ * Draw the saved title into the grid window.  The frame, borders, and the
+ * header text (down to and including the "Created by..." line) are drawn at
+ * once; then the credit lines below are revealed one at a time, matching the
+ * original AGT runner.  When animate is false the whole title is painted at
+ * once, used to repaint on resize/redraw.  A keypress skips the remaining
+ * pauses.
+ */
+static void
+gagt_title_paint (int animate)
+{
+  int row, i, suspended, split_row;
+
+  /*
+   * Rows up to and including split_row are drawn immediately (frame plus
+   * header text); rows beyond it have their text revealed incrementally.
+   * For a non-animated repaint, draw everything at once.
+   */
+  split_row = animate ? gagt_title_split_row () : gagt_title_line_count;
+
+  glk_set_window (gagt_status_window);
+  glk_window_clear (gagt_status_window);
+  glk_set_style (style_Normal);
+
+  suspended = FALSE;
+
+  /*
+   * Immediate pass: the box and borders everywhere, plus the header text on
+   * rows up to and including split_row.  Interior cells below the header are
+   * left blank for now.
+   */
+  for (row = 0; row < gagt_title_line_count; row++)
+    {
+      glk_window_move_cursor (gagt_status_window, 0, row);
+      for (i = 0; i < gagt_title_line_length[row]; i++)
+        {
+          glui32 c = gagt_title_lines[row][i];
+
+          if (gagt_title_is_frame_char (c)
+              || (row <= split_row && c != ' '))
+            glk_put_char_uni (c);
+          else
+            glk_put_char_uni (' ');
+        }
+    }
+
+  /* Let the box and header appear before the credits start filling in. */
+  if (animate && !suspended)
+    suspended = !gagt_title_delay ();
+
+  /* Incremental pass: reveal the credit text below the header, row by row. */
+  for (row = split_row + 1; row < gagt_title_line_count; row++)
+    {
+      int drew_text = FALSE;
+
+      for (i = 0; i < gagt_title_line_length[row]; i++)
+        {
+          glui32 c = gagt_title_lines[row][i];
+
+          if (c != ' ' && !gagt_title_is_frame_char (c))
+            {
+              glk_window_move_cursor (gagt_status_window, i, row);
+              glk_put_char_uni (c);
+              drew_text = TRUE;
+            }
+        }
+
+      if (animate && drew_text && !suspended)
+        suspended = !gagt_title_delay ();
+    }
+
+  glk_set_window (gagt_main_window);
+}
+
+/*
+ * gagt_title_reveal_grid()
+ *
+ * Show the just-built title box in the status grid window: grow the grid to
+ * the title's height, then draw it frame-first and fill in the text.  The
+ * grid is collapsed back to the normal status line later, by agt_clrscr(),
+ * when the title is dismissed.
+ */
+static void
+gagt_title_reveal_grid (void)
+{
+  gagt_title_capture ();
+
+  if (gagt_title_line_count == 0)
+    {
+      gagt_title_free ();
+      return;
+    }
+
+  gagt_title_in_grid = TRUE;
+
+  /* Grow the status grid to hold the whole title. */
+  glk_window_set_arrangement (glk_window_get_parent (gagt_status_window),
+                              winmethod_Above | winmethod_Fixed,
+                              gagt_title_line_count, NULL);
+
+  gagt_title_animating = TRUE;
+  gagt_title_paint (TRUE);
+  gagt_title_animating = FALSE;
+}
+
+/*
+ * gagt_title_collapse()
+ *
+ * Dismiss a title shown in the grid: discard the saved lines, shrink the
+ * grid back to the normal status line height, and restore the status line.
+ */
+static void
+gagt_title_collapse (void)
+{
+  gagt_title_in_grid = FALSE;
+  gagt_title_free ();
+
+  glk_window_clear (gagt_status_window);
+  glk_window_set_arrangement (glk_window_get_parent (gagt_status_window),
+                              winmethod_Above | winmethod_Fixed,
+                              gagt_extended_status_enabled ? 2 : 1, NULL);
+
+  gagt_status_redraw ();
+}
+
+
 /*---------------------------------------------------------------------*/
 /*  Glk port box drawing functions                                     */
 /*---------------------------------------------------------------------*/
@@ -4107,6 +4541,16 @@ agt_endbox (void)
 
   /* Back to allowing proportional font output again. */
   gagt_coerce_fixed_font (FALSE);
+
+  /*
+   * For the title box, show it in the status grid window, drawing the frame
+   * and borders first and then filling in the text inside, matching the
+   * original AGT runner.  This needs a status window to draw into; without
+   * one we just leave the title for the normal deferred flush.
+   */
+  if ((gagt_box_flags & TB_TTL) && gagt_status_window
+      && gagt_title_reveal_wanted ())
+    gagt_title_reveal_grid ();
 
   gagt_box_busy = FALSE;
   gagt_box_flags = gagt_box_width = gagt_box_startx = 0;
@@ -5151,7 +5595,8 @@ gagt_command_escape (const char *string)
 
   /* Take a copy of the string, without any leading space or introducer. */
   string_copy = gagt_malloc (strlen (string + posn) + 1 - strlen ("glk"));
-  strcpy (string_copy, string + posn + strlen ("glk"));
+  strncpy (string_copy, string + posn + strlen ("glk"),
+           strlen (string + posn) + 1 - strlen ("glk"));
 
   /*
    * Find the subcommand; the first word in the string copy.  Find its end,
@@ -5366,6 +5811,7 @@ agt_input (int in_type)
           memcpy(message, buffer, chars);
           message[chars] = '\0';
           gagt_styled_string(style_Input, message);
+          free(message);
 
           /*
            * Convert the string from Glk's ISO 8859 Latin-1 to IBM cp 437,
@@ -6346,6 +6792,17 @@ gagt_startup_code (int argc, char *argv[])
 
   /* Make the mandatory call for initialization. */
   set_default_options ();
+
+  /*
+   * Enable the Tone(hz,ms) opcode.  PURE_TONE is the interface's "low-level
+   * tone supported" capability flag (only ever set by the -tone CLI option in
+   * the other ports); now that agt_tone() synthesises a square wave, advertise
+   * support here.  sound_on is the runtime on/off toggle exposed to the player
+   * as SOUND ON/OFF; default it on so tones play out of the box (the app gates
+   * actual playback on the user's sound preference, theme.doSound).
+   */
+  PURE_TONE = 1;
+  sound_on = 1;
 
   /* Handle command line arguments. */
   for (argv_index = 1;

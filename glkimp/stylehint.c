@@ -20,6 +20,18 @@ glui32 glk_style_measure(winid_t win, glui32 styl, glui32 hint, glui32 *result)
 {
     glui32 res;
 
+    if (!win)
+    {
+        gli_strict_warning("style_measure: invalid ref");
+        return FALSE;
+    }
+
+    if (!result)
+    {
+        gli_strict_warning("style_measure: result pointer is NULL");
+        return FALSE;
+    }
+
     if (win->type != wintype_TextGrid && win->type != wintype_TextBuffer)
     {
         gli_strict_warning("glk_style_measure called with invalid window type!");
@@ -35,10 +47,6 @@ glui32 glk_style_measure(winid_t win, glui32 styl, glui32 hint, glui32 *result)
             
         case stylehint_Justification:
             *result = stylehint_just_LeftFlush;
-            return TRUE;
-            
-        case stylehint_Size:
-            *result = 1;
             return TRUE;
 
         default:

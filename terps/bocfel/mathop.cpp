@@ -1,4 +1,4 @@
-// Copyright 2010-2021 Chris Spiegel.
+// Copyright 2010-2022 Chris Spiegel.
 //
 // SPDX-License-Identifier: MIT
 
@@ -27,36 +27,18 @@ void znot()
 
 void zdec_chk()
 {
-    int16_t newval;
-    int16_t val = as_signed(zargs[1]);
+    auto newval = variable(zargs[0]) - 1;
+    store_variable(zargs[0], newval);
 
-    zdec();
-
-    // The z-spec 1.1 requires indirect variable references to the stack not to push/pop
-    if (zargs[0] == 0) {
-        newval = as_signed(*stack_top_element());
-    } else {
-        newval = as_signed(variable(zargs[0]));
-    }
-
-    branch_if(newval < val);
+    branch_if(as_signed(newval) < as_signed(zargs[1]));
 }
 
 void zinc_chk()
 {
-    int16_t newval;
-    int16_t val = as_signed(zargs[1]);
+    auto newval = variable(zargs[0]) + 1;
+    store_variable(zargs[0], newval);
 
-    zinc();
-
-    // The z-spec 1.1 requires indirect variable references to the stack not to push/pop
-    if (zargs[0] == 0) {
-        newval = as_signed(*stack_top_element());
-    } else {
-        newval = as_signed(variable(zargs[0]));
-    }
-
-    branch_if(newval > val);
+    branch_if(as_signed(newval) > as_signed(zargs[1]));
 }
 
 void ztest()
@@ -89,16 +71,20 @@ void zmul()
     store(static_cast<uint32_t>(zargs[0]) * static_cast<uint32_t>(zargs[1]));
 }
 
+// For zdiv() and zmod(), cast to long to avoid -32768 [/%] -1 which, on
+// 16-bit systems, is invalid (the quotient needs to be representable in
+// the target type, which is “promoted” int, too small for 32768).
+
 void zdiv()
 {
     ZASSERT(zargs[1] != 0, "divide by zero");
-    store(as_signed(zargs[0]) / as_signed(zargs[1]));
+    store(static_cast<long>(as_signed(zargs[0])) / as_signed(zargs[1]));
 }
 
 void zmod()
 {
     ZASSERT(zargs[1] != 0, "divide by zero");
-    store(as_signed(zargs[0]) % as_signed(zargs[1]));
+    store(static_cast<long>(as_signed(zargs[0])) % as_signed(zargs[1]));
 }
 
 void zlog_shift()

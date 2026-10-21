@@ -1,0 +1,478 @@
+# The Coveted Mirror -- full deterministic playthrough (wins the game).
+#
+# Plays from the throne (forced imprisonment) to "Congratulations!!" on the
+# Peak of Shards. The headless terp seeds rand() deterministically, so the
+# engine's random wandering-NPC spawns (rolled once per room ENTRY) are stable:
+# the GET SHADOW retry loop below (leave/re-enter the lane at Sue's) succeeds
+# on the 4th entry under this seed. If the route before it changes, re-pin the
+# retry count.
+#
+# Sand-timer cadence (variable 0x11; -1/turn, caught at 0, warning at 24):
+# bribes hand Boris an item at the prison cell (GO BARREL, E, WAIT, GIVE x;
+# escape with MOVE BED, GO HOLE, GO BARREL) -- each item buys a different
+# amount (ax 74, telescope 124, jug ~96, picture ~96, broom ~21, cookies ~72).
+# Two WAITs in the cell make Boris doze off for a 35-sand refill with no item,
+# and Bernt's cookies are an infinitely refillable ~72-sand bribe.
+#
+# Story beats: 4 mirror pieces (maze treasure room; colorful art room via
+# USE COLOR SPELL; prison cell via EXAMINE MIRROR after the horseshoe riddle;
+# castle chapel via EXAMINE MIRROR after WEAR MEDALLION lets you read the
+# Abbott's book) -> Brother Jon visits the tavern (class + ring) -> WEAR RING
+# and TALK to the deaf mute at the Forest of No Return -> he guides you through
+# the Impenetrable Mist -> drop down to weight <= var[9] for the Perilous Pass
+# squeeze, WEAR COAT for the freezing summit -> on the plateau WAIT x7 cycles
+# the shards round to the learned shape -> GET MIRROR.
+#
+# Win marker (see run_walkthroughs.sh): "Congratulations!!"
+# One input per line; blank lines and #-comments are ignored.
+
+BOW
+MOVE BED
+GO HOLE
+W
+READ BOOK
+S
+S
+OPEN WINDOW
+E
+E
+S
+S
+S
+UP
+GET AX
+DOWN
+S
+S
+S
+S
+S
+OPEN BARREL
+GO BARREL
+E
+WAIT
+GIVE AX
+MOVE BED
+GO HOLE
+GO BARREL
+N
+N
+W
+GET BALL
+UNCLE
+GET BALL
+N
+TALK
+E
+N
+TALK
+W
+GET LOCKPICK
+E
+E
+GET TELESCOPE
+ORION
+SCORPIO
+GEMINI
+GET TELESCOPE
+E
+TALK
+GIVE BALL
+W
+W
+S
+S
+S
+S
+S
+TALK
+USE LOCKPICK
+OPEN STOCKS
+N
+N
+N
+E
+OPEN DOOR
+E
+GET CANDLESTICK
+W
+W
+S
+W
+TALK
+GIVE CANDLESTICK
+GET BELLOWS
+E
+N
+N
+W
+GIVE BELLOWS
+GET SHOVEL
+E
+S
+S
+S
+GO BARREL
+E
+WAIT
+GIVE TELESCOPE
+MOVE BED
+GO HOLE
+GO BARREL
+S
+E
+N
+E
+N
+GET JUG
+W
+S
+E
+E
+GET PICTURE
+E
+GET GRAIN
+N
+DOWN
+TALK
+MOVE GLASSES
+UP
+GET LADDER
+S
+W
+W
+W
+N
+OPEN DOOR
+N
+GIVE GRAIN
+OPEN DOOR
+N
+GET ROPE
+S
+S
+S
+S
+W
+N
+S
+E
+E
+USE SHOVEL
+GET BONES
+W
+N
+E
+N
+S
+S
+W
+W
+N
+N
+N
+E
+OPEN DOOR
+E
+E
+READ BOOK
+W
+W
+W
+S
+S
+GO BARREL
+W
+S
+UP
+GET NECKLACE
+S
+E
+E
+E
+N
+N
+W
+W
+OPEN CUPBOARD
+GET VASE
+E
+N
+N
+E
+E
+S
+S
+E
+E
+S
+S
+W
+W
+GET MIRROR
+E
+E
+N
+N
+W
+W
+N
+N
+W
+W
+S
+S
+W
+W
+LIGHT CANDLE
+OPEN CUPBOARD
+E
+GET MEDALLION
+READ MESSAGE
+GO BARREL
+GO BARREL
+E
+WAIT
+GIVE JUG
+MOVE BED
+GO HOLE
+GO BARREL
+W
+GET HORSESHOE
+W
+GET SHADOW
+E
+W
+GET SHADOW
+E
+W
+GET SHADOW
+E
+W
+GET SHADOW
+E
+E
+GO BARREL
+E
+WAIT
+GIVE PICTURE
+MOVE BED
+GO HOLE
+GO BARREL
+N
+N
+N
+N
+N
+N
+N
+N
+W
+PUT LADDER
+UP
+PUT ROPE
+UP
+GIVE BONES
+GIVE SHADOW
+DOWN
+GET ROPE
+DOWN
+GET LADDER
+E
+S
+S
+S
+S
+S
+S
+S
+S
+GO BARREL
+E
+USE INVISIBILITY
+S
+E
+N
+N
+N
+S
+W
+GET FISH
+E
+E
+S
+USE VISIBILITY
+WAIT
+GIVE HORSESHOE
+USE INVISIBILITY
+EXAMINE MIRROR
+N
+E
+E
+GET BROOM
+W
+S
+S
+E
+E
+USE LOCKPICK
+OPEN DOOR
+N
+USE COLOR SPELL
+S
+S
+GET MOOSE
+N
+W
+W
+W
+W
+W
+W
+N
+OPEN CUPBOARD
+E
+E
+USE VISIBILITY
+EXAMINE MIRROR
+WAIT
+GIVE BROOM
+MOVE BED
+GO HOLE
+GO BARREL
+GO BARREL
+E
+WAIT
+WAIT
+WAIT
+WAIT
+WAIT
+WAIT
+WAIT
+WAIT
+WAIT
+WAIT
+WAIT
+WAIT
+WAIT
+WAIT
+WAIT
+WAIT
+MOVE BED
+GO HOLE
+GO BARREL
+WEAR MEDALLION
+N
+N
+E
+OPEN DOOR
+E
+E
+READ BOOK
+W
+W
+W
+S
+S
+GO BARREL
+E
+USE INVISIBILITY
+S
+E
+N
+N
+N
+EXAMINE MIRROR
+S
+S
+S
+W
+N
+USE VISIBILITY
+WAIT
+WAIT
+MOVE BED
+GO HOLE
+GO BARREL
+N
+N
+N
+N
+W
+W
+REMOVE MEDALLION
+TALK
+E
+E
+S
+S
+S
+E
+GIVE MOOSE
+GET COOKIES
+W
+S
+W
+W
+N
+GIVE FISH
+GET COAT
+S
+E
+E
+GO BARREL
+E
+WAIT
+GIVE COOKIES
+MOVE BED
+GO HOLE
+GO BARREL
+WEAR COAT
+DROP SHOVEL
+DROP LADDER
+DROP ROPE
+DROP NECKLACE
+DROP LOCKPICK
+DROP MEDALLION
+DROP CANDLE
+S
+E
+N
+E
+E
+E
+N
+E
+WAIT
+WEAR RING
+TALK
+W
+S
+W
+W
+W
+N
+OPEN DOOR
+N
+OPEN DOOR
+N
+N
+N
+N
+N
+E
+N
+N
+N
+W
+W
+W
+W
+WAIT
+WAIT
+WAIT
+WAIT
+WAIT
+WAIT
+WAIT
+GET MIRROR

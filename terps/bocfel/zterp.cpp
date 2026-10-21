@@ -1,4 +1,4 @@
-// Copyright 2009-2021 Chris Spiegel.
+// Copyright 2009-2024 Chris Spiegel.
 //
 // SPDX-License-Identifier: MIT
 
@@ -8,11 +8,13 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <exception>
 #include <iomanip>
 #include <ios>
 #include <iostream>
 #include <memory>
 #include <new>
+#include <optional>
 #include <set>
 #include <sstream>
 #include <string>
@@ -38,11 +40,13 @@
 #include "unicode.h"
 #include "util.h"
 
-#ifdef SPATTERLIGHT
+#if defined(SPATTERLIGHT) || defined(HEADLESS_V6)
 #include "entrypoints.hpp"
+#include "v6_specific.h"
+#endif
+#ifdef SPATTERLIGHT
 #include "extract_apple_2.h"
 #include "find_graphics_files.hpp"
-#include "v6_specific.h"
 #endif
 
 #ifdef ZTERP_GLK
@@ -53,6 +57,8 @@
 #endif
 
 using namespace std::literals;
+
+static constexpr uint32_t MAX_STORY_SIZE = 0xffff * 8;
 
 std::string game_file;
 
@@ -67,11 +73,7 @@ const std::string &get_story_id()
 //
 // Z-machine versions 7 and 8 are identical to version 5 but for a
 // couple of tiny details. They are thus classified as version 5.
-//
-// zwhich stores the actual version (1–8) for the few rare times where
-// this knowledge is necessary.
 int zversion;
-static int zwhich;
 
 #ifdef SPATTERLIGHT
 int pixversion;
@@ -80,11 +82,6 @@ int pixversion;
 Header header;
 
 static bool checksum_verified;
-
-#ifdef ZTERP_GLK_BLORB
-int zterp_blorb_expected_release = -1;
-std::array<uint8_t, 6> zterp_blorb_expected_serial;
-#endif
 
 // The null character in the alphabet table does not actually signify a
 // null character: character 6 from A2 is special in that it specifies
@@ -110,18 +107,18 @@ static unsigned long unpack_multiplier;
 
 uint32_t unpack_routine(uint16_t addr)
 {
-    return (addr * unpack_multiplier) + header.R_O;
+    return (addr * unpack_multiplier) + header.routines_offset;
 }
 
 uint32_t unpack_string(uint16_t addr)
 {
-    return (addr * unpack_multiplier) + header.S_O;
+    return (addr * unpack_multiplier) + header.strings_offset;
 }
 
 #ifdef SPATTERLIGHT
 uint32_t pack_routine(uint32_t addr)
 {
-    return (uint32_t)(addr - header.R_O) / unpack_multiplier ;
+    return (uint32_t)(addr - header.routines_offset) / unpack_multiplier ;
 }
 #endif
 
@@ -154,11 +151,31 @@ static void initialize_games()
         "1-041209-b1de",
     };
 
+#ifdef SPATTERLIGHT
+    // The 2011 releases, which need no Blorb file: the pictures are
+    // part of the story file.
+    static const std::set<std::string> mysterious_inline = {
+        "1-110126-1bac",
+        "1-110126-d3dd",
+        "1-110126-f57a",
+        "1-110126-d4e7",
+        "1-110126-99f5",
+        "1-110126-7645",
+        "1-110126-db4e",
+        "1-110126-606c",
+        "1-110126-0cfc",
+        "1-110126-c3f2",
+        "1-110126-37b0",
+    };
+#endif
+
     static const std::vector<std::pair<Game, std::set<std::string>>> gamemap = {
         { Game::Infocom1234, infocom1234 },
-#ifndef SPATTERLIGHT
-        { Game::Arthur, { "74-890714" } },
-        { Game::Journey, { "83-890706" } },
+        { Game::AMFV, { "131-850628", "77-850814", "79-851122" } },
+#if !defined(SPATTERLIGHT) && !defined(HEADLESS_V6)
+        { Game::Arthur, { "54-890606", "63-890622", "74-890714" } },
+        { Game::Infocom1234, infocom1234 },
+        { Game::Journey, { "26-890316", "30-890322", "77-890616", "83-890706" } },
 #else
         { Game::Arthur, { "40-890502", "41-890504", "54-890606", "63-890622", "74-890714" } },
 
@@ -166,25 +183,31 @@ static void initialize_games()
 #endif
         { Game::LurkingHorror, { "203-870506", "219-870912", "221-870918" } },
         { Game::Planetfall, { "1-830517", "20-830708", "26-831014", "29-840118", "37-851003", "39-880501" } },
-#ifndef SPATTERLIGHT
-        { Game::Shogun, { "322-890706" } },
+#if !defined(SPATTERLIGHT) && !defined(HEADLESS_V6)
+        { Game::Shogun, { "292-890314", "295-890321", "311-890510", "322-890706" } },
 #else
         { Game::Shogun, { "278-890209", "278-890211", "279-890217", "280-890217", "281-890222", "282-890224", "283-890228", "284-890302", "286-890306", "288-890308", "289-890309", "290-890311", "291-890313", "292-890314", "295-890321", "311-890510", "320-890627", "321-890629", "322-890706" } },
 #endif
         { Game::Stationfall, { "1-861017", "63-870218", "87-870326", "107-870430" } },
+#if defined(SPATTERLIGHT) || defined(HEADLESS_V6)
 #ifdef SPATTERLIGHT
         { Game::BeyondZork, { "1-870412", "1-870715", "47-870915", "49-870917", "51-870923", "57-871221", "60-880610" } },
         { Game::MadBomber, { "3-971123-caad" } },
-        { Game::ZorkZero, { "242-880830", "242-880901", "296-88101", "66-890111", "343-890217", "366-890323", "383-890602", "387-890612", "392-890714", "393-890714" } },
-#else
-        { Game::ZorkZero, { "0-870831", "393-890714" } },
 #endif
+        { Game::ZorkZero, { "242-880830", "242-880901", "296-881019", "66-890111", "343-890217", "366-890323", "383-890602", "387-890612", "392-890714", "393-890714" } },
+#else
+        { Game::ZorkZero, { "296-881019", "366-890323", "383-890602", "393-890714" } },
+#endif
+        { Game::ZorkZeroDOS, { "393-890714" } },
         { Game::MysteriousAdventures, mysterious },
+#ifdef SPATTERLIGHT
+        { Game::MysteriousAdventuresInline, mysterious_inline },
+#endif
     };
 
-    for (const auto &pair : gamemap) {
-        if (pair.second.find(story_id) != pair.second.end()) {
-            games.insert(pair.first);
+    for (const auto &[game, ids] : gamemap) {
+        if (ids.find(story_id) != ids.end()) {
+            games.insert(game);
         }
     }
 }
@@ -207,9 +230,12 @@ static void find_id()
     // must only check for A–Z, a–z, and 0–9. Because ASCII (or a
     // compatible charset) is required, testing against 'a', 'z', etc.
     // is OK.
-    std::copy_if(header.serial, header.serial + 6, serial.begin(), [](auto c) {
-        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
-    });
+    for (int i = 0; i < 6; i++) {
+        auto c = header.serial[i];
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
+            serial[i] = c;
+        }
+    }
 
     std::ostringstream ss;
     ss << header.release << "-" << serial;
@@ -225,14 +251,9 @@ static void find_id()
     initialize_games();
 }
 
-static bool have_statuswin = false;
-static bool have_upperwin  = false;
-
 static void write_flags1()
 {
-    uint8_t flags1;
-
-    flags1 = byte(0x01);
+    uint8_t flags1 = byte(0x01);
 
     if (zversion == 3) {
         flags1 |= FLAGS1_NOSTATUS;
@@ -243,10 +264,10 @@ static void write_flags1()
         flags1 |= FLAGS1_VARIABLE;
 #endif
 
-        if (have_statuswin) {
+        if (have_statuswin()) {
             flags1 &= ~FLAGS1_NOSTATUS;
         }
-        if (have_upperwin) {
+        if (have_upperwin()) {
             flags1 |= FLAGS1_SCREENSPLIT;
         }
         if (options.enable_censorship) {
@@ -326,7 +347,7 @@ static void write_flags2()
             flags2 &= ~FLAGS2_MENUS;
         }
 
-        if (options.disable_graphics_font) {
+        if (options.disable_graphics_font && zversion == 5) {
             flags2 &= ~FLAGS2_PICTURES;
         }
 
@@ -371,8 +392,6 @@ void write_header()
     write_header_extension_table();
 
     if (zversion >= 4) {
-        unsigned int width, height;
-
 #ifdef SPATTERLIGHT
         options.int_number = gli_zmachine_terp;
         if (is_spatterlight_v6) {
@@ -382,7 +401,7 @@ void write_header()
         store_byte(0x1e, options.int_number);
         store_byte(0x1f, options.int_version);
 
-        get_screen_size(width, height);
+        auto [width, height] = get_screen_size();
 
         // Screen height and width.
         // A height of 255 means infinite, so cap at 254.
@@ -408,7 +427,7 @@ void write_header()
     store_byte(0x32, 1);
     store_byte(0x33, 1);
 
-    if (options.username != nullptr) {
+    if (options.username.has_value()) {
         options.username->resize(8, '\0');
         std::copy(options.username->begin(), options.username->end(), &memory[0x38]);
     }
@@ -417,7 +436,7 @@ void write_header()
 static void process_alphabet_table()
 {
     if (zversion == 1) {
-        std::memcpy(&atable[26 * 2], R"#( 0123456789.,!?_#'"/\<-:()")#", 26);
+        std::memcpy(&atable[26 * 2], R"#( 0123456789.,!?_#'"/\<-:())#", 26);
     } else if (zversion >= 5 && word(0x34) != 0) {
         if (word(0x34) + 26 * 3 > memory_size) {
             die("corrupted story: alphabet table out of range");
@@ -462,6 +481,10 @@ void zterp_mouse_click(uint16_t x, uint16_t y)
 
 static void calculate_checksum(IO &io, long offset)
 {
+    if (header.file_length < 0x40) {
+        return;
+    }
+
     uint32_t remaining = header.file_length - 0x40;
     uint16_t checksum = 0;
 
@@ -500,7 +523,7 @@ static void process_story(IO &io, long offset)
     }
 
     try {
-        io.read_exact(memory, memory_size);
+        io.read_exact(memory.data(), memory_size);
     } catch (const IO::IOError &) {
         die("unable to read from story file");
     }
@@ -514,35 +537,43 @@ static void process_story(IO &io, long offset)
 
         // Don't extract pictures if we have set another preferred graphics format
         if (graphics_type == gli_z6_graphics && graphics_type != kGraphicsTypeApple2) {
-            newmemory = extract_apple_2((const char *)game_file.c_str(), &file_length, nullptr, nullptr, nullptr);
+            newmemory = extract_apple2_story((const char *)game_file.c_str(), &file_length, nullptr, nullptr, nullptr);
         } else {
-            newmemory = extract_apple_2((const char *)game_file.c_str(), &file_length, &raw_images, &image_count, &pixversion);
+            newmemory = extract_apple2_story((const char *)game_file.c_str(), &file_length, &raw_images, &image_count, &pixversion);
 
             graphics_type = kGraphicsTypeApple2;
-            //            options.int_number = INTERP_APPLE_IIE;
-            //            store_byte(0x1e, options.int_number);
-            hw_screenwidth = 140;
-            pixelwidth = 2.0;
+            set_hw_screen_geometry(graphics_type);
         }
         if (newmemory) {
-            free(memory);
-            memory = newmemory;
+            memory.assign(newmemory, newmemory + file_length);
+            memory_size = (uint32_t)file_length;
+        } else {
+            die("required disk image not found");
         }
-        memory_size = (uint32_t)file_length;
     }
 #endif
 
     zversion = byte(0x00);
-    if (zversion < 1 || zversion > 8) {
-        die("only z-code versions 1-8 are supported");
-    }
 
-    zwhich = zversion;
+#ifdef ZTERP_NO_V6
+    if (zversion == 6) {
+        die("support for version 6 has been disabled in this build");
+    }
+#endif
+
+    // The actual Z-machine version (differentiating 7 and 8 from 5) is
+    // only needed in this function, and only for 3 things:
+    //
+    // • The unpack multiplier
+    // • File length
+    // • Routine & string offsets for V6/7
+    auto actual_zversion = zversion;
+
     if (zversion == 7 || zversion == 8) {
         zversion = 5;
     }
 
-    switch (zwhich) {
+    switch (actual_zversion) {
     case 1: case 2: case 3:
         unpack_multiplier = 2;
         break;
@@ -553,7 +584,7 @@ static void process_story(IO &io, long offset)
         unpack_multiplier = 8;
         break;
     default:
-        die("unhandled z-machine version: %d", zwhich);
+        die("only z-code versions 1-8 are supported");
     }
 
     header.pc = word(0x06);
@@ -578,23 +609,18 @@ static void process_story(IO &io, long offset)
 
     if (zversion >= 5) {
         header.extension_table = word(0x36);
-        header.extension_entries = user_word(header.extension_table);
+        if (header.extension_table != 0) {
+            header.extension_entries = user_word(header.extension_table);
 
-        if (header.extension_table + (2 * header.extension_entries) > memory_size) {
-            die("corrupted story: header extension table out of range");
+            if (header.extension_table + (2 * (header.extension_entries + 1)) > memory_size) {
+                die("corrupted story: header extension table out of range");
+            }
         }
     }
 
     std::memcpy(header.serial, &memory[0x12], sizeof header.serial);
 
     unsigned long propsize = zversion <= 3 ? 62 : 126;
-
-    // There must be at least enough room in dynamic memory for the header
-    // (64 bytes), the global variables table (480 bytes), and the
-    // property defaults table (62 or 126 bytes).
-    if (header.static_start < 64UL + 480UL + propsize) {
-        die("corrupted story: dynamic memory too small (%d bytes)", static_cast<int>(header.static_start));
-    }
 
     if (header.static_start >= memory_size) {
         die("corrupted story: static memory out of range");
@@ -616,7 +642,7 @@ static void process_story(IO &io, long offset)
         die("corrupted story: abbreviation table out of range");
     }
 
-    header.file_length = word(0x1a) * (zwhich <= 3 ? 2UL : zwhich <= 5 ? 4UL : 8UL);
+    header.file_length = word(0x1a) * (actual_zversion <= 3 ? 2UL : actual_zversion <= 5 ? 4UL : 8UL);
     if (header.file_length > memory_size) {
         die("story's reported size (%lu) greater than file size (%lu)", static_cast<unsigned long>(header.file_length), static_cast<unsigned long>(memory_size));
     }
@@ -625,22 +651,15 @@ static void process_story(IO &io, long offset)
 
     calculate_checksum(io, offset);
 
-    if (zwhich == 6 || zwhich == 7) {
-        header.R_O = word(0x28) * 8UL;
-        header.S_O = word(0x2a) * 8UL;
+    if (actual_zversion == 6 || actual_zversion == 7) {
+        header.routines_offset = word(0x28) * 8UL;
+        header.strings_offset = word(0x2a) * 8UL;
     }
 
-    if (zversion >= 5 && !options.disable_term_keys) {
-        header.terminating_characters_table = word(0x2e);
-    }
-
-    if (dynamic_memory == nullptr) {
-        try {
-            dynamic_memory = new uint8_t[header.static_start];
-        } catch (const std::bad_alloc &) {
-            die("unable to allocate memory for dynamic memory");
-        }
-        std::memcpy(dynamic_memory, memory, header.static_start);
+    try {
+        dynamic_memory.assign(memory.begin(), memory.begin() + header.static_start);
+    } catch (const std::bad_alloc &) {
+        die("unable to allocate memory for dynamic memory");
     }
 
     process_alphabet_table();
@@ -650,8 +669,15 @@ static void process_story(IO &io, long offset)
     // story is known, and the ID of the current story is not known until
     // the file has been processed; so do both of those here.
     find_id();
+#ifndef ZTERP_NO_OPTIONS
     if (!options.disable_config) {
         options.read_config();
+    }
+    options.read_envvars();
+#endif
+
+    if (zversion >= 5 && !options.disable_term_keys) {
+        header.terminating_characters_table = word(0x2e);
     }
 
     // Most options directly set their respective variables, but a few
@@ -689,26 +715,31 @@ static void process_story(IO &io, long offset)
         apply_v6_patches();
     }
 
-#ifdef SPATTERLIGHT
+#if defined(SPATTERLIGHT) || defined(HEADLESS_V6)
     if (is_game(Game::Journey)) {
         is_spatterlight_journey = true;
     } else if (is_game(Game::Arthur)) {
         is_spatterlight_arthur = true;
     } else if (is_game(Game::Shogun)) {
         is_spatterlight_shogun = true;
+    } else if (is_game(Game::ZorkZero)) {
+        is_spatterlight_zork0 = true;
     }
-    if (is_spatterlight_journey || is_spatterlight_arthur || is_spatterlight_shogun) {
+    if (is_spatterlight_journey ||
+        is_spatterlight_arthur ||
+        is_spatterlight_shogun ||
+        is_spatterlight_zork0) {
         is_spatterlight_v6 = true;
         find_entrypoints();
     }
 #endif
 
     if (zversion <= 3) {
-        have_statuswin = create_statuswin();
+        create_statuswin();
     }
 
     if (zversion >= 3) {
-        have_upperwin = create_upperwin();
+        create_upperwin();
     }
 
     if (options.transcript_on) {
@@ -726,7 +757,6 @@ static void process_story(IO &io, long offset)
 
 void start_story()
 {
-    uint16_t flags2;
     static bool first_run = true;
 
     pc = header.pc;
@@ -736,8 +766,8 @@ void start_story()
     // used at the initial program start, but Flags2 should be preserved
     // there, as well: the pictures bit and the transcript bit might
     // have been set during story processing, and those should persist.
-    flags2 = word(0x10);
-    std::memcpy(memory, dynamic_memory, header.static_start);
+    uint16_t flags2 = word(0x10);
+    std::copy(dynamic_memory.begin(), dynamic_memory.begin() + header.static_start, memory.begin());
     store_word(0x10, flags2);
 
     write_header();
@@ -773,11 +803,10 @@ void zquit()
     // restore accidentally-deleted files. If the rename fails, though,
     // just try to delete it.
     if (options.autosave) {
-        auto autosave_name = zterp_os_autosave_name();
-        if (autosave_name != nullptr) {
+        if (auto autosave_name = zterp_os_autosave_name(); autosave_name.has_value()) {
             std::string backup_name = *autosave_name;
             backup_name += ".bak";
-            if (std::rename(autosave_name->c_str(), backup_name.c_str()) == -1) {
+            if (std::rename(autosave_name->c_str(), backup_name.c_str()) != 0) {
                 std::remove(autosave_name->c_str());
             }
         }
@@ -793,8 +822,8 @@ void zverify()
 
 static IO open_savefile(IO::Mode mode)
 {
-    // When this is null, the user is prompted for a filename.
-    std::unique_ptr<std::string> suggested;
+    // When this is std::nullopt, the user is prompted for a filename.
+    std::optional<std::string> suggested;
 
     // If no prompt argument is given, assume 0.
     if (znargs == 3 || (znargs == 4 && zargs[3] == 0)) {
@@ -816,16 +845,15 @@ static IO open_savefile(IO::Mode mode)
             filename = "NULL";
         }
 
-        auto aux = zterp_os_aux_file(filename);
-        if (aux != nullptr) {
-            suggested = std::make_unique<std::string>(*aux);
+        if (auto aux = zterp_os_aux_file(filename); aux.has_value()) {
+            suggested = *aux;
         }
     }
 
     // If there is a suggested filename and “prompt” is 1, this should
     // prompt the user with the suggested filename, but Glk doesn’t
     // support that.
-    return IO(suggested.get(), mode, IO::Purpose::Data);
+    return IO(suggested, mode, IO::Purpose::Data);
 }
 
 void zsave5()
@@ -835,13 +863,15 @@ void zsave5()
         return;
     }
 
-    ZASSERT(zargs[0] + zargs[1] < memory_size, "attempt to save beyond the end of memory");
+    ZASSERT(zargs[0] + zargs[1] <= memory_size, "attempt to save beyond the end of memory");
 
     try {
         auto savefile = open_savefile(IO::Mode::WriteOnly);
         savefile.write_exact(&memory[zargs[0]], zargs[1]);
         store(1);
     } catch (const IO::Error &) {
+        store(0);
+    } catch (const std::bad_alloc &) {
         store(0);
     }
 }
@@ -868,7 +898,7 @@ void zrestore5()
         }
 
         store(n);
-    } catch (const IO::OpenError &) {
+    } catch (const IO::Error &) {
         store(0);
     } catch (const std::bad_alloc &) {
         store(0);
@@ -891,13 +921,6 @@ static void real_main(int argc, char **argv)
         long offset = 0;
     } story;
 
-    // It’s too early to properly set up all tables (neither the alphabet
-    // nor Unicode table has been read from the story file), but it’s
-    // possible for messages to be displayed to the user before a story is
-    // even loaded, so at least the basic tables need to be created so
-    // that non-Unicode platforms have proper translations available.
-    setup_tables();
-
 #ifdef ZTERP_GLK
     if (!create_mainwin()) {
         return;
@@ -912,6 +935,8 @@ static void real_main(int argc, char **argv)
 #ifdef ZTERP_GLK
         glk_set_style(style_Preformatted);
 #endif
+
+#ifndef ZTERP_NO_OPTIONS
         for (const auto &error : options.errors()) {
             screen_puts(error);
         }
@@ -923,14 +948,17 @@ static void real_main(int argc, char **argv)
 
             options.help();
         }
+#endif
 
         throw Exit(EXIT_FAILURE);
     }
 
+#ifndef ZTERP_NO_OPTIONS
     if (options.show_help) {
         options.help();
         throw Exit(0);
     }
+#endif
 
 #ifndef ZTERP_GLK
     zterp_os_init_term();
@@ -950,7 +978,7 @@ static void real_main(int argc, char **argv)
 #endif
 
         auto config = zterp_os_rcfile(false);
-        if (config != nullptr) {
+        if (config.has_value()) {
             screen_printf("Configuration file: %s\n", config->c_str());
         } else {
             screen_puts("Cannot determine configuration file location");
@@ -964,7 +992,7 @@ static void real_main(int argc, char **argv)
     }
 
     try {
-        story.io = std::make_shared<IO>(&game_file, IO::Mode::ReadOnly, IO::Purpose::Data);
+        story.io = std::make_shared<IO>(game_file, IO::Mode::ReadOnly, IO::Purpose::Data);
     } catch (const IO::OpenError &) {
         die("cannot open file %s", game_file.c_str());
     }
@@ -974,7 +1002,7 @@ static void real_main(int argc, char **argv)
 
         const auto *chunk = blorb.find(Blorb::Usage::Exec, 0);
         if (chunk == nullptr) {
-            die("no EXEC resource found");
+            die("no Exec resource found");
         }
         if (chunk->type != IFF::TypeID("ZCOD")) {
             if (chunk->type == IFF::TypeID("GLUL")) {
@@ -993,20 +1021,23 @@ static void real_main(int argc, char **argv)
         memory_size = chunk->size;
         story.offset = chunk->offset;
     } catch (const Blorb::InvalidFile &) {
-        long size = story.io->filesize();
-
-        if (size == -1) {
+        auto size = story.io->filesize();
+        if (!size.has_value()) {
             die("unable to determine file size");
         }
 #if LONG_MAX > UINT32_MAX
-        if (size > UINT32_MAX) {
+        if (*size > UINT32_MAX) {
             die("file too large");
         }
 #endif
 
-        memory_size = size;
+        memory_size = *size;
         story.offset = 0;
     }
+
+    // Cap to the max possible story size (roughly 512K). This is a cap
+    // rather than a hard limit, in case a file has padding at the end.
+    memory_size = std::min(memory_size, MAX_STORY_SIZE);
 
     if (memory_size < 64) {
         die("story file too small");
@@ -1034,11 +1065,11 @@ static void real_main(int argc, char **argv)
     // 2OP, requiring two more bytes to be read. At this point the opcode
     // will be looked up, resulting in an illegal instruction error.
     try {
-        memory = new uint8_t[memory_size + 22];
+        memory.resize(memory_size + 22);
     } catch (const std::bad_alloc &) {
         die("unable to allocate memory for story file");
     }
-    std::memset(memory + memory_size, 0, 22);
+    std::fill(memory.begin() + memory_size, memory.begin() + memory_size + 22, 0);
 
     process_story(*story.io, story.offset);
 
@@ -1066,12 +1097,6 @@ static void real_main(int argc, char **argv)
         if (zversion == 6 && options.warn_on_v6) {
             show_message("Version 6 of the Z-machine is only partially supported. Be aware that the game might not function properly.");
         }
-
-#ifdef ZTERP_GLK_BLORB
-        if (zterp_blorb_expected_release != -1 && (header.release != zterp_blorb_expected_release || !std::equal(header.serial, header.serial + 6, zterp_blorb_expected_serial.begin()))) {
-            show_message("Found a Blorb file, but it does not match the story file. Proceeding, but expect odd behavior.");
-        }
-#endif
 #ifdef SPATTERLIGHT
         }
 #endif
@@ -1087,24 +1112,29 @@ void glk_main()
 int main(int argc, char **argv)
 #endif
 {
+    std::set_terminate([]() {
+        try {
+            std::rethrow_exception(std::current_exception());
+        } catch (const std::exception &e) {
+            std::cerr << "Unhandled exception: " << e.what() << std::endl;
+        } catch (...) {
+            std::cerr << "Unhandled exception" << std::endl;
+        }
+
+        std::abort();
+    });
+
 #ifdef ZTERP_GLK
     try {
         real_main();
     } catch (const Exit &) {
+    }
 #else
     try {
         real_main(argc, argv);
         return 0;
     } catch (const Exit &exit) {
         return exit.code();
-#endif
-    } catch (const std::exception &e) {
-        std::cerr << "Unhandled exception: " << e.what() << std::endl;
-    } catch (...) {
-        std::cerr << "Unhandled exception" << std::endl;
     }
-
-#ifndef ZTERP_GLK
-    return EXIT_FAILURE;
 #endif
 }

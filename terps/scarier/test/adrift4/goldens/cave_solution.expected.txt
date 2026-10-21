@@ -1,0 +1,1111 @@
+Loading game...
+
+Cave of Wonders
+It had been your first trip to Grandads for a long time.  Unfortunately, this
+time was to work.  Grandad was moving house, and needed your help to move all
+his stuff.  You were busy clearing out the loft when you came across a large
+book.  Reading the book, it told you about a secret cave full of jewels.
+There was a map at the back of the book, but it was so old that you could
+hardly read it.  Sneaking the book out under your jacket, you helped Grandad
+move the rest of his stuff and hurried home.
+
+You decided to try to find the secret cave.  You head out to the general
+direction of what the map displays.  Hopefully you'll be able to find some
+clues as to where the cave is.
+
+> drop book
+You drop the old book.
+
+> drop map
+You drop the faded map.
+
+> get poppy
+You pluck a single poppy from the field.  You could almost swear you heard a
+faint scream as it was wrenched from the ground.
+
+> wear poppy
+You put on the small red poppy.
+
+> w
+You move west.
+There is nothing of interest here.  You are standing outside an old shack.
+It looks very run down.  There is a pump here.  There is a cave to the north,
+a poppy field to the east, and a pool to the south.
+
+> kick door
+You kick the door in a karate style kick, and it flys open, then slams shut
+straight in your face.  Dust flys everywhere, and about a hundred spiders run
+into safety.
+
+> clean window
+You wipe the cobwebs away from the window, and scrape away most of the dirt.
+That should let a lot more light in.
+
+> open door
+You open the door.
+
+> in
+You move in.
+The shack is quite small, but looks as though it was once the home of some
+type of hermit.  There is dust everywhere.  There is a fireplace on the far
+wall.  To one side is a small bed, and over in the corner is a small toilet
+and hand basin.  Beside the front door is a small window.  Under the window
+is a large chest.  From the light from the window, you can just make out a
+hatch in the floor.  Also here is some sellotape.
+
+> pull spring
+You pull the spring from the matress.  It straightens out as you do, and
+finally snaps off from the mattress.
+
+> open chest
+You open the large chest.  Inside the large chest are a rusty old axe and a
+rusty poker.
+
+> take axe
+You take a rusty old axe from the large chest.
+
+> out
+You move out.
+There is nothing of interest here.  You are standing outside an old shack.
+It looks very run down.  There is a pump here.  There is a cave to the north,
+a poppy field to the east, and a pool to the south.
+
+> e
+You move east.
+You are standing in a large field of poppies.  All around you, you can see
+red, swaying in each gust of wind.  The smell of pollen is in the air.  There
+is a large tree to the north, a river bank to the east, an old stairway to
+the south, and an old shack to the west.  Also here is an old book and a
+faded map.
+
+> e
+You move east.
+You are standing on the banks of the river.  The river flows from the south
+to the north.  There is a small stone plinth here.  There is a bridge to the
+north, a beach to the south, and a poppy field to the west.
+
+> push button
+You push the button firmly.  You see a flash to the south.
+
+> n
+You move north.
+You are standing beside a great river, which is roaring past furiously.
+Someone has built a bridge here, which spans eastwards, over the river.
+There is a peninsula to the north, a bridge to the east, the river bank to
+the south, and a large tree to the west.
+
+> n
+You move north.
+You are standing on a small peninsula.  To your east, the river flow out,
+spanning into a large delta which blocks your way north.  The ground here is
+very rocky, and there is not much vegetation.  Sticking out from the rocks is
+a large tap.
+
+> move rock
+You lift the rock, uncovering a dark muddy patch.  A large earthworm squirms
+about underneath it.
+
+> take worm
+You pick up the squirmy worm.
+
+> turn wheel
+You turn the wheel.  Nothing appears to happen.
+
+> s
+You move south.
+You are standing beside a great river, which is roaring past furiously.
+Someone has built a bridge here, which spans eastwards, over the river.
+There is a peninsula to the north, a bridge to the east, the river bank to
+the south, and a large tree to the west.
+
+> w
+You move west.
+There is nothing of interest here.  You are standing beside an enormous tree.
+ The bark itself must be a couple of inches thick as you can see small gaps
+in the bark near the base of the tree.  Some of the roots poke back out from
+the ground like thick railings.  You cannot see all the way to the top of the
+tree.  There is a poppy field to the south, and a cave to the west.  You can
+also move east.
+
+> pick bark
+You peel a medium sized piece of bark from near the bottom of the tree.  It
+reveals a pale yellow colour where the tree has never been exposed to
+daylight.
+
+> climb tree
+Finding your footing in the branches, you make your way up the tree.
+
+> put wire in hole
+You shape the piece of wire into a scoop shape and poke it into the hole.
+After a few attempts, you manage to bring the glittering object a little
+closer, so that you can fish it out with your fingers.  It appears to be a
+coin.  As you bring it out, you drop it, and it falls down to the bottom of
+the tree.
+
+> climb tree
+You make your way further up the tree.
+
+> feed bird
+You dangle the worm out at arms length, and the bird snatches it from your
+fingers greedily.  The bird instantly looks more energetic as it swallows the
+tasty morsel.  The bird squats in it's nest, and lays a small green egg.
+
+> wait
+Time passes...
+
+> wait
+Time passes...
+The egg starts to shake, and soon a small hole appears in the side.  Moments
+later a little green head appears, and breaks away from the egg.  Unfurling
+it's wings, the baby dragon just looks at you.
+
+> take dragon
+You pick up the baby dragon.
+
+> climb down
+You make your way down the tree.
+
+> down
+You move down.
+There is nothing of interest here.  You are standing beside an enormous tree.
+ The bark itself must be a couple of inches thick as you can see small gaps
+in the bark near the base of the tree.  Some of the roots poke back out from
+the ground like thick railings.  You cannot see all the way to the top of the
+tree.  There is a poppy field to the south, and a cave to the west.  You can
+also move east.  Also here is a shiny gold coin.
+
+> take coin
+You pick up the shiny gold coin.
+
+> chop tree
+You hack away at the tree for what seems like ages.  Finally, when you get
+deep enough, the tree starts slowly teetering to the side, and then all of a
+sudden comes crashing down to the ground.  Birds, squirrels, and many other
+woodland creatures flee the huge mass as it falls.  Once the tree is down,
+you chop it up into managable sized pieces.
+
+> drop axe
+You drop the rusty old axe.
+
+> take wood
+You pick up some planks of wood.
+
+> w
+You move west.
+You are standing outside the entrance to a cave.  Inside, darkness beckons
+you.  There is a large tree to the east, and an old shack to the south.
+
+> s
+You move south.
+There is nothing of interest here.  You are standing outside an old shack.
+It looks very run down.  There is a pump here.  There is a cave to the north,
+a poppy field to the east, and a pool to the south.
+
+> in
+You move in.
+The shack is quite small, but looks as though it was once the home of some
+type of hermit.  There is dust everywhere.  There is a fireplace on the far
+wall.  To one side is a small bed, and over in the corner is a small toilet
+and hand basin.  Beside the front door is a small window.  Under the window
+is a large chest.  From the light from the window, you can just make out a
+hatch in the floor.  Also here is some sellotape.
+
+> open hatch
+You open the hatch.
+
+> down
+You move down.
+You are down in the basement of the old shack.  It is very dark down here,
+but every now and then, the baby dragon burps, sending a plume of fire from
+it's nostrils, lighting up the room.  There is a lever on one of the walls.
+
+> pull lever
+You pull on the lever.  Slowly, a small hidden panel in one of the walls
+opens to reveal a small shelf.  The shelf is completely bare except for a
+small wooden box.
+
+> up
+You move up.
+The shack is quite small, but looks as though it was once the home of some
+type of hermit.  There is dust everywhere.  There is a fireplace on the far
+wall.  To one side is a small bed, and over in the corner is a small toilet
+and hand basin.  Beside the front door is a small window.  Under the window
+is a large chest.  From the light from the window, you can just make out a
+hatch in the floor.  Also here is some sellotape.
+
+> out
+You move out.
+There is nothing of interest here.  You are standing outside an old shack.
+It looks very run down.  There is a pump here.  There is a cave to the north,
+a poppy field to the east, and a pool to the south.
+
+> e
+You move east.
+You are standing in a large field of poppies.  All around you, you can see
+red, swaying in each gust of wind.  The smell of pollen is in the air.  There
+is a large tree to the north, a river bank to the east, an old stairway to
+the south, and an old shack to the west.  Also here is an old book and a
+faded map.
+
+> s
+You move south.
+There is nothing of interest here.  You are standing at the bottom of an old
+stairway cut into the rock.  The steps are very large and a little slippery,
+but there is a rope handrail running along the side.  To the north is the
+poppy field, the beach is to the east, and the pool to the west.
+
+> untie rope
+You untie the rope from the rock wall.
+
+> make raft
+You tie the rope tightly around the planks of wood, making sure that it is
+very tight.  You criss cross the planks of wood to make sure it will survive
+the strong currents.
+
+> drop wire
+You drop the piece of wire.
+
+> drop dragon
+You drop the baby dragon.
+
+> e
+You move east.
+You are standing on a small beach.  It is not really much of a beach, as the
+sand is very muddy, but the river appears quite calm here.  To the north is
+the river bank, to the south is a large rock face, and there is a stone
+stairway to the west.  Also here is a tiny seed.
+
+> put raft in water
+You place the raft carefully in the calm water.
+
+> take seed
+You pick up the tiny seed.
+
+> go in raft
+You step into the raft.  Slowly, the current starts to move you, and you get
+caught into the main part of the stream.  With a little paddling, and a lot
+of luck, you make it over to the other side of the river.  As luck would have
+it, you find a nice pier to dock your raft to.   You clamber off the raft,
+leaving it in the water.
+
+> destroy raft
+You untie the rope from the raft.
+
+> drop rope
+You drop the length of rope.
+
+> drop wood
+You drop some planks of wood.
+
+> e
+You move east.
+You are standing in a small market.  There are a couple of stalls here, but
+nothing to sing and dance about.  To the north is a river bank, to the east
+is the gate to a graveyard, to the south is a large door, and there is a pier
+to the west.  Bob is here, standing behind a stall.
+
+> give coin to bob
+You hand the shiny coin to Bob.  He takes it greedily from your hands, and
+puts it in his pocket.  Reluctantly, he hands you the hammer.
+
+> n
+You move north.
+There is nothing of interest here.  You are standing on the bank of the
+river.  It is very grassy here.  There is a small path leading north and
+south.  Sitting on the path is a small dog.  There is a bridge to the north,
+and a market to the south.  To the east is a large metal fence.  There is a
+sad looking dog here.
+
+> give bark to dog
+You offer the bark to Paws.  His eyes light up as he sees the old rough bark
+in you hands.  Quickly, he snatches the bark from your fingers, and swallows
+it.  "Woof" he says loudly.  He runs around in circles for a little minute
+barking loudly, before digging a little hole in the ground, uncovering a pair
+of batteries.  Paws then runs away barking happily.
+
+> plant seed
+You put the seed into the hole, and pat some soil down on top of it.  A small
+stick appears in the hole.
+
+> wait
+Time passes...
+
+> wait
+Time passes...
+The stick reaches about two metres in height, then falls over.
+
+> wait
+Time passes...
+
+> wait
+Time passes...
+
+> wait
+Time passes...
+
+> take rod
+You pick up the fishing rod.
+
+> drop rod
+You drop the fishing rod.
+
+> s
+You move south.
+You are standing in a small market.  There are a couple of stalls here, but
+nothing to sing and dance about.  To the north is a river bank, to the east
+is the gate to a graveyard, to the south is a large door, and there is a pier
+to the west.  Bob is here, standing behind a stall.
+
+> s
+You move south.
+You are standing outside a large door built into the side of a small
+building.  There is a market to the north, and a garage to the east.
+
+> e
+You move east.
+You are standing outside what looks like a garage.  There is a large door to
+your west, and to the north are the gates to a graveyard.
+
+> in
+You move in.
+There is nothing of interest here.  You are standing inside a small garage.
+There are shelves running along the sides of the walls.  There is an old run
+down car in here.
+
+> take nails
+You take a bag of nails from the shelves.
+
+> take oil
+You take a small can of oil from the shelves.
+
+> out
+You move out.
+You are standing outside what looks like a garage.  There is a large door to
+your west, and to the north are the gates to a graveyard.
+
+> w
+You move west.
+You are standing outside a large door built into the side of a small
+building.  There is a market to the north, and a garage to the east.
+
+> n
+You move north.
+You are standing in a small market.  There are a couple of stalls here, but
+nothing to sing and dance about.  To the north is a river bank, to the east
+is the gate to a graveyard, to the south is a large door, and there is a pier
+to the west.  Bob is here, standing behind a stall.
+
+> w
+You move west.
+You are standing on a little pier made from wood.  It sticks out into the
+river which flows from the south.  To your east, you can just make out a
+small market.  Also here is some planks of wood and a length of rope.
+
+> take wood
+You pick up some planks of wood.
+
+> e
+You move east.
+You are standing in a small market.  There are a couple of stalls here, but
+nothing to sing and dance about.  To the north is a river bank, to the east
+is the gate to a graveyard, to the south is a large door, and there is a pier
+to the west.  Bob is here, standing behind a stall.
+
+> n
+You move north.
+There is nothing of interest here.  You are standing on the bank of the
+river.  It is very grassy here.  There is a small path leading north and
+south.  There is a small hole beside the path.  There is a bridge to the
+north, and a market to the south.  To the east is a large metal fence.  Also
+here is a fishing rod and a pair of batteries.
+
+> take batteries
+You pick up the pair of batteries.
+
+> n
+You move north.
+You are standing to the east of a wooden bridge that spans across the river.
+  At least, it would do if there wasn't a great gaping hole it the middle of
+it.  To the north is a waterfall, and the south takes you along the river.
+
+> fix bridge
+You place the wooden planks in the correct place on the bridge, and hammer in
+the nails to secure them down.  After putting the main framework back up, you
+nail down the flooring, and then the handrail.  Wow!  What a job.
+
+> drop hammer
+You drop the claw hammer.
+
+> s
+You move south.
+There is nothing of interest here.  You are standing on the bank of the
+river.  It is very grassy here.  There is a small path leading north and
+south.  There is a small hole beside the path.  There is a bridge to the
+north, and a market to the south.  To the east is a large metal fence.  Also
+here is a fishing rod.
+
+> take rod
+You pick up the fishing rod.
+
+> n
+You move north.
+You are standing to the east of a wooden bridge that spans across the river.
+  To the north is a waterfall, and the south takes you along the river.  Also
+here is a claw hammer.
+
+> w
+You move west.
+You are standing on the bridge spanning the river.  There is land to both the
+east and west.  It looks as though someone did a recent repair job here.
+
+> w
+You move west.
+You are standing beside a great river, which is roaring past furiously.
+Someone has built a bridge here, which spans eastwards, over the river.
+There is a peninsula to the north, a bridge to the east, the river bank to
+the south, and a large tree to the west.
+
+> w
+You move west.
+There is nothing of interest here.  You are standing by what was once an
+enormous tree.  All that is left, is a large stump in the ground, and a load
+of roots sticking out the ground.  Also here is a rusty old axe.
+
+> s
+You move south.
+You are standing in a large field of poppies.  All around you, you can see
+red, swaying in each gust of wind.  The smell of pollen is in the air.  There
+is a large tree to the north, a river bank to the east, an old stairway to
+the south, and an old shack to the west.  Also here is an old book and a
+faded map.
+
+> w
+You move west.
+There is nothing of interest here.  You are standing outside an old shack.
+It looks very run down.  There is a pump here.  There is a cave to the north,
+a poppy field to the east, and a pool to the south.
+
+> oil pump
+You squirt the oil into the moving parts of the pump.  Slowly, along with a
+gentle rocking movement, you manage to get the pump moving.
+
+> use pump
+You pump the pump.  A little toy robot falls out of the spout.  I wonder how
+that could have got there?  Never mind.
+
+> take robot
+You pick up the toy robot.
+
+> put batteries in robot
+You slot the batteries into the back of the robot.  The robots arms and legs
+start moving.
+
+> drop oil
+You drop the small can of oil.
+
+> e
+You move east.
+You are standing in a large field of poppies.  All around you, you can see
+red, swaying in each gust of wind.  The smell of pollen is in the air.  There
+is a large tree to the north, a river bank to the east, an old stairway to
+the south, and an old shack to the west.  Also here is an old book and a
+faded map.
+
+> s
+You move south.
+There is nothing of interest here.  You are standing at the bottom of an old
+stairway cut into the rock.  The steps are very large and a little slippery.
+To the north is the poppy field, the beach is to the east, and the pool to
+the west.  Also here is a piece of wire and a baby dragon.
+
+> take dragon
+You pick up the baby dragon.
+
+> take wire
+You pick up the piece of wire.
+
+> e
+You move east.
+You are standing on a small beach.  It is not really much of a beach, as the
+sand is very muddy, but the river appears quite calm here.  To the north is
+the river bank, to the south is a large rock face, and there is a stone
+stairway to the west.
+
+> catch fish
+You cast the lure into the river.  After a few moments, you feel a tug on the
+line.  Wow!  It's a fish.  Excitedly, you reel it in.
+
+> cook fish
+You tickle the baby dragon under the chin, which results in him blowing fire
+at you.  You stick the fish in the flame, and manage to get it cooked just
+fine.
+
+> eat fish
+You take a bite into the fish.  Hmm.  Tasty!  As you are enjoying it, you
+bite into something hard.  It appears the fish must have swallowed a key.
+
+> drop rod
+You drop the fishing rod.
+
+> w
+You move west.
+There is nothing of interest here.  You are standing at the bottom of an old
+stairway cut into the rock.  The steps are very large and a little slippery.
+To the north is the poppy field, the beach is to the east, and the pool to
+the west.
+
+> n
+You move north.
+You are standing in a large field of poppies.  All around you, you can see
+red, swaying in each gust of wind.  The smell of pollen is in the air.  There
+is a large tree to the north, a river bank to the east, an old stairway to
+the south, and an old shack to the west.  Also here is an old book and a
+faded map.
+
+> w
+You move west.
+There is nothing of interest here.  You are standing outside an old shack.
+It looks very run down.  There is a pump here.  There is a cave to the north,
+a poppy field to the east, and a pool to the south.  Also here is a small can
+of oil.
+
+> n
+You move north.
+You are standing outside the entrance to a cave.  Inside, darkness beckons
+you.  There is a large tree to the east, and an old shack to the south.
+
+> in
+You move in.
+You are standing inside the cave.  The dragon lights up the room with
+periodic bursts of fire.  Further in, the walls become too narrow for you to
+progress.  Slime drips down from the walls and splashes on the ground.
+
+> drop robot
+You set the robot down on the ground, facing the narrow passage.  It slowly
+marches inside.  You wait a few minutes, then it comes back holding a torn
+parchment.  You take the piece of parchment but before you manage to grab the
+robot, it is off again down the passage.  And it never comes back...
+
+> take parchment
+You've already got half of a parchment!
+
+> out
+You move out.
+You are standing outside the entrance to a cave.  Inside, darkness beckons
+you.  There is a large tree to the east, and an old shack to the south.
+
+> s
+You move south.
+There is nothing of interest here.  You are standing outside an old shack.
+It looks very run down.  There is a pump here.  There is a cave to the north,
+a poppy field to the east, and a pool to the south.  Also here is a small can
+of oil.
+
+> in
+You move in.
+The shack is quite small, but looks as though it was once the home of some
+type of hermit.  There is dust everywhere.  There is a fireplace on the far
+wall.  To one side is a small bed, and over in the corner is a small toilet
+and hand basin.  Beside the front door is a small window.  Under the window
+is a large chest.  From the light from the window, you can just make out a
+hatch in the floor.  Also here is some sellotape.
+
+> take sellotape
+You pick up some sellotape.
+
+> down
+You move down.
+You are down in the basement of the old shack.  It is very dark down here,
+but every now and then, the baby dragon burps, sending a plume of fire from
+it's nostrils, lighting up the room.  There is a lever on one of the walls.
+Also here is an old wooden box.
+
+> take box
+You pick up the old wooden box.
+
+> unlock box
+You place the tiny key into the lock and turn.  Despite it's age, the key
+turns easily in the lock, and the lid springs open.  Inside, you find a star
+shaped amulet.
+
+> drop box
+You drop the old wooden box.
+
+> drop key
+You drop the tiny key.
+
+> up
+You move up.
+The shack is quite small, but looks as though it was once the home of some
+type of hermit.  There is dust everywhere.  There is a fireplace on the far
+wall.  To one side is a small bed, and over in the corner is a small toilet
+and hand basin.  Beside the front door is a small window.  Under the window
+is a large chest.  From the light from the window, you can just make out a
+hatch in the floor.
+
+> out
+You move out.
+There is nothing of interest here.  You are standing outside an old shack.
+It looks very run down.  There is a pump here.  There is a cave to the north,
+a poppy field to the east, and a pool to the south.  Also here is a small can
+of oil.
+
+> drop parchment
+You drop half of a parchment.
+
+> drop amulet
+You drop the star shaped amulet.
+
+> drop dragon
+You drop the baby dragon.
+
+> drop sellotape
+You drop some sellotape.
+
+> s
+You move south.
+There is nothing of interest here.  You are standing by a little pool.  The
+water is very clear.  A few reeds stick out from beneath the surface.  To the
+north is an old shack, and there is an old stairway to the east.
+
+> swim
+You swim out into the middle of the pool.
+
+> down
+You take a deep breath, and dive down to the bottom of the pool.
+You are holding your breath, swimming about at the bottom of the pool.  It is
+quite light here as the water is so clear.  The bottom of the pool is covered
+in reed type plants.  Also here is a glass bottle.
+
+> take bottle
+You pick up the glass bottle.
+
+> pull plug
+You pull hard on the pool plug.  It slowly comes loose, and all the water in
+the pool starts to rush towards it.  After about a minute, there is no water
+left in the pool, and you are left standing in a crater.
+
+> down
+You move down.
+You are in what appears to be a space-ship.  There are consoles all around
+the perimeter of the ship.  In front of the screens is a single seat.   Next
+to the seat is a control panel.  Also here is a dead alien.
+
+> fix wiring
+You connect both wires up with the piece of wire that you are holding.
+
+> push green button
+You push the green button firmly.  All the lights in the space-ship turn on.
+
+> push red button
+You push the red button firmly.  There is a loud rumbling, and the entire
+space-ship starts to shake.  Then, all of a sudden, the rumbling stops.  A
+small message appears on all of the screens.
+
+> take alien
+You pick up the dead alien.
+
+> up
+You move up.
+You are standing in a crater.  The ground is damp, and there is a small hole
+in the middle of the crater.  There are various reeds scattered around.  The
+only way out of the crater is to the north.
+
+> n
+You move north.
+There is nothing of interest here.  You are standing north of a large crater
+which was once a pool.  To the north is an old shack, and there is an old
+stairway to the east.
+
+> drink water
+You drink the water, and feel refreshed.
+
+> n
+You move north.
+There is nothing of interest here.  You are standing outside an old shack.
+It looks very run down.  There is a pump here.  There is a cave to the north,
+a poppy field to the east, and a crater to the south.  Also here is a small
+can of oil, a baby dragon, a star shaped amulet, half of a parchment and some
+sellotape.
+
+> take parchment
+You pick up half of a parchment.
+
+> take sellotape
+You pick up some sellotape.
+
+> n
+You move north.
+You are standing outside the entrance to a cave.  Inside, darkness beckons
+you.  There is a large tree to the east, and an old shack to the south.
+
+> in
+You move in.
+It is too dark to make out anything other than the cave exit.
+
+> put bottle under slime
+You place the bottle under the dripping slime.  Plop!  A dollup lands in the
+bottle.  You wait for a few more drops, before picking up the bottle.
+
+> out
+You move out.
+You are standing outside the entrance to a cave.  Inside, darkness beckons
+you.  There is a large tree to the east, and an old shack to the south.
+
+> s
+You move south.
+There is nothing of interest here.  You are standing outside an old shack.
+It looks very run down.  There is a pump here.  There is a cave to the north,
+a poppy field to the east, and a crater to the south.  Also here is a small
+can of oil, a baby dragon and a star shaped amulet.
+
+> take amulet
+You pick up the star shaped amulet.
+
+> e
+You move east.
+You are standing in a large field of poppies.  All around you, you can see
+red, swaying in each gust of wind.  The smell of pollen is in the air.  There
+is a large tree to the north, a river bank to the east, an old stairway to
+the south, and an old shack to the west.  Also here is an old book and a
+faded map.
+
+> s
+You move south.
+There is nothing of interest here.  You are standing at the bottom of an old
+stairway cut into the rock.  The steps are very large and a little slippery.
+To the north is the poppy field, the beach is to the east, and the pool to
+the west.
+
+> drop amulet
+You drop the star shaped amulet.
+
+> n
+You move north.
+You are standing in a large field of poppies.  All around you, you can see
+red, swaying in each gust of wind.  The smell of pollen is in the air.  There
+is a large tree to the north, a river bank to the east, an old stairway to
+the south, and an old shack to the west.  Also here is an old book and a
+faded map.
+
+> n
+You move north.
+There is nothing of interest here.  You are standing by what was once an
+enormous tree.  All that is left, is a large stump in the ground, and a load
+of roots sticking out the ground.  Also here is a rusty old axe.
+
+> e
+You move east.
+You are standing beside a great river, which is roaring past furiously.
+Someone has built a bridge here, which spans eastwards, over the river.
+There is a peninsula to the north, a bridge to the east, the river bank to
+the south, and a large tree to the west.
+
+> e
+You move east.
+You are standing on the bridge spanning the river.  There is land to both the
+east and west.  It looks as though someone did a recent repair job here.
+
+> e
+You move east.
+You are standing to the east of a wooden bridge that spans across the river.
+  To the north is a waterfall, and the south takes you along the river.  Also
+here is a claw hammer.
+
+> s
+You move south.
+There is nothing of interest here.  You are standing on the bank of the
+river.  It is very grassy here.  There is a small path leading north and
+south.  There is a small hole beside the path.  There is a bridge to the
+north, and a market to the south.  To the east is a large metal fence.
+
+> s
+You move south.
+You are standing in a small market.  There are a couple of stalls here, but
+nothing to sing and dance about.  To the north is a river bank, to the east
+is the gate to a graveyard, to the south is a large door, and there is a pier
+to the west.  Bob is here, standing behind a stall.
+
+> s
+You move south.
+You are standing outside a large door built into the side of a small
+building.  There is a market to the north, and a garage to the east.
+
+> e
+You move east.
+You are standing outside what looks like a garage.  There is a large door to
+your west, and to the north are the gates to a graveyard.
+
+> in
+You move in.
+There is nothing of interest here.  You are standing inside a small garage.
+There are shelves running along the sides of the walls.  There is an old run
+down car in here.
+
+> put slime in car
+You locate the fuel cap on the car, and open it.  You then pour the slime
+from the bottle into it.
+
+> drop bottle
+You drop the glass bottle.
+
+> turn key
+You turn the ignition key.  The engine springs to life.  Moments later, the
+car jolts backwards, crashing through the rear wall of the garage.
+
+> s
+You move south.
+You are in Megs back garden.  There are bricks lying about, and in the middle
+is a very crumpled old car.  Meg has built a patio here.  There is a wall
+surrounding the garden.  Also here is a garden spade.
+
+> take spade
+You pick up the garden spade.
+
+> n
+You move north.
+There is nothing of interest here.  You are standing inside a small garage.
+There are shelves running along the sides of the walls.  There is a large
+hole in the south wall of the garage.  Also here is a glass bottle.
+
+> out
+You move out.
+You are standing outside what looks like a garage.  There is a large door to
+your west, and to the north are the gates to a graveyard.
+
+> n
+You move north.
+You are standing outside a graveyard.  The graveyard is surrounded by a large
+metal fence.  There is an open gate here leading in to the graveyard.  A
+sombre looking dude stands in front of the gate.  There is a market to the
+west, and you can also move south.  Douglas is here, looking well 'ard.
+
+> in
+The sombre looking dude checks to see that you are properly attired, before
+allowing you to enter the graveyard.
+
+> dig hole
+You dig a large hole with the spade.
+
+> bury alien
+You lower the alien into the hole.
+
+> fill in hole
+You fill in the grave with the dirt.  Moments later, you notice a shooting
+star fly across the sky.  It gets closer, until finally you realise that it
+is another U.F.O.  It lands right next to you in the graveyard.  Out step
+three aliens, looking just like the dead one except they don't smell so bad.
+The aliens line up beside the grave and salute the dead alien.  You notice a
+few tears in their eyes.  Finally, they head back into the space-ship.  As
+one of them leaves, it drops a gauntlet.  The space-ship disappears.
+
+> take gauntlet
+You pick up the strange gauntlet.
+
+> wear gauntlet
+You put on the strange gauntlet.
+
+> drop spade
+You drop the garden spade.
+
+> out
+You move out.
+You are standing outside a graveyard.  The graveyard is surrounded by a large
+metal fence.  There is an open gate here leading in to the graveyard.  A
+sombre looking dude is asleep near the gate.  There is a market to the west,
+and you can also move south.  Douglas is here, looking well 'ard.
+
+> w
+You move west.
+You are standing in a small market.  There are a couple of stalls here, but
+nothing to sing and dance about.  To the north is a river bank, to the east
+is the gate to a graveyard, to the south is a large door, and there is a pier
+to the west.  Bob is here, standing behind a stall.
+
+> s
+You move south.
+You are standing outside a large door built into the side of a small
+building.  There is a market to the north, and a garage to the east.
+
+> knock on door
+You knock loudly on the door.  The door opens and a rather overweight lady
+answers the door.  "Yes?"  she asks.  You mumble something about an
+emergency, and she reluctantly lets you in the building.
+
+> take restorer
+You pick up megs ink restorer.
+
+> give poppy to meg
+You offer the poppy to Meg.  Her cold eyes suddenly warm up as she accepts
+the gift.  She finds a vase, and puts the poppy in it, then places it on top
+of the television.  "We don't get many flowers this side of the river."
+
+> out
+You move out.
+You are standing outside a large door built into the side of a small
+building.  There is a market to the north, and a garage to the east.
+
+> n
+You move north.
+You are standing in a small market.  There are a couple of stalls here, but
+nothing to sing and dance about.  To the north is a river bank, to the east
+is the gate to a graveyard, to the south is a large door, and there is a pier
+to the west.  Bob is here, standing behind a stall.
+
+> n
+You move north.
+There is nothing of interest here.  You are standing on the bank of the
+river.  It is very grassy here.  There is a small path leading north and
+south.  There is a small hole beside the path.  There is a bridge to the
+north, and a market to the south.  To the east is a large metal fence.
+
+> n
+You move north.
+You are standing to the east of a wooden bridge that spans across the river.
+  To the north is a waterfall, and the south takes you along the river.  Also
+here is a claw hammer.
+
+> n
+You move north.
+You are standing by a small waterfall.  It comes from a pipe in the hills to
+the east, and flows down into the river to your west.  The waterfall is not
+falling too heavy at the moment.  There is a bridge to the south.
+
+> n
+You move north.
+There is nothing of interest here.  You are standing underneath the
+waterfall.  It is moderately dry here as the water falls in a clear arc above
+you.  There is a solid rock face to the north, but the east wall appears to
+be made from mud.
+
+> hit wall
+You hit the wall, and a large hole appears.  It looks as though you have
+uncovered a secret passage.
+
+> e
+You move east.
+You are in an east west passageway.  It is very dark here.  You can feel
+water running past you.
+
+> e
+You move east.
+Everything is dark.
+
+> move rock
+You move the rock, assisted by the alien gauntlet.  There is a sheet of paper
+under the rock.
+
+> take paper
+You pick up the piece of paper.
+
+> stick parchments together
+You take the two pieces of parchment, and stick them together with sellotape.
+
+> pour restorer on parchment
+You pour the ink restorer over the parchment.  Lots of words start appearing
+all over it.
+
+> w
+You move west.
+You are in an east west passageway.  It is very dark here.  You can feel
+water running past you.
+
+> w
+You move west.
+There is nothing of interest here.  You are standing underneath the
+waterfall.  It is moderately dry here as the water falls in a clear arc above
+you.  There is a solid rock face to the north, but the east wall appears to
+be made from mud.  There is a secret passage in the east wall.
+
+> s
+You move south.
+You are standing by a small waterfall.  It comes from a pipe in the hills to
+the east, and flows down into the river to your west.  The waterfall is not
+falling too heavy at the moment.  There is a bridge to the south.
+
+> s
+You move south.
+You are standing to the east of a wooden bridge that spans across the river.
+  To the north is a waterfall, and the south takes you along the river.  Also
+here is a claw hammer.
+
+> w
+You move west.
+You are standing on the bridge spanning the river.  There is land to both the
+east and west.  It looks as though someone did a recent repair job here.
+
+> w
+You move west.
+You are standing beside a great river, which is roaring past furiously.
+Someone has built a bridge here, which spans eastwards, over the river.
+There is a peninsula to the north, a bridge to the east, the river bank to
+the south, and a large tree to the west.
+
+> w
+You move west.
+There is nothing of interest here.  You are standing by what was once an
+enormous tree.  All that is left, is a large stump in the ground, and a load
+of roots sticking out the ground.  Also here is a rusty old axe.
+
+> s
+You move south.
+You are standing in a large field of poppies.  All around you, you can see
+red, swaying in each gust of wind.  The smell of pollen is in the air.  There
+is a large tree to the north, a river bank to the east, an old stairway to
+the south, and an old shack to the west.  Also here is an old book and a
+faded map.
+
+> s
+You move south.
+There is nothing of interest here.  You are standing at the bottom of an old
+stairway cut into the rock.  The steps are very large and a little slippery.
+To the north is the poppy field, the beach is to the east, and the pool to
+the west.  Also here is a star shaped amulet.
+
+> take amulet
+You pick up the star shaped amulet.
+
+> up
+You move up.
+There is nothing of interest here.  You are standing at the top of the stairs
+cut into the rock.  To your east you can see the main part of the rock, while
+the steps lead back down.
+
+> e
+You move east.
+There is nothing of interest here.  You are standing on the top of the large
+rock.  You can see all around you.  You can see how the river runs from the
+south all the way up to the north.  There is a stone table set into the
+middle of the rock.
+
+> put amulet on table
+You place the amulet carefully into the dimple on the table.  It fits
+perfectly into the star shape.  The amulet locks in place, and then ever so
+slowly, the table starts moving downwards, revealing a passage.
+
+> down
+You move down.
+You are in a small room carved into the rock.  There is a flight of stairs
+here leading up to a small hole in the roof.
+
+> score
+Your score is 900 out of a maximum of 1000.  (90%)
+
+> read parchment
+You read the parchment aloud. Suddenly, in front of you, the rock face slides
+open revealing an enormous room.  Everywhere, there are jewels and crystals
+and pearls and gold and everything anyone could ever want if their ambition
+was to be rich.  The roof is coated in stalactite crystals which glow,
+lighting up the room.  There are pots, pans, cups, goblets, necklaces and
+other good stuff.  In fact, it looks a lot like the cave in Aladdin.
+
+So, you found it.  The Cave of Wonders.  Now all you'll have to do is bag it,
+and take it to the bank, and hope that you don't have to fill out too many
+forms.
+
+But still, that's life.  Well done.
+You scored 1000 out of the maximum 1000!
+That is 100% of the game!
+Well done - you scored maximum points!
+
+[Press any key to end]

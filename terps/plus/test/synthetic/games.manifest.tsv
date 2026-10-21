@@ -1,0 +1,7 @@
+# The databases of the synthetic tests, written by mkdatabase.py.
+# Columns as in ../images/games.manifest.tsv.
+#
+# id	dir	file	sha256	keys	note
+synthetic	rare-opcodes	SYNTH.DAT	cd401ff634e976a7a2843a1c5411963ccdc6bb612896ea2fb209986542d24831		made-up database, loads as X-Men
+loader-edges	loader-edges	EDGES.DAT	2e57cbd1e82f43e15ad403eaeafc5cd6171e8d4116e4a9552c9c1f51157ec746		the same with an empty verb slot and a long message
+prefix-title	prefix-title	PREFIX.DAT	c48fb1c16b235cc16168ce2ff469d8c9dc1fb190c36e3286c43cc04973ba36db		the same titled with the start of X-Men's title: not loaded

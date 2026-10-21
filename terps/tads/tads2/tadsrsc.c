@@ -200,7 +200,7 @@ static void procop(osfildef *fpout, opdef *op, ulong *first_xfcn)
     /* set up the header */
     oswp2(buf, fsiz);
     buf[2] = strlen(op->opres);
-    strcpy(buf + 3, op->opres);
+    strncpy(buf + 3, op->opres, sizeof(buf) - 3);
     if (osfwb(fpout, buf, (uint)(buf[2] + 3)))
         errexit("error writing resource", 1);
     
@@ -865,7 +865,7 @@ static opdef *rscproc(osfildef *fp, osfildef *fpout, opdef *oplist)
         /* construct the timestamp */
         timer = time(0);
         tblock = localtime(&timer);
-        strcpy(datebuf, asctime(tblock));
+        snprintf(datebuf, sizeof(datebuf), "%s", asctime(tblock));
     }
         
     if (fpout)
@@ -1159,7 +1159,7 @@ static opdef *addopdir(opdef *cur, char *nam, opctxdef *opctx)
 
     /* add a '/' if the name isn't empty */
     if (dir_prefix[0] != '\0')
-        strcat(dir_prefix, "/");
+        strncat(dir_prefix, "/", OSFNMAX - strlen(dir_prefix) - 1);
 
     /* search the directory */
     if (os_open_dir(nam, &dirhdl))
@@ -1196,9 +1196,9 @@ static opdef *addopdir(opdef *cur, char *nam, opctxdef *opctx)
                 newop->opflag = opctx->flag;
                 newop->oprestype = get_file_restype(opctx->restype, fname);
                 newop->opres = (char *)(newop + 1);
-                strcpy(newop->opres, fullurl);
+                memcpy(newop->opres, fullurl, strlen(fullurl) + 1);
                 newop->opfile = newop->opres + strlen(newop->opres) + 1;
-                strcpy(newop->opfile, fullname);
+                memcpy(newop->opfile, fullname, strlen(fullname) + 1);
                 
                 /* it's the new head of the list */
                 cur = newop;
@@ -1352,9 +1352,9 @@ static opdef *addop(opdef *cur, char *nam, opctxdef *opctx)
     newop->opflag = opctx->flag;
     newop->opres  = (char *)(newop + 1);
     newop->oprestype = get_file_restype(opctx->restype, nam);
-    strcpy(newop->opres, p);
+    memcpy(newop->opres, p, strlen(p) + 1);
     newop->opfile = newop->opres + strlen(newop->opres) + 1;
-    strcpy(newop->opfile, nam);
+    memcpy(newop->opfile, nam, strlen(nam) + 1);
 
     return(newop);
 }
@@ -1407,7 +1407,7 @@ int main(int argc, char **argv)
     
     /* get the file name */
     infile = argv[curarg++];
-    strcpy(inbuf, infile);
+    snprintf(inbuf, sizeof(inbuf), "%s", infile);
     os_defext(inbuf, "gam");
 
     /* open the file for reading, unless we're creating a new file */
@@ -1455,10 +1455,10 @@ int main(int argc, char **argv)
     else
     {
         /* generate a temporary filename */
-        strcpy(tmpfile, inbuf);
+        snprintf(tmpfile, sizeof(tmpfile), "%s", inbuf);
         for (p = tmpfile + strlen(tmpfile) ; p > tmpfile &&
                  *(p-1) != ':' && *(p-1) != '\\' && *(p-1) != '/' ; --p);
-        strcpy(p, "$TADSRSC.TMP");
+        strncpy(p, "$TADSRSC.TMP", sizeof(tmpfile) - (p - tmpfile));
 
         /* open the temporary file */
         if ((fpout = osfopwb(tmpfile, OSFTGAME)) == 0)

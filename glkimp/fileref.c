@@ -35,9 +35,11 @@ fileref_t *gli_new_fileref(char *filename, glui32 usage, glui32 rock)
 
 	fref->rock = rock;
 
-    size_t length = 1 + strlen(filename);
-	fref->filename = malloc(length);
-    strncpy(fref->filename, filename, length);
+	fref->filename = strdup(filename);
+	if (!fref->filename) {
+		free(fref);
+		return NULL;
+	}
 
 	fref->textmode = ((usage & fileusage_TextMode) != 0);
 	fref->filetype = (usage & fileusage_TypeMask);
@@ -64,8 +66,6 @@ void gli_delete_fileref(fileref_t *fref)
         (*gli_unregister_obj)(fref, gidisp_Class_Fileref, fref->disprock);
         fref->disprock.ptr = NULL;
     }
-
-    fref->magicnum = 0;
 
     if (fref->filename) {
         free(fref->filename);
@@ -114,24 +114,36 @@ static char *gli_suffix_for_usage(glui32 usage)
 
 frefid_t glk_fileref_create_temp(glui32 usage, glui32 rock)
 {
+    char temppath[BUFLEN + 32];
+    int fd;
+
     gettempdir();
+    if (tempdir[0] == '\0')
+    {
+        gli_strict_warning("fileref_create_temp: no temporary directory.");
+        return NULL;
+    }
 
-    size_t temppathsize = sizeof(tempdir);
-    char *temppath = malloc(temppathsize + 19);
-    snprintf(temppath, temppathsize, "%s", tempdir);
-    strncat(temppath, "/glktempfref-XXXXXX", temppathsize + 19);
+    snprintf(temppath, sizeof temppath, "%s/glktempfref-XXXXXX", tempdir);
 
-    mkstemp(temppath);
+    /* mkstemp() creates the file and hands back a descriptor; only the
+       name is wanted here (the stream opens it again), so close it rather
+       than leak one descriptor per temporary fileref. */
+    fd = mkstemp(temppath);
+    if (fd == -1)
+    {
+        gli_strict_warning("fileref_create_temp: unable to create temporary file.");
+        return NULL;
+    }
+    close(fd);
 
     fileref_t *fref = gli_new_fileref(temppath, usage, rock);
 	if (!fref)
 	{
 		gli_strict_warning("fileref_create_temp: unable to create fileref.");
-        free(temppath);
 		return NULL;
 	}
 
-    free(temppath);
 	return fref;
 }
 
@@ -155,28 +167,15 @@ frefid_t glk_fileref_create_from_fileref(glui32 usage, frefid_t oldfref, glui32 
 	return fref;
 }
 
-frefid_t garglk_fileref_create_in_game_dir(glui32 usage, char *name,
-                                           glui32 rock)
-{
-    fileref_t *fref = glk_fileref_create_by_name(usage, name, rock);
-    size_t len = gli_parentdirlength + strlen(name) + 2;
-    char *newname = malloc(len);
-    snprintf(newname, len, "%s/%s", gli_parentdir, name);
-    free(fref->filename);
-    fref->filename = newname;
-
-    return fref;
-}
-
-frefid_t glk_fileref_create_by_name(glui32 usage, char *name,
-                                    glui32 rock)
+frefid_t gli_fileref_create_by_string_in_dir(glui32 usage, char *name, char *dirname,
+                                    glui32 add_suffix, glui32 rock)
 {
     fileref_t *fref;
     char buf[BUFLEN];
     char buf2[2*BUFLEN+10];
     unsigned long len;
     char *cx;
-    char *suffix;
+    const char *suffix = "";
 
     /* The new spec recommendations: delete all characters in the
      string "/\<>:|?*" (including quotes). Truncate at the first
@@ -184,45 +183,71 @@ frefid_t glk_fileref_create_by_name(glui32 usage, char *name,
      an appropriate suffix: ".glkdata", ".glksave", ".txt".
      */
 
-    for (cx=name, len=0; (*cx && *cx!='.' && len<BUFLEN-1); cx++) {
-        switch (*cx) {
-            case '"':
-            case '\\':
-            case '/':
-            case '>':
-            case '<':
-            case ':':
-            case '|':
-            case '?':
-            case '*':
-                break;
-            default:
-                buf[len++] = *cx;
+    if (add_suffix) {
+        for (cx=name, len=0; (*cx && *cx!='.' && len<BUFLEN-1); cx++) {
+            switch (*cx) {
+                case '"':
+                case '\\':
+                case '/':
+                case '>':
+                case '<':
+                case ':':
+                case '|':
+                case '?':
+                case '*':
+                    break;
+                default:
+                    buf[len++] = *cx;
+            }
         }
+        suffix = gli_suffix_for_usage(usage);
+    } else {
+        len = strnlen(name, BUFLEN - 1);
+        memcpy(buf, name, len);
     }
+
     buf[len] = '\0';
 
-    if (len == 0) {
+    if (len == 0)
         strcpy(buf, "null");
-        len = 5;
-    }
 
-    getworkdir();
-    len += strlen(gli_workdir);
-    suffix = gli_suffix_for_usage(usage);
-    len += strlen(suffix);
-    snprintf(buf2, len + 2, "%s/%s%s", gli_workdir, buf, suffix);
+    snprintf(buf2, sizeof buf2, "%s/%s%s", dirname, buf, suffix);
 
     fref = gli_new_fileref(buf2, usage, rock);
-    if (!fref) {
-        gli_strict_warning("fileref_create_by_name: unable to create fileref.");
-        return NULL;
-    }
-
-//    fprintf(stderr, "fileref_create_by_name: created fileref %d with name: %s\n", fref->tag, name);
     return fref;
 }
 
+frefid_t garglk_fileref_create_in_game_dir(glui32 usage, char *name, glui32 rock)
+{
+    if (gli_parentdir == NULL || gli_parentdirlength == 0) {
+        gli_strict_warning("garglk_fileref_create_in_game_dir: no game directory is set.");
+        return NULL;
+    }
+
+    fileref_t *fref = gli_fileref_create_by_string_in_dir(usage, name, gli_parentdir, 0, rock);
+
+    if (!fref) {
+        gli_strict_warning("garglk_fileref_create_in_game_dir: unable to create fileref.");
+    }
+
+    return fref;
+}
+
+
+frefid_t glk_fileref_create_by_name(glui32 usage, char *name,
+                                    glui32 rock) {
+    int result = create_workdir();
+    if (result == 0) {
+        gli_strict_warning("fileref_create_by_name: unable to create work directory.");
+        return NULL;
+    }
+
+    fileref_t *fref = gli_fileref_create_by_string_in_dir(usage, name, gli_workdir, 1, rock);
+    if (!fref) {
+        gli_strict_warning("fileref_create_by_name: unable to create fileref.");
+    }
+    return fref;
+}
 
 frefid_t glk_fileref_create_by_prompt(glui32 usage, glui32 fmode, glui32 rock)
 {
@@ -234,12 +259,11 @@ frefid_t glk_fileref_create_by_prompt(glui32 usage, glui32 fmode, glui32 rock)
 		buf = win_promptopen(usage & fileusage_TypeMask);
 	else
 		buf = win_promptsave(usage & fileusage_TypeMask);
-    if (buf != NULL)
-        val = strlen(buf);
+	if (buf != NULL)
+		val = strlen(buf);
 	if (!val)
 	{
-		/* The player just hit return. It would be nice to provide a
-         default value, but this implementation is too cheap. */
+		/* The player cancelled the file dialog. */
 		return NULL;
 	}
 
@@ -326,32 +350,27 @@ void glk_fileref_delete_file(fileref_t *fref)
 /* This should only be called from startup code. */
 void glkunix_set_base_file(char *filename)
 {
-    int ix;
+    const char *slash = strrchr(filename, '/');
 
-    size_t len = strlen(filename);
-    gli_game_path = malloc(len+1);
-    strncpy(gli_game_path, filename, len);
-    gli_game_path[len] = '\0';
+    free(gli_game_path);
+    gli_game_path = strdup(filename);
 
     getworkdir();
 
-    for (ix=(int)(strlen(filename)-1); ix >= 0; ix--)
-        if (filename[ix] == '/')
-            break;
+    free(gli_parentdir);
 
-    if (ix >= 0) {
-        /* There is a slash. */
-        gli_parentdir = malloc(ix + 1);
-        gli_parentdirlength = ix;
-        strncpy(gli_parentdir, filename, ix);
-        gli_parentdir[ix] = '\0';
+    if (slash == NULL) {
+        /* No slash, just a filename: the game is in the current directory. */
+        gli_parentdir = strdup(".");
+    }
+    else if (slash == filename) {
+        /* A file in the root directory. */
+        gli_parentdir = strdup("/");
     }
     else {
-        /* No slash, just a filename. */
-        gli_parentdirlength = 2;
-        gli_parentdir = malloc(2);
-        strncpy(gli_parentdir, ".", 2);
+        gli_parentdir = strndup(filename, (size_t)(slash - filename));
     }
+    gli_parentdirlength = gli_parentdir ? (int)strlen(gli_parentdir) : 0;
 }
 
 /* For autorestore */

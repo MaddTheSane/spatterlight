@@ -22,8 +22,8 @@
 //do { fprintf(stderr, fmt, ##__VA_ARGS__); } while (0)
 
 #define ABS(a) ((a) < 0 ? -(a) : (a))
-#define MIN(a,b) (a < b ? a : b)
-#define MAX(a,b) (a > b ? a : b)
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
+#define MAX(a,b) ((a) > (b) ? (a) : (b))
 
 
 // Defined Hugo colors
@@ -174,6 +174,8 @@ static int nlbufwin;
 
 static void hugo_mapcurwin(void);
 static void hugo_handlearrange(void);
+static void heglk_free_wincontext(int i);
+static int heglk_new_wincontext(void);
 static void hugo_flushnl(void);
 static void heglk_sizeifexists(int i);
 static void heglk_zcolor(void);
@@ -191,6 +193,7 @@ static schanid_t mchannel = NULL;
 static schanid_t schannel = NULL;
 
 static long resids[MAXRES];
+static char *resfiles[MAXRES];
 static int numres = 0;
 
 
@@ -344,14 +347,18 @@ void hugo_stopvideo(void) {}
 
 static int loadres(HUGO_FILE infile, int reslen)
 {
-    char *buf, *origbuf;
+    char *buf;
     long offset, suboffset;
     int index;
     int i;
 
+    /* A resource is identified by its offset *within a given file*: games
+       may have more than one resource file, and the same offset in two of
+       them is two different sounds. */
     offset = glk_stream_get_position(infile);
     for (i = 0; i < numres; i++)
-        if (resids[i] == offset) {
+        if (resids[i] == offset && resfiles[i] && infile->filename
+            && !strcmp(resfiles[i], infile->filename)) {
             return i;
         }
 
@@ -359,13 +366,16 @@ static int loadres(HUGO_FILE infile, int reslen)
     if (numres + 1 == MAXRES)
         return -1;
 
+    buf = malloc(reslen);
+    if (!buf)
+        return -1;
+
     index = numres++;
 
     resids[index] = offset;
-    origbuf = malloc(reslen);
-    buf = origbuf;
+    resfiles[index] = infile->filename ? strdup(infile->filename) : NULL;
 
-    glk_get_buffer_stream(infile, (char *)buf, reslen);
+    glk_get_buffer_stream(infile, buf, reslen);
 
     suboffset = 0;
 
@@ -383,9 +393,14 @@ static int loadres(HUGO_FILE infile, int reslen)
         }
     }
 
+    /* Note that reslen is still the whole length of the sound: in Hugo Tetris
+       the resource file's index is what is off, listing each sound a few bytes
+       before its RIFF header, while the length counts from the header. (The
+       last sound in TETRIS1 ends exactly at end of file when counted that
+       way.) So the junk is skipped by moving the start, not by shortening. */
     win_loadsound(index, infile->filename, offset + suboffset, reslen);
 
-    free(origbuf);
+    free(buf);
     return index;
 }
 
@@ -537,11 +552,16 @@ int hugo_color(int c)
             LOG("Unmapped color %d\n", c);
     }
 
+    /* A window's own default colors go to the GUI as zcolor_Default, which it
+       resolves against the theme when it draws, so that text follows a
+       light/dark switch. A default text color used to be passed as a default
+       only when the background was a default too; with a custom background it
+       was fixed at gfgcol/gsfgcol, and that text kept the old side's color. */
     if (wins[curwin].win || (statuswin && curwin == statuswin))
     {
         if (curwin == statuswin || wins[curwin].win->type == wintype_TextGrid)
         {
-            if (c == DEF_SLFCOLOR && wins[curwin].fg == DEF_SLFCOLOR && wins[curwin].bg == DEF_SLBGCOLOR)
+            if (c == DEF_SLFCOLOR && wins[curwin].fg == DEF_SLFCOLOR)
             {
                 return zcolor_Default;
             }
@@ -549,7 +569,7 @@ int hugo_color(int c)
                 return zcolor_Default;
             }
         } else {
-            if (c == DEF_FCOLOR  && wins[curwin].fg == DEF_FCOLOR && wins[curwin].bg == DEF_BGCOLOR)
+            if (c == DEF_FCOLOR && wins[curwin].fg == DEF_FCOLOR)
             {
                 return zcolor_Default;
             }
@@ -685,17 +705,19 @@ int hugo_strlen(char *a)
 
 int heglk_get_linelength(void)
 {
-    glui32 width = gscreenw;
-    width -= 2 * ggridmarginx;
-    width = width / gcellw;
+    int width = (int)gscreenw - 2 * ggridmarginx;
     if (width < 0)
         width = 0;
-    return width - 2; /* -2 to trigger automatic line wrapping */
+    width = width / gcellw;
+    width -= 2; /* -2 to trigger automatic line wrapping */
+    if (width < 0)
+        width = 0;
+    return width;
 }
 
 int heglk_get_screenheight(void)
 {
-    glui32 height = (gscreenh - 2 * ggridmarginy) / gcellh;
+    int height = ((int)gscreenh - 2 * ggridmarginy) / gcellh;
     if (height < 0)
         height = 0;
     return height;
@@ -800,6 +822,13 @@ void hugo_getline(char *prompt)
 
     /* make sure we have a window */
     hugo_mapcurwin();
+
+    if (!curwin || !wins[curwin].win)
+    {
+        LOG("hugo_getline: no window to read from!\n");
+        buffer[0] = '\0';
+        return;
+    }
 
     glk_set_window(wins[curwin].win);
     /* Print prompt */
@@ -969,6 +998,60 @@ int hugo_waitforkey(void)
 }
 
 
+/* Drop any Glk window and heap data belonging to a window context,
+ * and reset it so that it can be handed out again by
+ * heglk_new_wincontext().
+ */
+
+static void heglk_free_wincontext(int i)
+{
+    if (i < 1 || i >= MAXWINS)
+        return;
+
+    if (wins[i].win)
+        gli_delete_window(wins[i].win);
+    free(wins[i].filename);
+
+    memset(&wins[i], 0, sizeof(struct winctx));
+}
+
+/* Hand out a window context.
+ *
+ * hugo_unmapcleared() only reclaims a context when it happens to sit at the
+ * top of the array, so nwins otherwise grows for every new window rectangle
+ * a game defines, and would eventually run off the end of wins[]. Once we
+ * are out of slots, recycle a spent context instead: one that has been
+ * cleared, has no Glk peer, and isn't one of the windows we track by index.
+ * (A cleared context can still be matched by rectangle and reused, so we
+ * only take one when there is nothing left to hand out.)
+ *
+ * Returns 0 if even that fails; callers already treat a zero curwin as
+ * "no window".
+ */
+
+static int heglk_new_wincontext(void)
+{
+    if (nwins < MAXWINS)
+        return nwins++;
+
+    for (int i = 1; i < nwins; i++)
+    {
+        if (wins[i].win || !wins[i].clear)
+            continue;
+        if (i == mainwin || i == statuswin || i == menuwin || i == nlbufwin
+            || i == below_status || i == second_image_row || i == future_boy_line
+            || i == guilty_bastards_graphics_win || i == guilty_bastards_aux_win)
+            continue;
+
+        LOG("Recycled window context %d\n", i);
+        heglk_free_wincontext(i);
+        return i;
+    }
+
+    LOG("Out of window contexts!\n");
+    return 0;
+}
+
 /* Clear everything on the screen,
  * move the cursor to the top-left
  * corner of the screen
@@ -986,10 +1069,7 @@ void hugo_clearfullscreen(void)
     for (i = 1; i < nwins; i++)
     {
         //LOG(" + delete %d\n", i);
-        if (wins[i].win)
-        {
-            gli_delete_window(wins[i].win);
-        }
+        heglk_free_wincontext(i);
     }
 
     nwins = 1;
@@ -1012,24 +1092,10 @@ void hugo_clearfullscreen(void)
     currentline = 1;
 }
 
-// Returns true if the two window contexts overlap
-int overlap(struct winctx a, struct winctx b)
-{
-    // If one rectangle is on left side of other
-    if (a.x0 >= b.x1 || b.x0 >= a.x1)
-        return false;
-
-    // If one rectangle is above other
-    if (a.y1 <= b.y0 || b.y1 <= a.y0)
-        return false;
-
-    return true;
-}
-
 // Returns true if the window context covers the screen
 int isfullscreen(struct winctx ctx)
 {
-    return ((ctx.x0 == 0 && ctx.y0 == 0 && ctx.x0 == gscreenw && ctx.y0 == gscreenh)
+    return ((ctx.x0 == 0 && ctx.y0 == 0 && ctx.x1 == gscreenw && ctx.y1 == gscreenh)
          || (ctx.l == 1 && ctx.r == SCREENWIDTH && ctx.t == 1 && ctx.b == SCREENHEIGHT));
 }
 
@@ -1111,7 +1177,7 @@ void hugo_clearwindow(void)
         {
             if (i == future_boy_line) {
                 int line = wins[future_boy_line].t;
-                if (abs(line - b) < 3 || abs(line - t < 3))
+                if (abs(line - b) < 3 || abs(line - t) < 3)
                     continue;
             } else future_boy_line = 0;
 
@@ -1505,7 +1571,7 @@ void heglk_ensure_menu(void)
         wins[menuwin].papercolor = wins[menuwin].bg;
         lastbg = -1;
     } else {
-        statuswin = nwins++;
+        statuswin = heglk_new_wincontext();
     }
     wins[statuswin].y1 = wins[menuwin].y0;
 
@@ -1741,7 +1807,7 @@ void heglk_adjust_single_future_boy_image(int type, int i, int alignment, int sh
 
     heglk_sizeifexists(i);
     win_fillrect(wins[i].win->peer, hugo_color(wins[i].bg), 0, 0, abs(x1-x0), abs(y1-y0));
-    win_drawimage(wins[i].win->peer, xoff, yoff, origwidth, origheight);
+    win_drawimage(wins[i].win->peer, xoff, yoff, origwidth, origheight, 0, 0);
 }
 
 void heglk_adjust_future_boy_windows(void) {
@@ -2041,7 +2107,7 @@ void hugo_settextwindow(int left, int top, int right, int bottom)
     if (!curwin)
     {
         /* ... create a new window context if no suitable exists... */
-        curwin = nwins++;
+        curwin = heglk_new_wincontext();
         LOG("Created new window context %d\n", curwin);
         wins[curwin].win = NULL;
         wins[curwin].clear = 1;
@@ -2487,8 +2553,6 @@ void hugo_print(char *a)
     {
         if (isfutureboy && (a[0] == ' ' || a[0] == '\r' || a[0] == '\n'))
             return;
-        else
-            fprintf(stderr, "%d\n", a[0]);
         LOG("  unmap graphics window %d for printing\n", curwin);
         if (!wins[curwin].clear )
             hugo_waitforkey();
@@ -2674,8 +2738,10 @@ int hugo_displaypicture(HUGO_FILE infile, long reslength)
         wins[curwin].offset = file_offset;
         wins[curwin].length = reslength;
         size_t length = strlen(infile->filename) + 1;
+        free(wins[curwin].filename);
         wins[curwin].filename = malloc(length);
-        strncpy(wins[curwin].filename, infile->filename, length);
+        if (wins[curwin].filename)
+            memcpy(wins[curwin].filename, infile->filename, length);
 
         win_sizeimage(&width, &height);
 
@@ -2840,7 +2906,7 @@ int hugo_displaypicture(HUGO_FILE infile, long reslength)
             glk_set_style(style_User1);
             glk_put_char(' ');
             glk_set_hyperlink(1);
-            win_drawimage(wins[mainwin].win->peer, imagealign_InlineUp, 0, width, height);
+            win_drawimage(wins[mainwin].win->peer, imagealign_InlineUp, 0, width, height, 0, 0);
             glk_set_hyperlink(0);
             wins[mainwin].clear = 0;
             glk_put_char('\n');
@@ -2892,7 +2958,7 @@ int hugo_displaypicture(HUGO_FILE infile, long reslength)
             LOG("hugo_displaypicture: fill a rect with background color %x: width %d, height %d\n", hugo_color(wins[curwin].bg), abs(x1-x0), abs(y1-y0));
             win_fillrect(wins[curwin].win->peer, color, 0, 0, abs(x1-x0), abs(y1-y0));
             LOG("hugo_displaypicture: draw image: x offset %d, y offset %d, width %d, height %d\n", xoff, yoff, width, height);
-            win_drawimage(wins[curwin].win->peer, xoff, yoff, width, height);
+            win_drawimage(wins[curwin].win->peer, xoff, yoff, width, height, 0, 0);
             wins[curwin].clear = 0;
         }
     }
@@ -2908,9 +2974,13 @@ void PromptMore(void)
 
 void my_srandom(int seed)
 {
+    /* Seed the shared erkyrath_random() generator.  Under the determinism
+       testing theme always use the fixed seed 1234; otherwise honor Hugo's
+       requested seed (NORMALIZE_RANDOM passes 1 for a repeatable sequence,
+       INIT_RANDOM / startup pass a time-based seed). */
     if (gli_determinism) {
-        srandom(1234);
+        set_erkyrath_random(1234);
     } else {
-        srandom(seed);
+        set_erkyrath_random(seed);
     }
 }

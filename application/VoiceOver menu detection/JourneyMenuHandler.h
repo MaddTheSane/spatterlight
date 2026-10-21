@@ -4,80 +4,77 @@
 //
 //  Created by Administrator on 2024-01-28.
 //
+//  For VoiceOver users, builds the Journey Party and Individual Commands
+//  menus from the menu items the interpreter sends, and asks the game's
+//  questions as dialogs. Choosing a menu item or answering a dialog clicks
+//  the matching place in the grid window.
+//
 
 #import <Foundation/Foundation.h>
 
+#import "VoiceOverMenu.h"
+
 #include "glkimp.h"
 
-@class GlkController, JourneyMenuItem, GlkTextGridWindow;
+@class GlkController, JourneyMenuItem, GlkTextGridWindow, GlkTextBufferWindow;
 
-typedef NS_ENUM(NSInteger, kJourneyDialogType) {
-    kJourneyDialogTextEntry,
-    kJourneyDialogTextEntryElvish,
-    kJourneyDialogSingleChoice,
-    kJourneyDialogMultipleChoice
+// Archived as an integer: don't reorder.
+typedef NS_ENUM(NSInteger, JourneyDialogType) {
+    JourneyDialogTypeTextEntry,
+    JourneyDialogTypeTextEntryElvish,
+    JourneyDialogTypeSingleChoice,
+    JourneyDialogTypeMultipleChoice
 };
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface JourneyMenuHandler : NSObject
+@interface JourneyMenuHandler : NSObject <VoiceOverHelper>
 
-- (instancetype)initWithDelegate:(GlkController *)delegate gridWindow:(GlkTextGridWindow *)gridwindow bufferWindow:(GlkTextBufferWindow *)bufferwindow;
+- (instancetype)initWithGlkController:(GlkController *)glkctl gridWindow:(nullable GlkTextGridWindow *)gridWindow bufferWindow:(nullable GlkTextBufferWindow *)bufferWindow;
+
 - (void)handleMenuItemOfType:(JourneyMenuType)type column:(NSUInteger)column line:(NSUInteger)line stopflag:(BOOL)stopflag text:(char *_Nullable)buf length:(NSUInteger)len;
 
-- (void)sendCorrespondingMouseEventForMenuItem:(JourneyMenuItem *)item;
+// The actions of the menu items, passed on by GlkController.
+- (void)partyAction:(id)sender;
+- (void)memberVerbAction:(id)sender;
 
-- (void)journeyPartyAction:(id)sender;
-- (void)journeyMemberVerbAction:(id)sender;
-- (void)deleteAllJourneyMenus;
-- (void)recreateJourneyMenus;
-- (void)hideJourneyMenus;
-- (void)showJourneyMenus;
+- (void)deleteAllMenus;
+- (void)recreateMenus;
+- (void)hideMenus;
+- (void)showMenus;
+// Keeps a copy of the Individual Commands menu, which recreateMenus puts
+// back if another game window has replaced it.
 - (void)captureMembersMenu;
+// Shows the pending dialog, if any, after a short delay.
 - (void)recreateDialog;
 - (void)flushDisplay;
-- (BOOL)updateOnBecameKey:(BOOL)recreateDialog;
+// Looks up the windows again if needed and rebuilds the menus. If
+// shouldRecreateDialog is YES, also schedules recreateDialog and returns
+// YES; returns NO if nothing was scheduled.
+- (BOOL)updateOnBecameKey:(BOOL)shouldRecreateDialog;
 
-@property BOOL showsJourneyMenus;
-@property (weak) GlkController *delegate;
-@property (weak) GlkTextGridWindow *textGridWindow;
-@property (weak) GlkTextBufferWindow *textBufferWindow;
-
-@property NSPopUpButton *journeyPopupButton;
-@property NSTextField *journeyTextField;
-
-// These must be arrays, because a dictionary won't stay sorted
-// in the order items are added to it
-@property NSMutableArray<JourneyMenuItem *> *journeyDialogMenuItems;
-@property NSMutableArray<JourneyMenuItem *> *journeyPartyMenuItems;
-
-// We need this in order to know when to dispaly a new dialog.
-// If we didn't show dialogs, we could have compared to the actual menu instead
-@property NSMutableArray<JourneyMenuItem *> *journeyLastPartyMenuItems;
-@property NSMutableArray<JourneyMenuItem *> *journeyLastDialogMenuItems;
-
-@property NSDate *journeyDialogClosedTimestamp;
-
-@property NSMutableDictionary<NSNumber *,JourneyMenuItem *> *journeyVerbMenuItems;
-@property NSMutableArray<JourneyMenuItem *> *journeyGlueStrings;
-
-@property (nonatomic) NSMenuItem *journeyMembersMenu;
-@property (nonatomic) NSMenuItem *journeyPartyMenu;
-
-@property NSMutableArray<NSMenuItem *> *capturedMembersMenu;
-
-@property NSInteger gridTextWinName;
-@property NSInteger bufferTextWinName;
-@property BOOL shouldShowDialog;
-@property BOOL reallyShowingDialog;
-@property BOOL restoredShowingDialog;
-@property BOOL lastDialogAddedMove;
-@property BOOL restoredDialogAddedMove;
+// Whether a dialog was closed (or the menus deleted) less than a second ago.
+@property (readonly) BOOL dialogClosedRecently;
+// Whether the game has asked a question that has not been shown yet, or
+// was showing when the game was autosaved.
+@property (readonly) BOOL hasPendingDialog;
+// Set when a file dialog closes, so that the question the game asks next
+// is not shown.
 @property BOOL skipNextDialog;
 
-@property kJourneyDialogType storedDialogType;
-@property NSString *storedDialogText;
+@property (weak, nullable) GlkController *glkctl;
+@property (weak, nullable) GlkTextGridWindow *textGridWindow;
+@property (weak, nullable) GlkTextBufferWindow *textBufferWindow;
 
+// The names of the two windows when the handler was archived.
+@property (readonly) NSInteger gridTextWinName;
+@property (readonly) NSInteger bufferTextWinName;
+
+@end
+
+// Not NSSecureCoding: the captured members menu is archived as NSMenuItems,
+// which don't adopt it.
+@interface JourneyMenuHandler (Coding) <NSCoding>
 @end
 
 NS_ASSUME_NONNULL_END

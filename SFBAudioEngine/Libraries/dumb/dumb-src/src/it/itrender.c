@@ -4514,7 +4514,7 @@ static void process_all_playing(DUMB_IT_SIGRENDERER *sigrenderer) {
 
                 playing->delta =
                     (float)pow(DUMB_PITCH_BASE,
-                               ((60 - playing->note) << 8) - playing->finetune);
+                               (60 - playing->note) * 256 - playing->finetune);
                 /* playing->delta is 1.0 for C-5, 0.5 for C-6, etc. */
 
                 playing->delta *= 1.0f / playing->sample->C5_speed;

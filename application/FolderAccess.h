@@ -30,6 +30,17 @@ NS_ASSUME_NONNULL_BEGIN
 + (nullable NSURL *)restoreURL:(NSURL *)url;
 + (void)listActiveSecurityBookmarks;
 
+// The folder URLs we currently hold security-scoped bookmarks for. Used by the
+// AGT migration to locate original game folders the user has granted access to.
++ (NSArray<NSURL *> *)bookmarkedFolders;
+
+//! The shared app-group container, where the library, its stored files and
+//! the bookmarks live so that the QuickLook and Thumbnailer extensions
+//! (separate sandboxed processes sharing the group) can reach them. Falls
+//! back to the app's own Application Support/Spatterlight folder when there
+//! is no group container (e.g. a missing entitlement).
++ (NSURL *)sharedContainerURL;
+
 @end
 
 NS_ASSUME_NONNULL_END

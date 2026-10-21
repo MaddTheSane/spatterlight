@@ -1,5 +1,5 @@
 //
-//  LookForMissingFiles.m
+//  MissingFilesFinder.m
 //  Spatterlight
 //
 //  Created by Administrator on 2021-05-22.
@@ -9,25 +9,52 @@
 #import "Metadata.h"
 #import "NSString+Categories.h"
 #import "TableViewController.h"
+#import "GameLauncher.h"
+#import "GameImporter.h"
 
 #import "FolderAccess.h"
 #import "Constants.h"
 
 #import "MissingFilesFinder.h"
+#import "NSAlert+Spatterlight.h"
 
-#include "babel_handler.h"
 
 extern NSArray *gGameFileTypes;
 
 @implementation MissingFilesFinder
 
+//! Looks for the old file under an ancestor folder it shares with the folder
+//! the user found a game in. Starting from the file's innermost folder, each
+//! folder name is looked up among the components of @c directory; if the file
+//! exists at the same relative path below the matching folder, that path is
+//! returned. Folders are compared by whole name, so "Games" does not match
+//! "MyGames".
++ (nullable NSString *)pathForFile:(NSString *)oldPath underCommonAncestorWith:(NSString *)directory {
+    NSArray<NSString *> *fileComponents = oldPath.pathComponents;
+    NSArray<NSString *> *directoryComponents = directory.pathComponents;
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+
+    // The last component is the file name itself. Index 0 is the root "/".
+    for (NSInteger i = (NSInteger)fileComponents.count - 2; i > 0; i--) {
+        NSString *component = fileComponents[(NSUInteger)i];
+        NSUInteger j = [directoryComponents indexOfObject:component];
+        if (j == NSNotFound || j == 0)
+            continue;
+
+        NSArray<NSString *> *beginning = [directoryComponents subarrayWithRange:NSMakeRange(0, j)];
+        NSArray<NSString *> *end = [fileComponents subarrayWithRange:NSMakeRange((NSUInteger)i, fileComponents.count - (NSUInteger)i)];
+        NSString *newPath = [NSString pathWithComponents:[beginning arrayByAddingObjectsFromArray:end]];
+
+        if ([fileManager fileExistsAtPath:newPath])
+            return newPath;
+    }
+    return nil;
+}
+
 - (void)lookForMissingFile:(Game *)game libController:(TableViewController *)libController {
-    NSAlert *alert = [[NSAlert alloc] init];
-    alert.messageText = NSLocalizedString(@"Cannot find the file.", nil);
-    alert.informativeText = [NSString stringWithFormat: NSLocalizedString(@"The game file for \"%@\" could not be found at its original location. Do you want to look for it?", nil), game.metadata.title];
-    [alert addButtonWithTitle:NSLocalizedString(@"Look for game", nil)];
-    [alert addButtonWithTitle:NSLocalizedString(@"Cancel", nil)];
-    [alert addButtonWithTitle:NSLocalizedString(@"Delete game", nil)];
+    NSAlert *alert = [NSAlert alertWithMessage:NSLocalizedString(@"Cannot find the file.", nil)
+                                          info:[NSString stringWithFormat: NSLocalizedString(@"The game file for \"%@\" could not be found at its original location. Do you want to look for it?", nil), game.metadata.title]
+                                       buttons:@[ NSLocalizedString(@"Look for game", nil), NSLocalizedString(@"Cancel", nil), NSLocalizedString(@"Delete game", nil) ]];
 
     NSModalResponse choice = [alert runModal];
 
@@ -52,74 +79,30 @@ extern NSArray *gGameFileTypes;
         NSModalResponse result = [panel runModal];
         if (result == NSModalResponseOK) {
             NSString *newPath = ((NSURL *)panel.URLs[0]).path;
-            NSString *ifid = [self ifidFromFile:newPath reportFailure:YES];
-            if (ifid && [ifid isEqualToString:game.ifid]) {
-                [game bookmarkForPath:newPath];
-                game.found = YES;
-                NSString *parentDirectory = newPath.stringByDeletingLastPathComponent;
-                [self lookForMoreMissingFilesInFolder:parentDirectory context:game.managedObjectContext];
-            } else {
-                if (ifid) {
-                    NSAlert *anAlert = [[NSAlert alloc] init];
+            NSString *hash = newPath.signatureFromFile;
+            if (hash.length) {
+                if ([hash isEqualToString:game.hashTag]) {
+                    [game bookmarkForPath:newPath];
+                    game.found = YES;
+                    NSString *parentDirectory = newPath.stringByDeletingLastPathComponent;
+                    [self lookForMoreMissingFilesInFolder:parentDirectory context:game.managedObjectContext];
+                } else {
+                    NSAlert *anAlert = [NSAlert alertWithMessage:NSLocalizedString(@"Not a match.", nil)
+                                                            info:[NSString stringWithFormat:NSLocalizedString(@"This file does not match the game \"%@.\"\nDo you want to replace it anyway?", nil), game.metadata.title]
+                                                         buttons:@[ NSLocalizedString(@"Yes", nil), NSLocalizedString(@"Cancel", nil) ]];
                     anAlert.alertStyle = NSAlertStyleInformational;
-                    anAlert.messageText = NSLocalizedString(@"Not a match.", nil);
-                    anAlert.informativeText = [NSString stringWithFormat:NSLocalizedString(@"This file does not match the game \"%@.\"\nDo you want to replace it anyway?", nil), game.metadata.title];
-                    [anAlert addButtonWithTitle:NSLocalizedString(@"Yes", nil)];
-                    [anAlert addButtonWithTitle:NSLocalizedString(@"Cancel", nil)];
                     NSInteger response = [anAlert runModal];
                     if (response == NSAlertFirstButtonReturn) {
-
-                        if ([libController importGame:newPath inContext:game.managedObjectContext reportFailure:YES hide:NO]) {
+                        if ([libController.gameLauncher importGame:newPath inContext:game.managedObjectContext reportFailure:YES hide:NO]) {
                             [game.managedObjectContext deleteObject:game];
                         }
                     }
                 }
             }
         }
-    } else  if (choice == NSAlertThirdButtonReturn) {
+    } else if (choice == NSAlertThirdButtonReturn) {
         [game.managedObjectContext deleteObject:game];
     }
-}
-
-- (NSString *)ifidFromFile:(NSString *)path {
-    return [self ifidFromFile:path reportFailure:NO];
-}
-
-- (NSString *)ifidFromFile:(NSString *)path reportFailure:(BOOL)reportFailure {
-    void *context = get_babel_ctx();
-    char *format = babel_init_ctx((char*)path.UTF8String, context);
-    if (!format || !babel_get_authoritative_ctx(context))
-    {
-        if (reportFailure) {
-            NSAlert *anAlert = [[NSAlert alloc] init];
-            anAlert.messageText = NSLocalizedString(@"Unknown file format.", nil);
-            anAlert.informativeText = NSLocalizedString(@"Babel can not identify the file format.", nil);
-            [anAlert runModal];
-        }
-        babel_release_ctx(context);
-        free(context);
-        return nil;
-    }
-
-    char buf[TREATY_MINIMUM_EXTENT];
-
-    int rv = babel_treaty_ctx(GET_STORY_FILE_IFID_SEL, buf, sizeof buf, context);
-    if (rv <= 0)
-    {
-        if (reportFailure) {
-            NSAlert *anAlert = [[NSAlert alloc] init];
-            anAlert.messageText = NSLocalizedString(@"Fatal error.", nil);
-            anAlert.informativeText = NSLocalizedString(@"Can not compute IFID from the file.", nil);
-            [anAlert runModal];
-        }
-        babel_release_ctx(context);
-        free(context);
-        return nil;
-    }
-
-    babel_release_ctx(context);
-    free(context);
-    return @(buf);
 }
 
 - (void)lookForMoreMissingFilesInFolder:(NSString *)directory context:(NSManagedObjectContext *)context {
@@ -127,7 +110,7 @@ extern NSArray *gGameFileTypes;
     NSError *error = nil;
     NSArray *fetchedObjects;
 
-    NSFetchRequest *fetchRequest = [[NSFetchRequest alloc] init];
+    NSFetchRequest *fetchRequest = [Game fetchRequest];
 
     // We check all files in the directory, to see if they may
     // be other missing game files in our library
@@ -140,20 +123,27 @@ extern NSArray *gGameFileTypes;
                                includingPropertiesForKeys:@[NSURLNameKey]
                                                   options:NSDirectoryEnumerationSkipsHiddenFiles
                                                     error:nil];
+    NSMutableArray<NSPredicate *> *filenamePredicates = [NSMutableArray new];
     for (NSURL *url in contentsOfDir) {
         NSString *name = nil;
         [url getResourceValue:&name forKey:NSURLNameKey error:nil];
-        NSString *extension = name.pathExtension;
+        NSString *extension = name.pathExtension.lowercaseString;
         if (extension.length && [gGameFileTypes indexOfObject:extension] != NSNotFound) {
             NSString *filename = url.lastPathComponent;
-            if (filename.length) {
-                fetchRequest.entity = [NSEntityDescription entityForName:@"Game" inManagedObjectContext:context];
-                fetchRequest.predicate = [NSPredicate predicateWithFormat:@"path ENDSWITH[c] %@",filename];
-                fetchedObjects = [context executeFetchRequest:fetchRequest error:&error];
-                for (Game *game in fetchedObjects) {
-                    [game urlForBookmark];
-                }
-            }
+            if (filename.length)
+                [filenamePredicates addObject:[NSPredicate predicateWithFormat:@"path ENDSWITH[c] %@", filename]];
+        }
+    }
+
+    // One fetch per batch of file names rather than one per file. The
+    // batches keep the SQL expression well below SQLite's depth limit.
+    const NSUInteger batchSize = 100;
+    for (NSUInteger start = 0; start < filenamePredicates.count; start += batchSize) {
+        NSRange range = NSMakeRange(start, MIN(batchSize, filenamePredicates.count - start));
+        fetchRequest.predicate = [NSCompoundPredicate orPredicateWithSubpredicates:[filenamePredicates subarrayWithRange:range]];
+        fetchedObjects = [context executeFetchRequest:fetchRequest error:&error];
+        for (Game *game in fetchedObjects) {
+            [game urlForBookmark];
         }
     }
 
@@ -169,8 +159,6 @@ extern NSArray *gGameFileTypes;
     }
     NSString *commonDirectory = directoryComponents[componentIndex];
 
-
-    fetchRequest.entity = [NSEntityDescription entityForName:@"Game" inManagedObjectContext:context];
     fetchRequest.predicate = [NSPredicate predicateWithFormat:@"path CONTAINS[cd] %@", commonDirectory];
 
     fetchedObjects = [context executeFetchRequest:fetchRequest error:&error];
@@ -179,7 +167,6 @@ extern NSArray *gGameFileTypes;
     }
 
     // The we get all missing files in library and check if they can be found here
-    fetchRequest.entity = [NSEntityDescription entityForName:@"Game" inManagedObjectContext:context];
     fetchRequest.predicate = [NSPredicate predicateWithFormat:@"found == NO"];
 
     fetchedObjects = [context executeFetchRequest:fetchRequest error:&error];
@@ -205,38 +192,16 @@ extern NSArray *gGameFileTypes;
         } else {
             // If the missing game is not in the current directory, we check for a
             // common ancestor directory
-            NSArray<NSString *> *pathComponents = (filename.stringByDeletingLastPathComponent).pathComponents;
-
-            NSEnumerator *enumerator = [pathComponents reverseObjectEnumerator];
-            NSString *component;
-            NSRange foundRange, rangeInFileName;
-            while (component = [enumerator nextObject]) {
-                foundRange = [directory rangeOfString:component];
-                if (foundRange.location == NSNotFound || foundRange.location == 0)
-                    continue;
-
-                rangeInFileName = [filename rangeOfString:component];
-                if (rangeInFileName.location == NSNotFound)
-                    continue;
-
-                NSString *newPathBeginning = [directory substringToIndex:foundRange.location - 1];
-                NSString *newPathEnd = [filename substringFromIndex:rangeInFileName.location];
-                NSString *newPath = [newPathBeginning stringByAppendingPathComponent:newPathEnd];
-
-                if ([[NSFileManager defaultManager] fileExistsAtPath:newPath]) {
-                    filenames[newPath] = game;
-                    break;
-                }
-            }
+            NSString *newPath = [MissingFilesFinder pathForFile:filename underCommonAncestorWith:directory];
+            if (newPath)
+                filenames[newPath] = game;
         }
     }
 
     if (!filenames.count)
         return;
 
-    NSArray<NSString *> __block *matchedPaths = filenames.allKeys;
-
-    matchedPaths = [matchedPaths sortedArrayUsingComparator:
+    NSArray<NSString *> *matchedPaths = [filenames.allKeys sortedArrayUsingComparator:
                   ^NSComparisonResult(NSString * obj1, NSString * obj2){
         NSUInteger l1 = ((NSString *)obj1).length;
         NSUInteger l2 = ((NSString *)obj2).length;
@@ -250,20 +215,31 @@ extern NSArray *gGameFileTypes;
     }];
 
     [FolderAccess askForAccessToURL:[NSURL fileURLWithPath:matchedPaths.firstObject] andThenRunBlock:^{
-        for (NSString *path in matchedPaths)
-            if (![[self ifidFromFile:path] isEqualToString:filenames[path].ifid]) {
-                filenames[path] = nil;
+        // A file is only the missing game if it has the same signature, just
+        // like the file the user picked by hand. An IFID is not enough: other
+        // releases and other platform versions of a game share one. Entries
+        // that never got a signature are matched by IFID and given one below.
+        for (NSString *path in matchedPaths) {
+            Game *candidate = filenames[path];
+            BOOL match;
+            if (candidate.hashTag.length)
+                match = [path.signatureFromFile isEqualToString:candidate.hashTag];
+            else {
+                NSString *ifid = nil;
+                [GameImporter identifyFile:path format:NULL ifid:&ifid];
+                match = [ifid isEqualToString:candidate.ifid];
             }
+            if (!match)
+                filenames[path] = nil;
+        }
 
         NSArray *matchedIfids = filenames.allValues;
 
         if (filenames.count > 0) {
-            NSAlert *alert = [[NSAlert alloc] init];
+            NSAlert *alert = [NSAlert alertWithMessage:[NSString stringWithFormat:NSLocalizedString(@"%@ %@ also in this folder.", nil), [NSString stringWithSummaryOfGames:matchedIfids], (matchedIfids.count > 1) ? NSLocalizedString(@"are", nil) : NSLocalizedString(@"is", nil)]
+                                                  info:[NSString stringWithFormat:NSLocalizedString(@"Do you want to update %@ as well?", nil), (matchedIfids.count > 1) ? @"them" : @"it"]
+                                               buttons:@[NSLocalizedString(@"Yes", nil), NSLocalizedString(@"Cancel", nil)]];
             alert.alertStyle = NSAlertStyleInformational;
-            alert.messageText = [NSString stringWithFormat:NSLocalizedString(@"%@ %@ also in this folder.", nil), [NSString stringWithSummaryOfGames:matchedIfids], (matchedIfids.count > 1) ? NSLocalizedString(@"are", nil) : NSLocalizedString(@"is", nil)];
-            alert.informativeText = [NSString stringWithFormat:NSLocalizedString(@"Do you want to update %@ as well?", nil), (matchedIfids.count > 1) ? @"them" : @"it"];
-            [alert addButtonWithTitle:NSLocalizedString(@"Yes", nil)];
-            [alert addButtonWithTitle:NSLocalizedString(@"Cancel", nil)];
 
             NSModalResponse choice = [alert runModal];
             if (choice == NSAlertFirstButtonReturn) {
@@ -272,6 +248,10 @@ extern NSArray *gGameFileTypes;
                     NSLog(@"Updating game %@ with new path %@", game.metadata.title, path);
                     [game bookmarkForPath:path];
                     game.found = YES;
+                    if (!game.hashTag.length) {
+                        game.hashTag = path.signatureFromFile;
+                        game.metadata.hashTag = game.hashTag;
+                    }
                 }
             }
         }

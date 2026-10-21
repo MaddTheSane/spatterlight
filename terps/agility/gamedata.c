@@ -16,6 +16,7 @@
 #include <ctype.h>
 #include <assert.h>
 #include <stddef.h>
+#include <setjmp.h>
 
 
 /* ------------------------------------------------------------------- */
@@ -621,7 +622,7 @@ static word add0_dict(const char *s)
       dict[i]=(dict[i]-dictstr)+newstr;
     dictstr=newstr;
   }
-  strcpy(dictstr+dictstrptr,s); /* Copy word into memory */
+  strncpy(dictstr+dictstrptr,s,dictstrsize-dictstrptr); /* Copy word into memory */
   dict[dp]=dictstr+dictstrptr;
   dictstrptr=newptr;
 
@@ -672,7 +673,7 @@ static void init0_dict(void)
 
   dict=rmalloc(sizeof(char*));
   dictstr=rmalloc(DICT_GRAN);
-  strcpy(dictstr,"any");
+  strncpy(dictstr,"any", DICT_GRAN);
   dict[0]=dictstr;
   
   dictstrptr=4; /* Point just after 'any' */
@@ -1593,8 +1594,17 @@ void agtnwarn(const char *s,int n,int elev)
     rprintf("Warning: %s%d.\n",s,n);
 }
 
+/* If non-NULL, fatal() recovers via longjmp() instead of exit().  This lets
+   the AGT reader be used in-process (e.g. by Spatterlight's importer, to
+   compute a game's IFID directly from its .D$$/.DA1 files) without a malformed
+   game taking down the host process.  The interactive interpreter never sets
+   this, so its behaviour is unchanged.  See agtifid.c. */
+jmp_buf *agt_fatal_jmp = NULL;
+
 void fatal(const char *s)
 {
+  if (agt_fatal_jmp)
+    longjmp(*agt_fatal_jmp, 1);  /* recoverable: bail back to the caller */
   /* Should really change this so it uses only low-level primitives,
      instead of rprintf (which depends on writestr, etc.) */
   rprintf("Fatal error: %s\n",s);

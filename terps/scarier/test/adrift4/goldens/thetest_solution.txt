@@ -1,0 +1,14 @@
+open clothes
+take fluff
+drop fluff
+z
+take fluff
+drop fluff
+z
+take fluff
+drop fluff
+z
+take key
+unlock door
+east
+score

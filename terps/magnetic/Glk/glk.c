@@ -645,8 +645,11 @@ static const glui32 GMS_GRAPHICS_TIMEOUT = 50;
 static const int GMS_GRAPHICS_ANIMATION_WAIT = 2,
                  GMS_GRAPHICS_REPAINT_WAIT = 10;
 
-/* Pixel size multiplier for image size scaling. */
+/* Pixel size multiplier for image size scaling.
+ * Recomputed per picture in gms_graphics_position_picture() unless the user
+ * pinned it via -sc, in which case gms_graphics_pixel_user_set is TRUE. */
 static int gms_graphics_pixel = 2;
+static int gms_graphics_pixel_user_set = FALSE;
 
 /* Proportion of the display to use for graphics. */
 static glui32 gms_graphics_proportion = 60;
@@ -659,14 +662,15 @@ static glui32 gms_graphics_height_pixels = 0;
 /*
  * Border and shading control.  For cases where we can't detect the back-
  * ground color of the main window, there's a default, white, background.
- * Bordering is black, with a 1 pixel border, 2 pixel shading, and 8 steps
- * of shading fade.
+ * Bordering is black, with a 1 pixel border, 2 pixel shading, 8 steps
+ * of shading fade, and 10 pixels of padding above and below image.
  */
 static const glui32 GMS_GRAPHICS_DEFAULT_BACKGROUND = 0x00ffffff,
                     GMS_GRAPHICS_BORDER_COLOR = 0x00000000;
 static const int GMS_GRAPHICS_BORDER = 1,
                  GMS_GRAPHICS_SHADING = 2,
-                 GMS_GRAPHICS_SHADE_STEPS = 8;
+                 GMS_GRAPHICS_SHADE_STEPS = 8,
+                 GMS_VERTICAL_PADDING = 20;
 
 /*
  * Guaranteed unused pixel value.  This value is used to fill the on-screen
@@ -1384,15 +1388,51 @@ gms_graphics_position_picture (winid_t glk_window,
   glk_window_get_size (glk_window, &window_width, &window_height);
 
 #ifdef SPATTERLIGHT
-  if (window_height < height * pixel_size + GMS_GRAPHICS_BORDER * 2 + GMS_GRAPHICS_SHADING)
+  /* Pick the largest integer scale that still fits the image horizontally —
+   * same idea as OptimalPictureSize() in scott_display.c, but width-only
+   * since the height is what we're resizing the window to match. Skip if the
+   * user pinned the scale with -sc. */
+  if (!gms_graphics_pixel_user_set)
     {
-      glk_window_close(gms_graphics_window, NULL);
-      gms_graphics_window = glk_window_open (gms_main_window,
-                                               winmethod_Above
-                                               | winmethod_Fixed,
-                                               height * pixel_size + GMS_GRAPHICS_BORDER * 2 + GMS_GRAPHICS_SHADING + 20,
-                                               wintype_Graphics, 0);
-      glk_window_get_size (gms_graphics_window, &window_width, &window_height);
+      int optimal_pixel = window_width / width;
+      if (optimal_pixel < 1)
+        optimal_pixel = 1;
+      gms_graphics_pixel = optimal_pixel;
+      pixel_size = optimal_pixel;
+    }
+
+  /* Honour a user-pinned window height (-gx) by skipping the resize. */
+  if (gms_graphics_height_pixels == 0)
+    {
+      glui32 target_height = height * pixel_size + GMS_GRAPHICS_BORDER * 2 + GMS_GRAPHICS_SHADING + GMS_VERTICAL_PADDING;
+      if (window_height != target_height)
+        {
+          winid_t parent = glk_window_get_parent (gms_graphics_window);
+
+          /* Resize, then verify the text buffer kept at least 4 rows. Glk has
+           * no "pixels per line" query, so if the text buffer came out too
+           * short we shrink the graphics target and retry. Bounded so a
+           * degenerate window can't loop forever. */
+          for (int attempt = 0; attempt < 10; attempt++)
+            {
+              glk_window_set_arrangement (parent,
+                                          winmethod_Above | winmethod_Fixed,
+                                          target_height,
+                                          gms_graphics_window);
+              if (!gms_main_window)
+                break;
+              glui32 main_cols, main_rows;
+              glk_window_get_size (gms_main_window, &main_cols, &main_rows);
+              if (main_rows >= 4 || target_height == 0)
+                break;
+              /* Shrink proportionally to how many rows short we are. */
+              glui32 shrink = target_height / (4 - main_rows + 1);
+              if (shrink == 0)
+                shrink = 1;
+              target_height = (target_height > shrink) ? target_height - shrink : 0;
+            }
+          glk_window_get_size (gms_graphics_window, &window_width, &window_height);
+        }
     }
 #endif
 
@@ -5055,8 +5095,9 @@ gms_command_escape (const char *string, int *undo_command)
     return FALSE;
 
   /* Take a copy of the string, without any leading space or introducer. */
-  string_copy = gms_malloc (strlen (string + posn) + 1 - strlen ("glk"));
-  strcpy (string_copy, string + posn + strlen ("glk"));
+  size_t stringlength = strlen (string + posn) + 1 - strlen ("glk");
+  string_copy = gms_malloc (stringlength);
+  strncpy (string_copy, string + posn + strlen ("glk"), stringlength);
 
   /*
    * Find the subcommand; the first word in the string copy.  Find its end,
@@ -5804,7 +5845,7 @@ gms_establish_filenames (char *name, char **text, char **graphics, char **hints)
 
   /* Take a destroyable copy of the input filename. */
   base = gms_malloc (strlen (name) + 1);
-  strcpy (base, name);
+  memcpy (base, name, strlen (name) + 1);
 
   /* If base has an extension .MAG, .GFX, or .HNT, remove it. */
   if (strlen (base) > strlen (".XXX"))
@@ -5819,14 +5860,14 @@ gms_establish_filenames (char *name, char **text, char **graphics, char **hints)
   text_file = gms_malloc (strlen (base) + strlen (".MAG") + 1);
 
   /* Form a candidate text file, by adding a .MAG extension. */
-  strcpy (text_file, base);
-  strcat (text_file, ".MAG");
+  memcpy (text_file, base, strlen (base) + 1);
+  strncat (text_file, ".MAG", 4);
   stream = fopen (text_file, "rb");
   if (!stream)
     {
       /* Retry, using a .mag extension instead. */
-      strcpy (text_file, base);
-      strcat (text_file, ".mag");
+      memcpy (text_file, base, strlen (base) + 1);
+      strncat (text_file, ".mag", 4);
       stream = fopen (text_file, "rb");
       if (!stream)
         {
@@ -5850,14 +5891,14 @@ gms_establish_filenames (char *name, char **text, char **graphics, char **hints)
   graphics_file = gms_malloc (strlen (base) + strlen (".GFX") + 1);
 
   /* As above, form a candidate graphics file, using a .GFX extension. */
-  strcpy (graphics_file, base);
-  strcat (graphics_file, ".GFX");
+  memcpy (graphics_file, base, strlen (base) + 1);
+  strncat (graphics_file, ".GFX", 4);
   stream = fopen (graphics_file, "rb");
   if (!stream)
     {
       /* Retry, using a .gfx extension instead. */
-      strcpy (graphics_file, base);
-      strcat (graphics_file, ".gfx");
+      memcpy (graphics_file, base, strlen (base) + 1);
+      strncat (graphics_file, ".gfx", 4);
       stream = fopen (graphics_file, "rb");
       if (!stream)
         {
@@ -5876,14 +5917,14 @@ gms_establish_filenames (char *name, char **text, char **graphics, char **hints)
   hints_file = gms_malloc (strlen (base) + strlen (".HNT") + 1);
 
   /* As above, form a candidate graphics file, using a .HNT extension. */
-  strcpy (hints_file, base);
-  strcat (hints_file, ".HNT");
+  memcpy (hints_file, base, strlen (base) + 1);
+  strncat (hints_file, ".HNT", 4);
   stream = fopen (hints_file, "rb");
   if (!stream)
     {
       /* Retry, using a .hnt extension instead. */
-      strcpy (hints_file, base);
-      strcat (hints_file, ".hnt");
+      memcpy (hints_file, base, strlen (base) + 1);
+      strncat (hints_file, ".hnt", 4);
       stream = fopen (hints_file, "rb");
       if (!stream)
         {
@@ -5963,6 +6004,7 @@ gms_startup_code (int argc, char *argv[])
           if (scale >= 1 && scale <= 8 && *endptr == 0)
             {
               gms_graphics_pixel = scale;
+              gms_graphics_pixel_user_set = TRUE;
             }
           continue;
         }

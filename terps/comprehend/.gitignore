@@ -1,0 +1,5 @@
+# Standalone-build artifacts (terps/comprehend/Makefile + Makefile.headless)
+*.o
+comprehend
+comprehend_hl
+headless_obj/

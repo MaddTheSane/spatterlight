@@ -1,0 +1,122 @@
+Hero
+male
+
+n
+e
+take poker
+take pistol
+w
+w
+open bookcase with poker
+d
+take torch
+u
+e
+e
+light torch in fireplace
+w
+u
+w
+open wooden box
+take flak jacket
+wear flak jacket
+open cardboard box
+take potatoes
+eat potatoes
+e
+e
+open curtain
+untie girl
+w
+d
+w
+d
+n
+drink water
+n
+shoot fernelli with pistol
+shoot fernelli with pistol
+shoot fernelli with pistol
+shoot fernelli with pistol
+shoot fernelli with pistol
+shoot fernelli with pistol
+# RE-DERIVED 2026-09-12: a 3.9 Speed 1 NPC attacks EVERY turn (run390
+# getnexthit 42C60A draws Int(Rnd*1)+1, not run400's Int(Rnd*2)+1), so the
+# mobster now fires every turn and twelve straight shots kill the player.
+# Step back to the fountain once mid-fight; the mobster stays put.
+s
+drink water
+n
+shoot fernelli with pistol
+shoot fernelli with pistol
+shoot fernelli with pistol
+shoot fernelli with pistol
+shoot fernelli with pistol
+shoot fernelli with pistol
+# SEEN-MODEL RE-DERIVE (2026-08-24): a dynamic object lying loose in a room
+# is not referenceable until something LISTS it -- the Runner stamps the seen
+# byte in its room lister, not once a turn.  Measured live in run400
+# (Adrift_22_xfiles.txt, The X-Files): `take knife` in a room entered through a
+# ShowRoomDesc=0 task answers "Take what?" although the knife is on the floor.
+# The gold key is a dynamic lying in a room reached without a room description;
+# `look` is what lists it.
+look
+take gold key
+s
+drink water
+d
+s
+unchain butler
+n
+u
+e
+u
+n
+lie on bed
+n
+w
+n
+take bone
+s
+e
+take bottle
+break bottle
+take front door key
+n
+e
+open refrigerator
+take sandwich
+eat sandwich
+w
+w
+# RE-ORDERED 2026-09-13 for the pre-4.0 spent-task claim (run390 checktask
+# 44B4DD, ported): T11 `*open * cabinet *` (+5, prints the "locked" text and
+# closes object 2) and T10 `*kick * cabinet*` (+5, opens it) are both one-shot.
+# Kick-then-open used to need a THIRD line, a second `open cabinet`, for the
+# library to open the door after T11 had shut it again -- but a spent T11
+# claims that line ("You have already done that.") in the real Runner, and
+# now here too.  Open first (T11, cabinet closed), kick second (T10, cabinet
+# open): same +10.  The kick's action opens the cabinet without LISTING it,
+# and an unlisted dynamic is not referenceable (the seen rule, below), so
+# `x cabinet` -- "An AUG assault rifle is inside the gun cabinet." -- is what
+# puts the rifle in reach; the library open used to do that listing.
+open cabinet
+kick cabinet
+x cabinet
+take rifle
+e
+n
+open door
+n
+give bone to dog
+n
+open automobile
+take dynamite
+open cab
+take matches
+n
+n
+destroy boulder
+score
+n
+snipe fuel tank with rifle

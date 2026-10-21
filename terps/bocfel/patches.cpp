@@ -1,4 +1,4 @@
-// Copyright 2017-2021 Chris Spiegel.
+// Copyright 2017-2025 Chris Spiegel.
 //
 // SPDX-License-Identifier: MIT
 
@@ -14,7 +14,9 @@
 
 #include "patches.h"
 #include "memory.h"
+#include "options.h"
 #include "process.h"
+#include "screen.h"
 #include "types.h"
 #include "util.h"
 #include "zterp.h"
@@ -41,24 +43,20 @@ struct Patch {
     std::vector<Replacement> replacements;
 };
 
-// The Bureaucracy patch assumes that timed input is available, as it
-// uses that to simulate a sleep. If timed input is not available,
-// though, it will instead just be a regular @read_char, which will
-// block till the user hits a key. This is worse behavior than the
-// default, which is to effectively not sleep at all. Timed input is
-// only available with Glk, and then only if the Glk implementation
-// supports timers.
+// A couple patches assume that timed input is available, as they use
+// that to simulate a sleep. If timed input is not available, though, it
+// will instead just be a regular @read_char, which will block till the
+// user hits a key. This is worse behavior than the default, which is to
+// effectively not sleep at all. Timed input is only available with Glk,
+// and then only if the Glk implementation supports timers.
+static bool has_timed_input()
+{
 #ifdef ZTERP_GLK
-static bool bureaucracy_active()
-{
     return glk_gestalt(gestalt_Timer, 0);
-}
 #else
-static bool bureaucracy_active()
-{
     return false;
-}
 #endif
+}
 
 static std::vector<Patch> base_patches = {
     // In Arthur, there is a routine called INIT-STATUS-LINE which does this:
@@ -77,9 +75,9 @@ static std::vector<Patch> base_patches = {
         "Arthur", "890502", 40, 0x2f5d,
         {
             {
-                0x9789, 20,
-                {0xbe, 0x13, 0x5f, 0x01, 0x03, 0x00, 0x77, 0x00, 0x1f, 0x01, 0xd4, 0x1f, 0x3b, 0x9e, 0x01, 0x05, 0x35, 0x00, 0x01, 0x00},
-                {0xd4, 0x1f, 0x3b, 0x9e, 0x01, 0x05, 0x10, 0x00, 0x21, 0x00, 0x35, 0x00, 0x00, 0x00, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4}
+                0x9789, 10,
+                {0xbe, 0x13, 0x5f, 0x01, 0x03, 0x00, 0x77, 0x00, 0x1f, 0x01},
+                {0x10, 0x00, 0x21, 0x01, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4}
             }
         },
     },
@@ -87,9 +85,9 @@ static std::vector<Patch> base_patches = {
         "Arthur", "890504", 41, 0xa406,
         {
             {
-                0x9789, 20,
-                {0xbe, 0x13, 0x5f, 0x01, 0x03, 0x00, 0x77, 0x00, 0x1f, 0x01, 0xd4, 0x1f, 0x3b, 0x9c, 0x01, 0x05, 0x35, 0x00, 0x01, 0x00},
-                {0xd4, 0x1f, 0x3b, 0x9c, 0x01, 0x05, 0x10, 0x00, 0x21, 0x00, 0x35, 0x00, 0x00, 0x00, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4}
+                0x9789, 10,
+                {0xbe, 0x13, 0x5f, 0x01, 0x03, 0x00, 0x77, 0x00, 0x1f, 0x01},
+                {0x10, 0x00, 0x21, 0x01, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4},
             }
         },
     },
@@ -97,29 +95,31 @@ static std::vector<Patch> base_patches = {
         "Arthur", "890606", 54, 0x8e4a,
         {
             {
-                0x9e29, 20,
-                {0xbe, 0x13, 0x5f, 0x01, 0x03, 0x00, 0x77, 0x00, 0x1f, 0x01, 0xd4, 0x1f, 0x41, 0x25, 0x01, 0x05, 0x35, 0x00, 0x01, 0x00},
-                {0xd4, 0x1f, 0x41, 0x25, 0x01, 0x05, 0x10, 0x00, 0x21, 0x00, 0x35, 0x00, 0x00, 0x00, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4}
+                0x9e29, 10,
+                {0xbe, 0x13, 0x5f, 0x01, 0x03, 0x00, 0x77, 0x00, 0x1f, 0x01},
+                {0x10, 0x00, 0x21, 0x01, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4},
             }
-        },
+        }
     },
+
     {
         "Arthur", "890622", 63, 0x45eb,
         {
             {
-                0x9e29, 20,
-                {0xbe, 0x13, 0x5f, 0x01, 0x03, 0x00, 0x77, 0x00, 0x1f, 0x01, 0xd4, 0x1f, 0x41, 0x2d, 0x01, 0x05, 0x35, 0x00, 0x01, 0x00},
-                {0xd4, 0x1f, 0x41, 0x2d, 0x01, 0x05, 0x10, 0x00, 0x21, 0x00, 0x35, 0x00, 0x00, 0x00, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4}
+                0x9e31, 10,
+                {0xbe, 0x13, 0x5f, 0x01, 0x03, 0x00, 0x77, 0x00, 0x1f, 0x01},
+                {0x10, 0x00, 0x21, 0x01, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4}
             }
-        },
+        }
     },
+
     {
         "Arthur", "890714", 74, 0xd526,
         {
             {
-                0x9de8, 20,
-                {0xbe, 0x13, 0x5f, 0x01, 0x03, 0x00, 0x77, 0x00, 0x1f, 0x01, 0xd4, 0x1f, 0x41, 0x29, 0x01, 0x05, 0x35, 0x00, 0x01, 0x00},
-                {0xd4, 0x1f, 0x41, 0x29, 0x01, 0x05, 0x10, 0x00, 0x21, 0x00, 0x35, 0x00, 0x00, 0x00, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4}
+                0x9de8, 10,
+                {0xbe, 0x13, 0x5f, 0x01, 0x03, 0x00, 0x77, 0x00, 0x1f, 0x01},
+                {0x10, 0x00, 0x21, 0x01, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4}
             }
         }
     },
@@ -407,7 +407,7 @@ static std::vector<Patch> base_patches = {
                 0x2128c, 18,
                 {0x02, 0x00, 0x01, 0x00, 0x00, 0x10, 0x00, 0x1e, 0x00, 0xd0, 0x2f, 0xde, 0x5c, 0x00, 0x02, 0xd6, 0x2f, 0x03},
                 {0x01, 0x00, 0x01, 0x56, 0x01, 0x0a, 0x01, 0xf6, 0x63, 0x01, 0x01, 0x84, 0xa7, 0x00, 0xb0, 0x00, 0x00, 0xb0},
-                bureaucracy_active,
+                has_timed_input,
             }
         }
     },
@@ -418,7 +418,7 @@ static std::vector<Patch> base_patches = {
                 0x212d0, 18,
                 {0x02, 0x00, 0x01, 0x00, 0x00, 0x10, 0x00, 0x1e, 0x00, 0xd0, 0x2f, 0xde, 0x64, 0x00, 0x02, 0xd6, 0x2f, 0x03},
                 {0x01, 0x00, 0x01, 0x56, 0x01, 0x0a, 0x01, 0xf6, 0x63, 0x01, 0x01, 0x84, 0xb8, 0x00, 0xb0, 0x00, 0x00, 0xb0},
-                bureaucracy_active,
+                has_timed_input,
             }
         }
     },
@@ -429,16 +429,16 @@ static std::vector<Patch> base_patches = {
                 0x212c8, 18,
                 {0x02, 0x00, 0x01, 0x00, 0x00, 0x10, 0x00, 0x1e, 0x00, 0xd0, 0x2f, 0xdc, 0xce, 0x00, 0x02, 0xd6, 0x2f, 0x03},
                 {0x01, 0x00, 0x01, 0x56, 0x01, 0x0a, 0x01, 0xf6, 0x63, 0x01, 0x01, 0x84, 0xb6, 0x00, 0xb0, 0x00, 0x00, 0xb0},
-                bureaucracy_active,
+                has_timed_input,
             }
         }
     },
 
     // Journey doubles up the word “essence” when examining Praxix’s
     // pouch: originally the game printed short descriptions when the
-    // screen was narrow enough, which didn't include the word
+    // screen was narrow enough, which didn’t include the word
     // “essence”, so it always just printed out an extra “essence”,
-    // knowing that it wasn't shown. However, release 51 changed this so
+    // knowing that it wasn’t shown. However, release 51 changed this so
     // that the long descriptions, which included “essence”, were
     // unconditionally printed in this circumstance; but the extra
     // “essence” remained. This patches out the printing of that extra
@@ -462,6 +462,34 @@ static std::vector<Patch> base_patches = {
     {
         "Journey", "890706", 83, 0xd2b8,
         {{ 0xa0ef, 3, {0xb2, 0x80, 0x3e}, {0xb4, 0xb4, 0xb4} }},
+    },
+
+    // Journey has a CHANGE-FONT routine it uses to change the font, but
+    // it only supports fonts 3 and 4, so when it wants to set the font
+    // back to 1, nothing happens. This is worked around here by,
+    // instead of executing RFALSE when the font is unsupported, jumping
+    // to the <FONT 1> call at the end of the routine.
+    //
+    // This fix was created by Petter Sjölund.
+    {
+        "Journey", "890522", 51, 0x4f59,
+        {{ 0x471f, 1, {0x40}, {0x4b} }},
+    },
+    {
+        "Journey", "890526", 54, 0x5707,
+        {{ 0x4727, 1, {0x40}, {0x4b} }},
+    },
+    {
+        "Journey", "890616", 77, 0xb136,
+        {{ 0x474f, 1, {0x40}, {0x4b} }},
+    },
+    {
+        "Journey", "890627", 79, 0xff04,
+        {{ 0x4757, 1, {0x40}, {0x4b} }},
+    },
+    {
+        "Journey", "890706", 83, 0xd2b8,
+        {{ 0x4757, 1, {0x40}, {0x4b} }},
     },
 
     // This is in a routine which iterates over all attributes of an
@@ -546,6 +574,52 @@ static std::vector<Patch> base_patches = {
         {{ 0x1f910, 1, {0xbc}, {0xb4} }},
     },
 
+    // Two Zork Zero beta releases, 242-880830 and 242-880901, target an
+    // earlier, unreleased version 6 Z-machine whose @get_wind_prop
+    // (WINGET) opcode takes three operands instead of two, one of which
+    // being a table to write the result to. But the table only has one
+    // element, and all calls to WINGET go through a wrapper that
+    // effectively simulates the standard WINGET opcode:
+    //
+    // <CONSTANT WTBL <LTABLE 0>>
+    //
+    // <ROUTINE WINPROP (WIN PROP)
+    // 	 <WINGET .WIN ,WTBL .PROP>
+    // 	 <GET ,WTBL 1>>
+    //
+    // Rewrite this routine to:
+    //
+    // <ROUTINE WINPROP (WIN PROP)
+    // 	 <WINGET .WIN .PROP>>
+    //
+    // i.e. convert the non-standard WINGET call to the standard version.
+    //
+    // WINPUT/@put_wind_prop is non-standard in a similar way, but since
+    // that opcode is unsupported by Bocfel, and because it decodes just
+    // fine, there’s currently no need to patch it.
+    //
+    // See https://intfiction.org/t/illegal-use-of-parameters-in-opcode-get-wind-prop-zork0-242/75353
+    {
+        "Zork Zero", "880830", 242, 0xbf47,
+        {
+            {
+                0x1cc2b, 5,
+                {0x8b, 0x01, 0x70, 0x8b, 0x02},
+                {0xaf, 0x01, 0x02, 0x00, 0xb8},
+            },
+        },
+    },
+    {
+        "Zork Zero", "880901", 242, 0xbbab,
+        {
+            {
+                0x1cc2b, 5,
+                {0x8b, 0x01, 0x70, 0x8b, 0x02},
+                {0xaf, 0x01, 0x02, 0x00, 0xb8},
+            },
+        },
+    },
+
 #ifdef ZTERP_STATIC_PATCH_FILE
 #include ZTERP_STATIC_PATCH_FILE
 #endif
@@ -571,6 +645,53 @@ static std::vector<Patch> base_patches = {
                 0xb6c2, 5,
                 {0x95, 0x01, 0x02, 0xff, 0x01},
                 {0x97, 0x01, 0x02, 0xff, 0xb4},
+            },
+        }
+    },
+
+    // Sunburst Contamination is compiled BASIC, and never clears the
+    // screen: its start menu is left to scroll away as the game goes
+    // on. That leaves the menu sitting above the opening text, so
+    // clear the screen when one of the menu choices (instructions,
+    // load game, start game) is made. Each of them is followed by a
+    // couple of instructions that can never be reached (the range
+    // check of a constant array index). The choices are made to jump
+    // there, and the unreachable instructions are replaced by:
+    //
+    // @erase_window 0;
+    // @jump <original destination>;
+    {
+        "Sunburst Contamination", "070222", 1, 0x04ff,
+        {
+            // Instructions.
+            {
+                0x6498, 3,
+                {0x8c, 0x00, 0xb6},
+                {0x8c, 0x00, 0x0a},
+            },
+            // The destinations for “instructions” and “start game”.
+            {
+                0x64a3, 12,
+                {0xfa, 0x15, 0x5f, 0x1f, 0x59, 0x1d, 0x00, 0x05, 0x01, 0xfa, 0xe8, 0x7f},
+                {0xed, 0x7f, 0x00, 0x8c, 0x00, 0xa8, 0xed, 0x7f, 0x00, 0x8c, 0x01, 0x38},
+            },
+            // Load game. This is a call to the restore routine followed
+            // by a jump, so the call moves to the destination as well.
+            {
+                0x64cc, 3,
+                {0x8f, 0x02, 0x0e},
+                {0x8c, 0x00, 0x0d},
+            },
+            {
+                0x64da, 9,
+                {0xfa, 0x15, 0x5f, 0x1f, 0x59, 0x1d, 0x00, 0x05, 0x01},
+                {0xed, 0x7f, 0x00, 0x8f, 0x02, 0x0e, 0x8c, 0x01, 0x2a},
+            },
+            // Start game.
+            {
+                0x6503, 3,
+                {0x8c, 0x00, 0xe1},
+                {0x8c, 0xff, 0xa5},
             },
         }
     },
@@ -642,6 +763,7 @@ static std::vector<Patch> base_patches = {
 
 // These patches help with the V6 hacks.
 static std::vector<Patch> v6_patches = {
+#ifdef SPATTERLIGHT
     {
         "Arthur", "890714", 74, 0xd526,
         {
@@ -674,14 +796,8 @@ static std::vector<Patch> v6_patches = {
             {
                 0x10e76, 20,
                 {0xda, 0x1f, 0x3d, 0xb1, 0x03, 0xef, 0x3f, 0xff, 0xff, 0xf6, 0x53, 0x01, 0x96, 0x20, 0x7d, 0x00, 0xef, 0x3f, 0xff, 0xfe},
-#ifdef SPATTERLIGHT
                 {0xf6, 0x53, 0x01, 0x03, 0x20, 0x7d, 0x00, 0xda, 0x1f, 0x3d, 0xb1, 0x03, 0xf6, 0x53, 0x01, 0x96, 0x20, 0x7d, 0x00, 0xb4}
-#else
-                {0xf6, 0x53, 0x01, 0x0a, 0x20, 0x7d, 0x00, 0xda, 0x1f, 0x3d, 0xb1, 0x03, 0xf6, 0x53, 0x01, 0x96, 0x20, 0x7d, 0x00, 0xb4}
-#endif
             },
-
-#ifdef SPATTERLIGHT
         }
     },
     {
@@ -735,49 +851,395 @@ static std::vector<Patch> v6_patches = {
             }
         },
     },
-
 #else
-            // Parser messages are meant to be displayed on the bottom
-            // of the screen, but since Bocfel doesn’t have real V6
-            // window support, the messages are displayed inline as with
-            // most other Infocom games. However, the messages are
-            // printed in reverse video (in fact, the current color is
-            // looked up with @get_wind_prop, @set_colour is called with
-            // the values swapped, the message is printed, and then
-            // @set_colour puts things back). This might look OK with
-            // the parser messages in a separate window, but it’s
-            // jarring interleaved with user input, so this removes the
-            // calls to @set_colour entirely.
+    // There are two V6 hack patches for Arthur:
+    //
+    // 1. In the intro, two images are shown in immediate succession:
+    //
+    // <RT-CENTER-PIC ,K-PIC-SWORD>
+    // <RT-CENTER-PIC ,K-PIC-SWORD-MERLIN>
+    //
+    // This is presumably under the assmption that drawing is slow, so
+    // it will look like a small animation. On modern systems
+    // K-PIC-SWORD won’t be seen in this sequence, so this patch
+    // rewrites the code to add a 1s sleep call via @read_char. There
+    // are two calls to @set_cursor (to hide the cursor) which have no
+    // effect in Bocfel, giving 8 total bytes to work with, which is
+    // enough to add the new call. The following:
+    //
+    // <RT-CENTER-PIC ,K-PIC-SWORD-MERLIN>     |   call_2n         #19234 #03
+    // <CURSET -1> ;"Make cursor go away."     |   set_cursor      #ffff
+    // <INPUT 1 150 ,RT-STOP-READ>             |   read_char       #01 #96 #11d64 -> -(SP)
+    // <CURSET -2> ;"Make cursor come back."   |   set_cursor      #fffe
+    //
+    // is replaced with:
+    //
+    // <INPUT 1 10 ,RT-STOP-READ>              |   read_char        #01 #0a #11d64 -> -(SP)
+    // <RT-CENTER-PIC ,K-PIC-SWORD-MERLIN>     |   call_2n          #19234 #03
+    // <INPUT 1 150 ,RT-STOP-READ>             |   read_char        #01 #96 #11d64 -> -(SP)
+    // <NOOP>                                  |   nop
+    //
+    // (The routine addresses above represent the 74-890714 version but
+    // the approach is the same for all versions).
+    //
+    // 2. Parser messages are meant to be displayed on the bottom of the
+    // screen, but since Bocfel doesn’t have real V6 window support, the
+    // messages are displayed inline as with most other Infocom games.
+    // However, the messages are printed in reverse video (in fact, the
+    // current color is looked up with @get_wind_prop, @set_colour is
+    // called with the values swapped, the message is printed, and then
+    // @set_colour puts things back). This might look OK with the parser
+    // messages in a separate window, but it’s jarring interleaved with
+    // user input, so this removes the calls to @set_colour entirely.
+    {
+        "Arthur", "890606", 54, 0x8e4a,
+        {
+            // Merlin.
+            {
+                0x11418, 20,
+                {0xda, 0x1f, 0x49, 0xae, 0x03, 0xef, 0x3f, 0xff, 0xff, 0xf6, 0x53, 0x01, 0x96, 0x21, 0xd4, 0x00, 0xef, 0x3f, 0xff, 0xfe},
+                {0xf6, 0x53, 0x01, 0x0a, 0x21, 0xd4, 0x00, 0xda, 0x1f, 0x49, 0xae, 0x03, 0xf6, 0x53, 0x01, 0x96, 0x21, 0xd4, 0x00, 0xb4},
+                has_timed_input,
+            },
+
+            // Reverse video.
+            { 0x117bf, 3, {0x7b, 0x0d, 0x0c}, {0xb4, 0xb4, 0xb4} },
+            { 0x117cb, 3, {0x7b, 0x0c, 0x0d}, {0xb4, 0xb4, 0xb4} },
+        }
+    },
+
+    {
+        "Arthur", "890622", 63, 0x45eb,
+        {
+            // Merlin.
+            {
+                0x1147e, 20,
+                {0xda, 0x1f, 0x3f, 0x2e, 0x03, 0xef, 0x3f, 0xff, 0xff, 0xf6, 0x53, 0x01, 0x96, 0x22, 0x04, 0x00, 0xef, 0x3f, 0xff, 0xfe},
+                {0xf6, 0x53, 0x01, 0x0a, 0x22, 0x04, 0x00, 0xda, 0x1f, 0x3f, 0x2e, 0x03, 0xf6, 0x53, 0x01, 0x96, 0x22, 0x04, 0x00, 0xb4},
+                has_timed_input,
+            },
+
+            // Reverse video.
+            { 0x11853, 3, {0x7b, 0x0d, 0x0c}, {0xb4, 0xb4, 0xb4} },
+            { 0x1185f, 3, {0x7b, 0x0c, 0x0d}, {0xb4, 0xb4, 0xb4} },
+        }
+    },
+
+    {
+        "Arthur", "890714", 74, 0xd526,
+        {
+            // Merlin.
+            {
+                0x10e76, 20,
+                {0xda, 0x1f, 0x3d, 0xb1, 0x03, 0xef, 0x3f, 0xff, 0xff, 0xf6, 0x53, 0x01, 0x96, 0x20, 0x7d, 0x00, 0xef, 0x3f, 0xff, 0xfe},
+                {0xf6, 0x53, 0x01, 0x0a, 0x20, 0x7d, 0x00, 0xda, 0x1f, 0x3d, 0xb1, 0x03, 0xf6, 0x53, 0x01, 0x96, 0x20, 0x7d, 0x00, 0xb4},
+                has_timed_input,
+            },
+
+            // Reverse video.
             { 0x1124b, 3, {0x7b, 0x0d, 0x0c}, {0xb4, 0xb4, 0xb4} },
             { 0x11257, 3, {0x7b, 0x0c, 0x0d}, {0xb4, 0xb4, 0xb4} },
         },
     },
-#endif
+
+    // There are several V6 hack patches for Shogun:
+    //
+    // 1. Avoid calling a function that prints too many newlines during
+    // interludes.
+    //
+    // 2. Shogun uses either @set_colour or @set_text_style for reverse
+    // video in the status line, but it only uses @set_text_style on
+    // Amiga. Unconditionally use @set_text_style for better results.
+    //
+    // 3. Shogun clears the window right after printing the title
+    // screen, rendering it invisible without proper V6 support. Ignore
+    // that request.
+    //
+    // 4. Shogun has a GET-FROM-MENU routine which is used to present a
+    // menu (e.g. at the start of the game) from which the user selects
+    // an entry. This menu does not work properly with Glk, so a custom
+    // opcode replacement is used to present a working menu.
+    //
+    // 5. Two Shogun releases split the window for the title screen such
+    // that the actual text displayed is in a tiny main window and hard
+    // to deal with. Without proper V6 support, the split is
+    // problematic, so just don’t do it.
+    //
+    // 6. The same two Shogun releases try to calculate offsets into a
+    // window to draw the maze; but with Glk windows, the maze should
+    // always be offset by 0 (which is then adjusted by the block width
+    // of 7). Overwrite the assignment to these offsets with @nop.
+    {
+        "Shogun", "890314", 292, 0x69b8,
+        {
+            // Newlines.
+            { 0x11ef1, 1, {0xda}, {0xb0} },
+
+            // Reverse video.
+            { 0x11be5, 3, {0x7b, 0xde, 0x2c}, {0xf1, 0x7f, 0x01} },
+
+            // Title clear.
+            { 0x10bcf, 3, {0xed, 0x7f, 0x00}, {0xb4, 0xb4, 0xb4} },
+
+            // Game start menu.
+            {
+                0x10bd5, 5,
+                {0xec, 0x00, 0x7f, 0x15, 0x1c},
+                {0xb4, 0xb4, 0xbe, SHOGUN_MENU_EXT, 0x01},
+            },
+
+            // Game over menu.
+            {
+                0x12914, 4,
+                {0xe0, 0x08, 0x15, 0x1c},
+                {0xb4, 0xbe, SHOGUN_MENU_EXT, 0x23},
+            },
+
+            // End of scene menu.
+            {
+                0x13caf, 4,
+                {0xe0, 0x08, 0x15, 0x1c},
+                {0xb4, 0xbe, SHOGUN_MENU_EXT, 0x23},
+            },
+
+            // Color menu.
+            {
+                0x1750d, 5,
+                {0xec, 0x00, 0xbf, 0x15, 0x1c},
+                {0xb4, 0xb4, 0xbe, SHOGUN_MENU_EXT, 0x02},
+            },
+
+            // Title split.
+            { 0x10bc9, 3, {0xea, 0xbf, 0x00}, {0xb4, 0xb4, 0xb4} },
+
+            // Maze offset.
+            { 0x3d7b1, 4, {0x57, 0x00, 0x02, 0xb6}, {0xb4, 0xb4, 0xb4, 0xb4 } },
+            { 0x3d7c3, 4, {0x57, 0x00, 0x02, 0x6d}, {0xb4, 0xb4, 0xb4, 0xb4 } },
+        }
+    },
+
+    {
+        "Shogun", "890321", 295, 0x5c0b,
+        {
+            // Newlines.
+            { 0x120a9, 1, {0xda}, {0xb0} },
+
+            // Reverse video.
+            { 0x10a85, 4, {0x41, 0x40, 0x04, 0x46}, {0xf1, 0x7f, 0x01, 0xb0} },
+
+            // Title clear.
+            { 0x10d14, 3, {0xed, 0x7f, 0x00}, {0xb4, 0xb4, 0xb4} },
+
+            // Game start menu.
+            {
+                0x10d1a, 5,
+                {0xec, 0x00, 0x7f, 0x15, 0x66},
+                {0xb4, 0xb4, 0xbe, SHOGUN_MENU_EXT, 0x01},
+            },
+
+            // Game over menu.
+            {
+                0x12acc, 4,
+                {0xe0, 0x08, 0x15, 0x66},
+                {0xb4, 0xbe, SHOGUN_MENU_EXT, 0x23},
+            },
+
+            // End of scene menu.
+            {
+                0x13e6f, 4,
+                {0xe0, 0x08, 0x15, 0x66},
+                {0xb4, 0xbe, SHOGUN_MENU_EXT, 0x23},
+            },
+
+            // Color menu.
+            {
+                0x176e5, 5,
+                {0xec, 0x00, 0xbf, 0x15, 0x66},
+                {0xb4, 0xb4, 0xbe, SHOGUN_MENU_EXT, 0x02},
+            },
+
+            // Title split.
+            { 0x10d0e, 3, {0xea, 0xbf, 0x00}, {0xb4, 0xb4, 0xb4} },
+
+            // Maze offset.
+            { 0x3d999, 4, {0x57, 0x00, 0x02, 0xb8}, {0xb4, 0xb4, 0xb4, 0xb4 } },
+            { 0x3d9ab, 4, {0x57, 0x00, 0x02, 0x6e}, {0xb4, 0xb4, 0xb4, 0xb4 } },
+        }
+    },
+
+    {
+        "Shogun", "890510", 311, 0xe200,
+        {
+            // Newlines.
+            { 0x12625, 1, {0xda}, {0xb0} },
+
+            // Reverse video.
+            { 0x117d1, 4, {0x41, 0x43, 0x04, 0x46}, {0xf1, 0x7f, 0x01, 0xb0} },
+
+            // Title clear.
+            { 0x10cb0, 3, {0xed, 0x7f, 0x00}, {0xb4, 0xb4, 0xb4} },
+
+            // Game start menu.
+            {
+                0x10cb6, 5,
+                {0xec, 0x00, 0x7f, 0x16, 0x95},
+                {0xb4, 0xb4, 0xbe, SHOGUN_MENU_EXT, 0x01},
+            },
+
+            // Game over menu.
+            {
+                0x130ab, 4,
+                {0xe0, 0x00, 0x16, 0x95},
+                {0xb4, 0xbe, SHOGUN_MENU_EXT, 0x03},
+            },
+
+            // End of scene menu.
+            {
+                0x14499, 9,
+                {0xf9, 0x08, 0x16, 0x95, 0x00, 0xc2, 0x00, 0x20, 0x53},
+                {0xbe, SHOGUN_MENU_EXT, 0x23, 0x00, 0xc2, 0x00, 0x20, 0x53, 0x02},
+            },
+
+            // Color menu.
+            {
+                0x17d69, 5,
+                {0xec, 0x00, 0xbf, 0x16, 0x95},
+                {0xb4, 0xb4, 0xbe, SHOGUN_MENU_EXT, 0x02},
+            },
+        }
+    },
 
     {
         "Shogun", "890706", 322, 0x5c88,
         {
-            // Avoid calling a function that prints too many newlines
-            // during interludes.
+            // Newlines.
             { 0x12771, 1, {0xda}, {0xb0} },
 
-            // Shogun uses @set_text_style to switch to reverse video on
-            // Amiga only; otherwise it uses @set_colour. This
-            // unconditionally uses @set_text_style, for better results.
+            // Reverse video.
             { 0x11865, 4, {0x41, 0x43, 0x04, 0x46}, {0xf1, 0x7f, 0x01, 0xb0} },
+
+            // Title clear.
+            { 0x10d44, 3, {0xed, 0x7f, 0x00}, {0xb4, 0xb4, 0xb4} },
+
+            // Game start menu.
+            {
+                0x10d4a, 5,
+                {0xec, 0x00, 0x7f, 0x16, 0xba},
+                {0xb4, 0xb4, 0xbe, SHOGUN_MENU_EXT, 0x01},
+            },
+
+            // Game over menu.
+            {
+                0x131e7, 4,
+                {0xe0, 0x00, 0x16, 0xba},
+                {0xb4, 0xbe, SHOGUN_MENU_EXT, 0x03},
+            },
+
+            // End of scene menu.
+            {
+                0x145e1, 9,
+                {0xf9, 0x08, 0x16, 0xba, 0x00, 0xc2, 0x00, 0x20, 0xa5},
+                {0xbe, SHOGUN_MENU_EXT, 0x23, 0x00, 0xc2, 0x00, 0x20, 0xa5, 0x02},
+            },
+
+            // Color menu.
+            {
+                0x17edd, 5,
+                {0xec, 0x00, 0xbf, 0x16, 0xba},
+                {0xb4, 0xb4, 0xbe, SHOGUN_MENU_EXT, 0x02},
+            },
         }
     },
 
-#ifndef SPATTERLIGHT
+    // There are two V6 hack patches for Journey:
+    //
+    // 1. The DIAL-GRAPHICS routine calls GRAPHIC with the specified
+    // arrow and location; since the same arrows are used for both
+    // dials, the offset for the arrows can’t be determined just by the
+    // picture number. Instead rewrite the calls to a custom
+    // zjourney_dial(), passing 0 for the left arrow, and 1 for the
+    // right.
+    //
+    // 2. When the interpreter number is set to Amiga, Journey draws a
+    // box around the entire screen. This is not possible with Glk (at
+    // least not in a way that wouldn’t require loads of special-
+    // casing); and even worse, Bocfel hacks around some Journey/Glk
+    // issues by pretending the screen height is 6, so that Journey
+    // won’t expand the upper window to extend across the whole screen,
+    // with the side effect that the calculation of the border is
+    // broken, causing an apparent hang that is effectively this, but
+    // slow, since it’s interpreted:
+    //
+    // uint16_t val = 1;
+    // while (val++ != 0) { }
+    //
+    // Border drawing is controlled by the global variable BORDER-FLAG,
+    // which is only set for Amiga. This patch ensures that BORDER-FLAG
+    // is never set, so the game never tries to draw the border.
+    {
+        "Journey", "890316", 26, 0x27cc,
+        {
+            // DIAL-GRAPHICS
+            {
+                0x30095, 6,
+                {0xf9, 0x59, 0xcc, 0x00, 0x00, 0x00},
+                {0xbe, JOURNEY_DIAL_EXT, 0x9f, 0x97, 0x00, 0xb4}
+            },
+            {
+                0x300a3, 6,
+                {0xe0, 0x58, 0xcc, 0x00, 0x00, 0xff},
+                {0xbe, JOURNEY_DIAL_EXT, 0x9f, 0x97, 0x01, 0xb0}
+            },
+
+            // Amiga hang
+            { 0x4b3e, 3, {0x0d, 0xab, 0x01}, {0x0d, 0xab, 0x00} },
+        }
+    },
+
+    {
+        "Journey", "890322", 30, 0x985b,
+        {
+            // DIAL-GRAPHICS
+            {
+                0x30189, 6,
+                {0xf9, 0x59, 0xcc, 0x00, 0x00, 0x00},
+                {0xbe, JOURNEY_DIAL_EXT, 0x9f, 0x97, 0x00, 0xb4}
+            },
+            {
+                0x30197, 6,
+                {0xe0, 0x58, 0xcc, 0x00, 0x00, 0xff},
+                {0xbe, JOURNEY_DIAL_EXT, 0x9f, 0x97, 0x01, 0xb0}
+            },
+
+            // Amiga hang
+            { 0x4bea, 3, {0x0d, 0xaa, 0x01}, {0x0d, 0xaa, 0x00} },
+        }
+    },
+
+    {
+        "Journey", "890616", 77, 0xb136,
+        {
+            // DIAL-GRAPHICS
+            {
+                0x30771, 6,
+                {0xf9, 0x59, 0xf1, 0x00, 0x00, 0x00},
+                {0xbe, JOURNEY_DIAL_EXT, 0x9f, 0x97, 0x00, 0xb4}
+            },
+            {
+                0x3077f, 6,
+                {0xe0, 0x58, 0xf1, 0x00, 0x00, 0xff},
+                {0xbe, JOURNEY_DIAL_EXT, 0x9f, 0x97, 0x01, 0xb0}
+            },
+
+            // Amiga hang
+            { 0x4dcf, 3, {0x0d, 0xad, 0x01}, {0x0d, 0xad, 0x00} },
+        }
+    },
+
     {
         "Journey", "890706", 83, 0xd2b8,
         {
-            // The DIAL-GRAPHICS routine calls GRAPHICS with the
-            // specified arrow and location; since the same arrows are
-            // used for both dials, the offset for the arrows can’t be
-            // determined just by the picture number. Instead rewrite
-            // the calls to a custom zjourney_dial(), passing 0 for the
-            // left arrow, and 1 for the right.
+            // DIAL-GRAPHICS
             {
                 0x307b9, 6,
                 {0xf9, 0x59, 0xef, 0x00, 0x00, 0x00},
@@ -789,69 +1251,83 @@ static std::vector<Patch> v6_patches = {
                 {0xbe, JOURNEY_DIAL_EXT, 0x9f, 0x97, 0x01, 0xb0}
             },
 
-            // The Amiga version of Journey draws a box around the
-            // entire screen. This is not possible with Glk (at least
-            // not in a way that wouldn’t require loads of special-
-            // casing); and even worse, Bocfel hacks around some
-            // Journey/Glk issues by pretending the screen height is 6,
-            // so that Journey won’t expand the upper window to extend
-            // across the whole screen, with the side effect that the
-            // calculation of the border is broken, causing an apparent
-            // hang that is effectively this, but slow, since it’s
-            // interpreted:
-            //
-            // uint16_t val = 1;
-            // while (val++ != 0) { }
-            //
-            // Border drawing is controlled by the global variable
-            // BORDER-FLAG (G9f), which is only set for Amiga. This
-            // patch ensures that BORDER-FLAG is never set, so the game
-            // never tries to draw the border.
+            // Amiga hang
             { 0x4dcf, 3, {0x0d, 0xaf, 0x01}, {0x0d, 0xaf, 0x00} },
         }
     },
-#endif
+
+    // There are two V6 hack patches for Zork Zero:
+    //
+    // 1. In Fanucci, Zork Zero displays labels under each card
+    // (DISCARD, 1, 2, 3, 4). This is done in a graphics window, though,
+    // and Glk doesn’t support text in graphics windows. It would
+    // probably be possible to create a new text window just below the
+    // graphics window and put this text in there, but since it’s not
+    // crucial to the game, as you can either use the mouse to click, or
+    // just infer/look up which cards are which, jump over the entire
+    // sequence of moving the cursor and writing text. This is necessary
+    // because, without it, output such as the jester’s commentary is
+    // not visible.
+    //
+    // 2. Zork Zero only allows the compass to be clicked for certain
+    // machine types (interpreter numbers). But the mouse works under
+    // Glk regardless (if the Glk implementation supports mouse clicks).
+    // This bypasses the machine-type check, allowing the compass rose
+    // to be clicked no matter which interpreter number is selected.
+    //
+    // Only release 296 actually needs this: its native check accepts
+    // the Macintosh interpreter (number 3) only, so the default
+    // (Amiga) is rejected. From release 343 onwards the game accepts
+    // Macintosh, Amiga, MS-DOS and Apple natively, and Spatterlight
+    // always clamps the V6 interpreter number into that set via
+    // v6_switch_to_allowed_interpreter_number() (see zterp.cpp), so the
+    // compass works without any patch. The compass replacements for
+    // 366/383/393 were therefore no-ops and have been dropped; only the
+    // Fanucci replacement remains for those. If that clamping is ever
+    // relaxed to allow a non-accepted interpreter number through, those
+    // builds would need the bypass restored.
+    {
+        "Zork Zero", "881019", 296, 0x8c61,
+        {
+            // Fanucci.
+            { 0x2aa6d, 3, {0xef, 0xaf, 0x02}, {0x8c, 0x00, 0x3e} },
+
+            // Compass rose.
+            { 0x1d3cc, 4, {0x41, 0x00, 0x03, 0x62}, {0xb4, 0xb4, 0xb4, 0xb4} },
+        },
+    },
+
+    {
+        "Zork Zero", "890323", 366, 0xc5cd,
+        {
+            // Fanucci.
+            { 0x2964c, 3, {0xef, 0xaf, 0x02}, {0x8c, 0x00, 0x3e} },
+        },
+    },
+
+    {
+        "Zork Zero", "890602", 383, 0x6f7f,
+        {
+            // Fanucci.
+            { 0x29e87, 3, {0xef, 0xaf, 0x03}, {0x8c, 0x00, 0x3e} },
+        },
+    },
 
     {
         "Zork Zero", "890714", 393, 0x791c,
         {
-            // In Fanucci, Zork Zero displays labels under each card
-            // (DISCARD, 1, 2, 3, 4). This is done in a graphics window,
-            // though, and Glk doesn’t support text in graphics windows.
-            // It would probably be possible to create a new text window
-            // just below the graphics window and put this text in
-            // there, but since it’s not crucial to the game, as you can
-            // either use the mouse to click, or just infer/look up
-            // which cards are which, replace the entire sequence of
-            // moving the cursor and writing text with @nop.
-            {
-                0x2a127, 63,
-                {0xef, 0xaf, 0x03, 0x04, 0xb2, 0x11, 0x24, 0x38, 0x98, 0x11, 0x04, 0x18, 0x97, 0x91, 0x25, 0xef,
-                 0xaf, 0x03, 0x05, 0xe5, 0x7f, 0x31, 0x74, 0x05, 0x06, 0x00, 0xef, 0xaf, 0x03, 0x00, 0xe5, 0x7f,
-                 0x32, 0x56, 0x06, 0x02, 0x00, 0x74, 0x05, 0x00, 0x00, 0xef, 0xaf, 0x03, 0x00, 0xe5, 0x7f, 0x33,
-                 0x56, 0x06, 0x03, 0x00, 0x74, 0x05, 0x00, 0x00, 0xef, 0xaf, 0x03, 0x00, 0xe5, 0x7f, 0x34},
-
-                {0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4,
-                 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4,
-                 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4,
-                 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4}
-            },
-
-            // Zork Zero only allows the compass to be clicked when the
-            // machine is an Apple II, Macintosh, Amiga, or IBM PC. But
-            // the mouse works under Glk regardless (if the Glk
-            // implementation supports mouse clicks). This bypasses the
-            // mouse check, allowing the compass rose to be clicked no
-            // matter which interpreter number is selected.
-            { 0x1c20d, 3, {0xa0, 0x00, 0xce}, {0xb4, 0xb4, 0xb4} },
+            // Fanucci.
+            { 0x2a127, 3, {0xef, 0xaf, 0x03}, {0x8c, 0x00, 0x3e} },
         },
     },
+#endif
 };
 
 static bool apply_patch(const Replacement &r)
 {
     if (r.addr >= header.static_start &&
-        r.addr + r.n < memory_size &&
+        r.n <= memory_size &&
+        r.addr <= memory_size - r.n &&
         std::memcmp(&memory[r.addr], r.in.data(), r.n) == 0) {
 
         std::memcpy(&memory[r.addr], r.out.data(), r.n);
@@ -862,16 +1338,48 @@ static bool apply_patch(const Replacement &r)
     return false;
 }
 
+static bool sanity_check(const Patch &patch)
+{
+    bool ok = true;
+
+    for (const auto &replacement : patch.replacements) {
+        if (replacement.in.size() != replacement.n ||
+            replacement.out.size() != replacement.n)
+        {
+            std::ostringstream ss;
+            ss << "patch consistency error: " <<
+                patch.title << " (" <<
+                patch.release << "-" << patch.serial <<
+                " @0x" << std::hex << replacement.addr <<
+                ")";
+
+            std::cerr << ss.str() << std::endl;
+            ok = false;
+        }
+    }
+
+    return ok;
+}
+
 static void apply_patches(const std::vector<Patch> &patches)
 {
     for (const auto &patch : patches) {
-        if (std::memcmp(patch.serial, header.serial, sizeof header.serial) == 0 &&
+        if (sanity_check(patch) &&
+            std::memcmp(patch.serial, header.serial, sizeof header.serial) == 0 &&
             patch.release == header.release &&
             patch.checksum == header.checksum) {
 
             for (const auto &replacement : patch.replacements) {
                 if (replacement.active()) {
-                    apply_patch(replacement);
+                    if (!apply_patch(replacement)) {
+                        std::ostringstream ss;
+                        ss << "internal patch error: patch for " <<
+                            patch.title << " (" <<
+                            patch.release << "-" << patch.serial <<
+                            " @0x" << std::hex << replacement.addr <<
+                            ") is not valid: byte sequence not found";
+                        std::cerr << ss.str() << std::endl;
+                    }
                 }
             }
         }
@@ -914,7 +1422,7 @@ void apply_user_patch(std::string patchstr)
     if (!(ss >> std::hex >> addr) ||
         !(ss >> std::dec >> count))
     {
-        throw PatchStatus::SyntaxError();
+        throw PatchStatus::SyntaxError("unable to read address and count");
     }
 
     ss >> std::hex;
@@ -922,8 +1430,11 @@ void apply_user_patch(std::string patchstr)
     auto read_into = [&count, &ss](std::vector<uint8_t> &vec){
         for (uint32_t i = 0; i < count; i++) {
             unsigned int byte;
-            if (!(ss >> byte) || byte > 255) {
-                throw PatchStatus::SyntaxError();
+            if (!(ss >> byte)) {
+                throw PatchStatus::SyntaxError("not enough bytes");
+            }
+            if (byte > 255) {
+                throw PatchStatus::SyntaxError("invalid byte: must be 0-255");
             }
             vec.push_back(byte);
         }
@@ -933,7 +1444,7 @@ void apply_user_patch(std::string patchstr)
     read_into(out);
 
     if (ss.peek() != std::char_traits<char>::eof()) {
-        throw PatchStatus::SyntaxError();
+        throw PatchStatus::SyntaxError("unexpected characters at end");
     }
 
     Replacement replacement = {
@@ -969,8 +1480,8 @@ void patch_load_file(const std::string &file)
     parse_grouped_file(f, [&file](const std::string &line, int lineno) {
         try {
             apply_user_patch(line);
-        } catch (const PatchStatus::SyntaxError &) {
-            std::cerr << file << ":" << lineno << ": patch file syntax error" << std::endl;
+        } catch (const PatchStatus::SyntaxError &e) {
+            std::cerr << file << ":" << lineno << ": patch file syntax error" << ": " << e.what() << std::endl;
         } catch (const PatchStatus::NotFound &) {
             std::cerr << file << ":" << lineno << ": patch file byte sequence not found" << std::endl;
         }

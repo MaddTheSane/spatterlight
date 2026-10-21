@@ -1,0 +1,409 @@
+# Third-party game data (.taf) is never committed (§6 step 4 of
+# TODO_plover_walkthroughs.md). run_v4_walkthroughs.sh reads games from here by
+# basename; recreate with symlinks or set GAMES_DIR on another machine.
+/games/
+
+# Downloaded third-party walkthrough documents (source material for the
+# derivations in notes/); not ours to commit.
+/downloaded/
+
+# Archie's Birthday (AIF): explicit text, deliberately not committed.
+/notes/Archies_Birthday_walkthrough.md
+/goldens/archie_solution.txt
+/goldens/archie_solution.expected.txt
+
+# Diary of a Stripper (AIF): explicit text, deliberately not committed.
+/notes/Diary_of_a_Stripper_walkthrough.md
+/goldens/diarystrip_solution.txt
+/goldens/diarystrip_solution.expected.txt
+
+# Camp Windy Lake : Part 2 (AIF): explicit text, deliberately not committed.
+/goldens/windy2_solution.txt
+/goldens/windy2_solution.expected.txt
+
+# Lara Croft : The Sun Obelisk (AIF): explicit text, deliberately not committed.
+/goldens/croft_solution.txt
+/goldens/croft_solution.expected.txt
+
+# Doctor Who and the Vortex of Lust (AIF): explicit text, deliberately not
+# committed.
+/goldens/dr-who-vortex-lust_solution.txt
+/goldens/dr-who-vortex-lust_solution.expected.txt
+
+# The Gamma Gals (AIF): explicit text, deliberately not committed.
+/goldens/gamma_solution.txt
+/goldens/gamma_solution.expected.txt
+
+# The Wingman (AIF): explicit text, deliberately not committed.
+/goldens/wingman1_solution.txt
+/goldens/wingman1_solution.expected.txt
+
+# Temple Of The Sun (AIF): explicit text, deliberately not committed.
+/goldens/templeofthesun_solution.txt
+/goldens/templeofthesun_solution.expected.txt
+
+# Amy And The Raging Hormones (AIF): explicit text, deliberately not
+# committed.
+/goldens/amy_solution.txt
+/goldens/amy_solution.expected.txt
+
+# BSG TWENTY TWO Final (AIF): explicit text, deliberately not committed.
+/goldens/bsg22_solution.txt
+/goldens/bsg22_solution.expected.txt
+
+# The Strange Tale of Dr Wilkins (AIF): explicit text, deliberately not
+# committed.
+/goldens/wilkins_solution.txt
+/goldens/wilkins_solution.expected.txt
+
+# The Worst Game In The World... Ever!!! (AIF): comedic adult content,
+# deliberately not committed.
+/goldens/worstgame_solution.txt
+/goldens/worstgame_solution.expected.txt
+
+# Sex is Mental (AIF): explicit text, deliberately not committed.
+/goldens/sexismental_solution.txt
+/goldens/sexismental_solution.expected.txt
+
+# warlock.taf (AIF): explicit text, deliberately not committed.
+/goldens/warlock_solution.txt
+/goldens/warlock_solution.expected.txt
+
+# Dear Diary.taf (AIF): explicit text, deliberately not committed.
+/goldens/deardiary_solution.txt
+/goldens/deardiary_solution.expected.txt
+
+# The croft.taf SYNONYM-precedence probe generator.  It is a faithful
+# reduction of an AIF file and is built from that game's own vocabulary, so
+# it stays local like the solutions above; the finding it measured is
+# recorded, in schematic form, in the croft section of
+# notes/v4_walkthrough_rows.md and in notes/WALKTHROUGH_TODO.md.
+/harness/make_39_synprobe.py
+/harness/pSYN.taf
+/harness/pSYN.taf.plain
+
+# Riding_Home.taf (AIF): explicit text, deliberately not committed.
+/goldens/riding_home_solution.txt
+/goldens/riding_home_solution.expected.txt
+
+# Dear Diary 2.taf (AIF): explicit text, deliberately not committed.
+/goldens/deardiary2_solution.txt
+/goldens/deardiary2_solution.expected.txt
+
+# Barney's Problem (AIF): explicit text, deliberately not committed.
+/goldens/barneysproblem_solution.txt
+/goldens/barneysproblem_solution.expected.txt
+
+# cldone.taf (AIF): explicit text, deliberately not committed.
+/goldens/cldone_solution.txt
+/goldens/cldone_solution.expected.txt
+
+# Scandal.taf (AIF): explicit text, deliberately not committed.
+/goldens/scandal_solution.txt
+/goldens/scandal_solution.expected.txt
+
+# hcw.taf (AIF): explicit text, deliberately not committed.
+/goldens/hcw_solution.txt
+/goldens/hcw_solution.expected.txt
+
+# magicshow.taf (AIF): explicit text, deliberately not committed.
+/goldens/magicshow_solution.txt
+/goldens/magicshow_solution.expected.txt
+
+# goblin.taf (AIF): explicit text, deliberately not committed.
+/goldens/goblin_solution.txt
+/goldens/goblin_solution.expected.txt
+
+# ss whore.taf (AIF): explicit text, deliberately not committed.
+/goldens/sswhore_solution.txt
+/goldens/sswhore_solution.expected.txt
+
+# Real-Runner transcripts and compare reports of the explicit games above
+# (runner_transcripts/<tag>.txt|.rtf and runner_transcripts/compare/<tag>.txt).
+# harness/runner_transcripts.py collect flags any that this list misses.
+/runner_transcripts/**/archie.*
+/runner_transcripts/**/diarystrip.*
+/runner_transcripts/**/windy2.*
+/runner_transcripts/**/croft.*
+/runner_transcripts/**/dr-who-vortex-lust.*
+/runner_transcripts/**/gamma.*
+/runner_transcripts/**/wingman1.*
+/runner_transcripts/**/templeofthesun.*
+/runner_transcripts/**/amy.*
+/runner_transcripts/**/bsg22.*
+/runner_transcripts/**/wilkins.*
+/runner_transcripts/**/worstgame.*
+/runner_transcripts/**/sexismental.*
+/runner_transcripts/**/warlock.*
+/runner_transcripts/**/deardiary.*
+/runner_transcripts/**/riding_home.*
+/runner_transcripts/**/deardiary2.*
+/runner_transcripts/**/barneysproblem.*
+/runner_transcripts/**/cldone.*
+/runner_transcripts/**/scandal.*
+/runner_transcripts/**/hcw.*
+/runner_transcripts/**/magicshow.*
+/runner_transcripts/**/goblin.*
+/runner_transcripts/**/sswhore.*
+
+# Crossworlds Part 2 and Part 4 (AIF): explicit text, deliberately not
+# committed.
+/goldens/crossworlds2_solution.txt
+/goldens/crossworlds2_solution.expected.txt
+/goldens/crossworlds4_solution.txt
+/goldens/crossworlds4_solution.expected.txt
+/runner_transcripts/**/crossworlds2.*
+/runner_transcripts/**/crossworlds4.*
+
+# Dead or Alive Xtreme Beach Sex (AIF): explicit text, deliberately not
+# committed.
+/goldens/doa_xbs_solution.txt
+/goldens/doa_xbs_solution.expected.txt
+/runner_transcripts/**/doa_xbs.*
+
+# The Silver Maiden (AIF): explicit text, deliberately not committed.
+/goldens/silvermaiden_solution.txt
+/goldens/silvermaiden_solution.expected.txt
+/runner_transcripts/**/silvermaiden.*
+
+# Trapped With A Girl (AIF): explicit text, deliberately not committed.
+/goldens/trappedwithagirl_solution.txt
+/goldens/trappedwithagirl_solution.expected.txt
+/runner_transcripts/**/trappedwithagirl.*
+
+# Practice Policy (AIF): explicit text, deliberately not committed.
+/goldens/practicepolicy_solution.txt
+/goldens/practicepolicy_solution.expected.txt
+/runner_transcripts/**/practicepolicy.*
+
+# To Be King (AIF): explicit text, deliberately not committed.
+/goldens/tobeking_solution.txt
+/goldens/tobeking_solution.expected.txt
+/runner_transcripts/**/tobeking.*
+
+# Harem Prologue (AIF): explicit text, deliberately not committed.
+/goldens/haremprologue_solution.txt
+/goldens/haremprologue_solution.expected.txt
+/runner_transcripts/**/haremprologue.*
+
+# Duchess of Desire (AIF): explicit text, deliberately not committed.
+/goldens/duchess_solution.txt
+/goldens/duchess_solution.expected.txt
+/runner_transcripts/**/duchess.*
+
+# Ziva.taf (AIF): explicit text, deliberately not committed.
+/goldens/ziva_solution.txt
+/goldens/ziva_solution.expected.txt
+/runner_transcripts/**/ziva.*
+
+# Smoke Demo.taf and Homeless Harry.taf (AIF): explicit text, not committed.
+/goldens/smokedemo_solution.txt
+/goldens/smokedemo_solution.expected.txt
+/goldens/homelessharry_solution.txt
+/goldens/homelessharry_solution.expected.txt
+/goldens/gosha_solution.txt
+/goldens/gosha_solution.expected.txt
+/runner_transcripts/**/smokedemo.*
+/runner_transcripts/**/homelessharry.*
+/runner_transcripts/**/gosha.*
+
+# home1-2.taf (AIF): explicit text, deliberately not committed.
+/goldens/home12_solution.txt
+/goldens/home12_solution.expected.txt
+/runner_transcripts/**/home12.*
+
+# Vengance.taf / alex.taf / Notice Me.taf / ghost.taf (AIF): explicit text.
+/goldens/vengance_solution.txt
+/goldens/vengance_solution.expected.txt
+/goldens/alex_solution.txt
+/goldens/alex_solution.expected.txt
+/goldens/noticeme_solution.txt
+/goldens/noticeme_solution.expected.txt
+/goldens/ghost_solution.txt
+/goldens/ghost_solution.expected.txt
+/runner_transcripts/**/vengance.*
+/runner_transcripts/**/alex.*
+/runner_transcripts/**/noticeme.*
+/runner_transcripts/**/ghost.*
+
+# Ginger.taf (AIF): explicit text, deliberately not committed.
+/goldens/ginger_solution.txt
+/goldens/ginger_solution.expected.txt
+/runner_transcripts/**/ginger.*
+
+# breakout.taf / Filthy Bill.taf (AIF): explicit text, deliberately not committed.
+/goldens/breakout_solution.txt
+/goldens/breakout_solution.expected.txt
+/goldens/filthybill_solution.txt
+/goldens/filthybill_solution.expected.txt
+/runner_transcripts/**/breakout.*
+/runner_transcripts/**/filthybill.*
+
+# gotcha.taf (AIF): explicit text, deliberately not committed.
+/goldens/gotcha_solution.txt
+/goldens/gotcha_solution.expected.txt
+/runner_transcripts/**/gotcha.*
+
+# AFP.taf (AIF): explicit text, deliberately not committed.
+/goldens/afp_solution.txt
+/goldens/afp_solution.expected.txt
+/runner_transcripts/**/afp.*
+/runner_transcripts/**/AFP.*
+
+# PB.taf / Pizza Beast (AIF): explicit text, deliberately not committed.
+/goldens/pb_solution.txt
+/goldens/pb_solution.expected.txt
+/runner_transcripts/**/pb.*
+/runner_transcripts/**/PB.*
+
+# sororityHouse.taf (AIF): explicit text, deliberately not committed.
+/goldens/sororityHouse_solution.txt
+/goldens/sororityHouse_solution.expected.txt
+/runner_transcripts/**/sororityHouse.*
+
+# freshman.taf (AIF): explicit text, deliberately not committed.
+/goldens/freshman_solution.txt
+/goldens/freshman_solution.expected.txt
+/runner_transcripts/**/freshman.*
+
+# prostitute.taf (AIF): explicit text, deliberately not committed.
+/goldens/prostitute_solution.txt
+/goldens/prostitute_solution.expected.txt
+/runner_transcripts/**/prostitute.*
+
+# Loving Family.taf (AIF): explicit text, deliberately not committed.
+/goldens/lovingfamily_solution.txt
+/goldens/lovingfamily_solution.expected.txt
+/runner_transcripts/**/lovingfamily.*
+
+# fantasy.taf (AIF): explicit text, deliberately not committed.
+/goldens/fantasy_solution.txt
+/goldens/fantasy_solution.expected.txt
+/runner_transcripts/**/fantasy.*
+
+# LoveForReal.taf: deliberately not committed.
+/goldens/loveforreal_solution.txt
+/goldens/loveforreal_solution.expected.txt
+/runner_transcripts/**/loveforreal.*
+
+# The Village of Love and Lust.taf (AIF): explicit text, deliberately not committed.
+/goldens/villagelove_solution.txt
+/goldens/villagelove_solution.expected.txt
+/runner_transcripts/**/villagelove.*
+
+# mwf.taf / The Magic Wishing Fountain (AIF): explicit text, deliberately not committed.
+/goldens/mwf_solution.txt
+/goldens/mwf_solution.expected.txt
+/runner_transcripts/**/mwf.*
+
+# The new Superstud.taf (AIF): explicit text, deliberately not committed.
+/goldens/superstud_solution.txt
+/goldens/superstud_solution.expected.txt
+/runner_transcripts/**/superstud.*
+
+# britishfox.taf: explicit text, deliberately not committed.
+/goldens/britishfox_solution.txt
+/goldens/britishfox_solution.expected.txt
+/runner_transcripts/**/britishfox.*
+
+# Hunting Ground.taf: non-consensual sexualized violence, deliberately not
+# committed.
+/goldens/huntingground_solution.txt
+/goldens/huntingground_solution.expected.txt
+/runner_transcripts/**/huntingground.*
+
+# fantasyworld.taf (AIF): explicit text, deliberately not committed.  The row
+# plays the game's own NOSEX route; the notes file stays tracked.
+/goldens/fantasyworld_solution.txt
+/goldens/fantasyworld_solution.expected.txt
+/runner_transcripts/**/fantasyworld.*
+
+# Escape Pod (AIF): explicit text, deliberately not committed.
+/goldens/escapepod_solution.txt
+/goldens/escapepod_solution.expected.txt
+/runner_transcripts/**/escapepod.*
+
+# Handyman (AIF): explicit text, deliberately not committed.
+/goldens/handyman_solution.txt
+/goldens/handyman_solution.expected.txt
+/runner_transcripts/**/handyman.*
+
+# XClue (AIF): explicit text, deliberately not committed.
+/goldens/xclue_solution.txt
+/goldens/xclue_solution.expected.txt
+/runner_transcripts/**/xclue.*
+
+# ovaloffice.taf (AIF): explicit text, deliberately not committed.
+/goldens/ovaloffice_solution.txt
+/goldens/ovaloffice_solution.expected.txt
+/runner_transcripts/**/ovaloffice.*
+
+# Planescape: Encounters 1 (AIF): explicit text, deliberately not committed.
+/goldens/planescape_solution.txt
+/goldens/planescape_solution.expected.txt
+/runner_transcripts/**/planescape.*
+
+# studio.taf (AIF): adult content, deliberately not committed.
+/goldens/studio_solution.txt
+/goldens/studio_solution.expected.txt
+/goldens/studio_patched_solution.txt
+/goldens/studio_patched_solution.expected.txt
+/runner_transcripts/**/studio.*
+/runner_transcripts/**/studio_patched.*
+
+# fun town.taf (AIF): explicit text, deliberately not committed.
+/goldens/funtown_solution.txt
+/goldens/funtown_solution.expected.txt
+/goldens/funtown_patched_solution.txt
+/goldens/funtown_patched_solution.expected.txt
+/runner_transcripts/**/funtown.*
+/runner_transcripts/**/funtown_patched.*
+
+# RodneyandthePrincess40v3-1.taf (AIF): explicit text, deliberately not committed.
+/goldens/rodneyprincess_solution.txt
+/goldens/rodneyprincess_solution.expected.txt
+/runner_transcripts/**/rodneyprincess.*
+
+# salvation.taf (AIF): explicit text, deliberately not committed.
+/goldens/salvation_solution.txt
+/goldens/salvation_solution.expected.txt
+/runner_transcripts/**/salvation.*
+
+# christmas present 1.0.taf (AIF): explicit text, deliberately not committed.
+/goldens/christmaspresent_solution.txt
+/goldens/christmaspresent_solution.expected.txt
+/runner_transcripts/**/christmaspresent.*
+/runner_transcripts/**/heretoday.*
+
+# Here Today Gone to Hell (AIF): explicit text, deliberately not committed.
+/goldens/heretoday_solution.txt
+/goldens/heretoday_solution.expected.txt
+
+# The GameMaster: Resident Lust (AIF): explicit text, deliberately not committed.
+/goldens/vgm1_3_solution.txt
+/goldens/vgm1_3_solution.expected.txt
+/runner_transcripts/**/vgm1_3.*
+/notes/VGM1_3_walkthrough.md
+
+# Ghost Justice (AIF): explicit text, deliberately not committed.
+/goldens/ghostjustice_solution.txt
+/goldens/ghostjustice_solution.expected.txt
+/runner_transcripts/**/ghostjustice.*
+/notes/ghostjustice_walkthrough.md
+
+# Blue Sky (AIF): explicit text, deliberately not committed.
+/goldens/bluesky_solution.txt
+/goldens/bluesky_solution.expected.txt
+/runner_transcripts/**/bluesky.*
+/notes/bluesky_walkthrough.md
+
+# Runner probe transcripts of the explicit games above (runner_probes/<tag>.*).
+/runner_probes/britishfox.*
+/runner_probes/hcw.*
+/runner_probes/magicshow.*
+/runner_probes/sswhore.*
+/runner_probes/filthybill.*
+
+# SCARE-specific routes (notes/scare_routes/) of the explicit games above.
+/notes/scare_routes/duchess_solution.txt
+/notes/scare_routes/bluesky_solution.txt

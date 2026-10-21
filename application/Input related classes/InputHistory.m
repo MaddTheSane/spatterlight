@@ -6,14 +6,17 @@
 //
 
 #import "InputHistory.h"
-#import <AppKit/AppKit.h>
 
+// At most HISTORYLEN - 1 lines, plus the edit line.
 #define HISTORYLEN 100
 
-@interface InputHistory () <NSSecureCoding> {
-    /* For command history */
-    NSMutableArray *history;
-    NSUInteger historypos, historyfirst, historypresent;
+@interface InputHistory () {
+    // Oldest first, at most HISTORYLEN - 1 lines.
+    NSMutableArray<NSString *> *entries;
+    // The line being edited when the player last left the present.
+    NSString *editLine;
+    // Index into entries; entries.count is the present.
+    NSUInteger pos;
 }
 @end
 
@@ -26,119 +29,76 @@
 - (instancetype)init {
     self = [super init];
     if (self) {
-        history = [[NSMutableArray alloc] init];
+        entries = [[NSMutableArray alloc] init];
+        editLine = @"";
     }
     return self;
 }
 
+// "history" holds the lines, oldest first, followed by the edit line, and
+// "historypos" the position in them. Anything malformed gives an empty
+// history.
 - (instancetype)initWithCoder:(NSCoder *)decoder {
-    self = [super init];
+    self = [self init];
     if (self) {
-        history = [decoder decodeObjectOfClass:[NSMutableArray class] forKey:@"history"];
-        historypos = (NSUInteger)[decoder decodeIntegerForKey:@"historypos"];
-        historyfirst = (NSUInteger)[decoder decodeIntegerForKey:@"historyfirst"];
-        historypresent = (NSUInteger)[decoder decodeIntegerForKey:@"historypresent"];
+        NSArray *lines = [decoder decodeObjectOfClasses:[NSSet setWithObjects:[NSArray class], [NSString class], nil] forKey:@"history"];
+        if (![lines isKindOfClass:[NSArray class]] || !lines.count)
+            return self;
+        for (id line in lines)
+            if (![line isKindOfClass:[NSString class]])
+                return self;
+
+        NSUInteger count = lines.count - 1;
+        NSUInteger start = count >= HISTORYLEN ? count - HISTORYLEN + 1 : 0;
+        [entries addObjectsFromArray:[lines subarrayWithRange:NSMakeRange(start, count - start)]];
+        editLine = lines.lastObject;
+        NSInteger oldpos = [decoder decodeIntegerForKey:@"historypos"] - (NSInteger)start;
+        pos = (oldpos < 0 || (NSUInteger)oldpos > entries.count) ? entries.count : (NSUInteger)oldpos;
     }
     return self;
 }
 
 - (void)encodeWithCoder:(NSCoder *)encoder {
-    [encoder encodeObject:history forKey:@"history"];
-    [encoder encodeInteger:(NSInteger)historypos forKey:@"historypos"];
-    [encoder encodeInteger:(NSInteger)historyfirst forKey:@"historyfirst"];
-    [encoder encodeInteger:(NSInteger)historypresent forKey:@"historypresent"];
+    NSMutableArray *lines = [entries mutableCopy];
+    [lines addObject:editLine];
+    [encoder encodeObject:lines forKey:@"history"];
+    [encoder encodeInteger:(NSInteger)pos forKey:@"historypos"];
 }
 
 - (void)reset {
-    historypos = historypresent;
+    pos = entries.count;
 }
 
 - (void)saveHistory:(NSString *)line {
-    if (history.count <= historypresent) {
-       [history addObject:line];
-    } else {
-        history[historypresent] = line;
-    }
-
-    historypresent++;
-    if (historypresent >= HISTORYLEN)
-        historypresent -= HISTORYLEN;
-
-    if (historypresent == historyfirst) {
-        historyfirst++;
-        if (historyfirst > HISTORYLEN)
-            historyfirst -= HISTORYLEN;
-    }
-
-    if (history.count > historypresent) {
-        [history removeObjectAtIndex:historypresent];
-    }
+    [entries addObject:[line copy]];
+    if (entries.count >= HISTORYLEN)
+        [entries removeObjectAtIndex:0];
+    editLine = @"";
+    pos = entries.count;
 }
 
-- (NSString *)travelBackwardInHistory:(NSString *)currentInput {
-    NSString *cx;
-    if (historypos == historyfirst)
+- (NSString *)travelBackward:(NSString *)currentInput {
+    if (pos == 0)
         return nil;
-
-    if (historypos == historypresent) {
-        /* save the edited line */
-        if (currentInput && currentInput.length)
-            cx = currentInput;
-        else
-            cx = @"";
-        if (history.count <= historypos)
-            [history addObject:cx];
-        else
-            history[historypos] = cx;
-    }
-
-    if (historypos == 0)
-        historypos = HISTORYLEN;
-
-    historypos--;
-
-    if (historypos > history.count - 1)
-        historypos = history.count - 1;
-    cx = history[historypos];
-    [self performSelector:@selector(speakString:) withObject:cx afterDelay:0];
-    return cx;
+    if (pos == entries.count)
+        editLine = [currentInput copy] ?: @"";
+    pos--;
+    return entries[pos];
 }
 
-- (NSString *)travelForwardInHistory {
-    if (historypos == historypresent)
+- (NSString *)travelForward {
+    if (pos >= entries.count)
         return nil;
-
-    historypos++;
-    if (historypos >= HISTORYLEN)
-        historypos -= HISTORYLEN;
-
-    if (historypos > history.count - 1)
-        historypos = history.count - 1;
-    NSString *string = history[historypos];
-    [self speakString:string];
-    return string;
+    pos++;
+    return pos == entries.count ? editLine : entries[pos];
 }
 
-- (void)speakString:(NSString *)string {
-    if (!string || string.length == 0)
-        return;
-
-    NSDictionary *announcementInfo = @{
-        NSAccessibilityPriorityKey : @(NSAccessibilityPriorityHigh),
-        NSAccessibilityAnnouncementKey : string
-    };
-
-    NSWindow *mainWin = NSApp.mainWindow;
-
-    if (mainWin) {
-        NSAccessibilityPostNotificationWithUserInfo(
-                                                    mainWin,
-                                                    NSAccessibilityAnnouncementRequestedNotification, announcementInfo);
-    }
+- (BOOL)isEmpty {
+    return entries.count == 0;
 }
 
-- (BOOL)empty {
-    return (history.count == 0);
+- (NSUInteger)count {
+    return entries.count;
 }
 
 @end

@@ -8,15 +8,18 @@
 #import "BufferTextView.h"
 #import "GlkTextBufferWindow.h"
 #import "GlkController.h"
+#import "GlkController+Speech.h"
 #import "MarginContainer.h"
+#import "NSView+Categories.h"
 #import "MarginImage.h"
 #import "CommandScriptHandler.h"
 #import "Preferences.h"
 #import "Game.h"
 
 
-@interface BufferTextView () <NSTextFinderClient, NSSecureCoding> {
-    NSTextFinder *_textFinder;
+@interface BufferTextView () <NSSecureCoding> {
+    NSTimer *caretTimer;
+    BOOL bottomPaddingUpdatePending;
 }
 @end
 
@@ -67,60 +70,37 @@
     return YES;
 }
 
-- (void)mouseDown:(NSEvent *)theEvent {
-    NSDate *mouseTime = [NSDate date];
+// Let the buffer window handle the click (hyperlinks, input focus) and fall
+// back to normal text view behaviour if it doesn't.
+- (void)forwardMouseDown:(NSEvent *)theEvent {
+    if (![(GlkTextBufferWindow *)self.delegate myMouseDown:theEvent])
+        [super mouseDown:theEvent];
+}
 
+- (void)mouseDown:(NSEvent *)theEvent {
     [self temporarilyHideCaret];
-    NSPoint __block location = [self convertPoint:theEvent.locationInWindow fromView:nil];
-    NSPoint adjustedPoint = location;
-    adjustedPoint.x -= self.textContainerInset.width;
-    adjustedPoint.y -= self.textContainerInset.height;
+    NSPoint adjustedPoint = [self containerPointForEvent:theEvent];
 
     MarginImage *marginImage = [(MarginContainer *)self.textContainer marginImageAt:adjustedPoint];
     if (!marginImage) {
-        if (![(GlkTextBufferWindow *)self.delegate myMouseDown:theEvent])
-            [super mouseDown:theEvent];
+        [self forwardMouseDown:theEvent];
     } else {
+        [self trackClickOrDragFromEvent:theEvent click:^(NSEvent *upEvent) {
+            [self forwardMouseDown:theEvent];
+        } drag:^(NSEvent *dragEvent) {
+            GlkTextBufferWindow *delegate = (GlkTextBufferWindow *)self.delegate;
+            NSRect bounds = marginImage.bounds;
+            bounds.origin.x += self.textContainerInset.width;
+            bounds.origin.y += self.textContainerInset.height;
 
-        NSEventMask eventMask = NSEventMaskLeftMouseDown | NSEventMaskLeftMouseDragged | NSEventMaskLeftMouseUp;
-        NSTimeInterval timeout = NSEventDurationForever;
-
-        CGFloat dragThreshold = 0.3;
-
-        [self.window trackEventsMatchingMask:eventMask timeout:timeout mode:NSEventTrackingRunLoopMode handler:^(NSEvent * _Nullable event, BOOL * _Nonnull stop) {
-
-            if (!event) { return; }
-
-            if (event.type == NSEventTypeLeftMouseUp) {
-                *stop = YES;
-                if (mouseTime.timeIntervalSinceNow > -0.5) {
-                    if (![(GlkTextBufferWindow *)self.delegate myMouseDown:theEvent])
-                        [super mouseDown:theEvent];
-                }
-            } else if (event.type == NSEventTypeLeftMouseDragged) {
-                NSPoint movedLocation = [self convertPoint:event.locationInWindow fromView: nil];
-                if (ABS(movedLocation.x - location.x) > dragThreshold || ABS(movedLocation.y - location.y) > dragThreshold) {
-                    *stop = YES;
-
-                    GlkTextBufferWindow *delegate = (GlkTextBufferWindow *)self.delegate;
-                    NSString *filename = delegate.glkctl.game.path.lastPathComponent.stringByDeletingPathExtension;
-
-                    NSRect bounds = marginImage.bounds;
-                    bounds.origin.x += self.textContainerInset.width;
-                    bounds.origin.y += self.textContainerInset.height;
-
-                    [marginImage dragMarginImageFrom:self event:event filename:filename rect:bounds];
-                }
-            }
+            [marginImage dragMarginImageFrom:self event:dragEvent filename:delegate.glkctl.game.fileBaseName rect:bounds];
         }];
     }
 }
 
 // Change mouse cursor when over margin images
 - (void)mouseMoved:(NSEvent *)event {
-    NSPoint point = [self convertPoint:event.locationInWindow fromView:nil];
-    point.x -= self.textContainerInset.width;
-    point.y -= self.textContainerInset.height;
+    NSPoint point = [self containerPointForEvent:event];
     MarginImage *marginImage = [(MarginContainer *)self.textContainer marginImageAt:point];
     if (marginImage) {
         [marginImage cursorUpdate];
@@ -129,24 +109,22 @@
     [super mouseMoved:event];
 }
 
+// Never draw a caret if the system doesn't want to. Super overrides
+// glkTextBuffer.
 - (BOOL)shouldDrawInsertionPoint {
-    BOOL result = super.shouldDrawInsertionPoint;
-
-    // Never draw a caret if the system doesn't want to. Super overrides
-    // glkTextBuffer.
-    if (result && !_shouldDrawCaret)
-        result = _shouldDrawCaret;
-
-    return result;
+    return super.shouldDrawInsertionPoint && _shouldDrawCaret;
 }
 
 - (void)enableCaret:(nullable id)sender {
     _shouldDrawCaret = YES;
 }
 
+// Hide the caret for a moment. Repeated calls extend the pause rather than
+// stacking timers, so the caret comes back 0.05 s after the last call.
 - (void)temporarilyHideCaret {
     _shouldDrawCaret = NO;
-    [NSTimer scheduledTimerWithTimeInterval:0.05
+    [caretTimer invalidate];
+    caretTimer = [NSTimer scheduledTimerWithTimeInterval:0.05
                                      target:self
                                    selector:@selector(enableCaret:)
                                    userInfo:nil
@@ -154,15 +132,54 @@
 }
 
 - (void)setFrameSize:(NSSize)newSize {
-    // NSLog(@"BufferTextView setFrameSize: %@ Old size: %@",
-    // NSStringFromSize(newSize), NSStringFromSize(self.frame.size));
+    // The layout manager passes the height of the text. A caller that re-sets
+    // the current frame (autoresizing, updateBottomPadding) passes the height
+    // with the padding already added, so take it off again, or the padding
+    // would pile up, or stay behind once the image no longer needs it.
+    CGFloat textHeight = newSize.height;
+    if (_bottomPadding > 0 && textHeight == NSHeight(self.frame))
+        textHeight -= _bottomPadding;
 
-    newSize.height += _bottomPadding;
+    _bottomPadding = [self paddingForTextHeight:textHeight];
+    newSize.height = textHeight + _bottomPadding;
     [super setFrameSize:newSize];
 }
 
+// How far the lowest margin image (plus the bottom margin) reaches below
+// text of the given height.
+- (CGFloat)paddingForTextHeight:(CGFloat)textHeight {
+    MarginContainer *marginContainer = (MarginContainer *)self.textContainer;
+    if (![marginContainer isKindOfClass:[MarginContainer class]] || !marginContainer.hasMarginImages)
+        return 0;
+    CGFloat imagesBottom = marginContainer.marginImagesBottom;
+    if (imagesBottom <= 0)
+        return 0;
+    CGFloat needed = imagesBottom + self.textContainerOrigin.y + self.textContainerInset.height;
+    return MAX(0, needed - textHeight);
+}
+
+- (void)updateBottomPadding {
+    bottomPaddingUpdatePending = NO;
+    NSSize size = self.frame.size;
+    CGFloat textHeight = size.height - _bottomPadding;
+    if (fabs([self paddingForTextHeight:textHeight] - _bottomPadding) < 0.5)
+        return;
+    [self setFrameSize:size];
+}
+
+- (void)bottomPaddingNeedsUpdate {
+    if (bottomPaddingUpdatePending)
+        return;
+    CGFloat textHeight = NSHeight(self.frame) - _bottomPadding;
+    if (fabs([self paddingForTextHeight:textHeight] - _bottomPadding) < 0.5)
+        return;
+    bottomPaddingUpdatePending = YES;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self updateBottomPadding];
+    });
+}
+
 - (BOOL)validateMenuItem:(NSMenuItem *)menuItem {
-    BOOL isValidItem = NO;
     BOOL waseditable = self.editable;
     GlkTextBufferWindow *delegate = (GlkTextBufferWindow *)self.delegate;
 
@@ -200,17 +217,8 @@
         return NO;
     }
 
-    if (menuItem.action == @selector(performTextFinderAction:))
-        isValidItem = [self.textFinder validateAction:menuItem.tag];
-
-    // validate other menu items if needed
-    // ...
-    // and don't forget to call the superclass
-    else {
-        isValidItem = [super validateMenuItem:menuItem];
-    }
-
-    return isValidItem;
+    // Also validates performTextFinderAction:.
+    return [super validateMenuItem:menuItem];
 }
 
 - (void)cut:(id)sender {
@@ -288,8 +296,23 @@
 
 - (void)scrollWheel:(NSEvent *)event {
     GlkTextBufferWindow *delegate = (GlkTextBufferWindow *)self.delegate;
-    [delegate scrollWheelchanged:(NSEvent *)event];
+    // Let the scroll happen first, then notify the delegate, so it can test
+    // the *updated* scroll position (e.g. to resume auto-scrolling once the
+    // user has reached the bottom).
+    CGFloat oldPosition = self.enclosingScrollView.contentView.bounds.origin.y;
     [super scrollWheel:event];
+    [delegate scrollWheelchanged:event fromPosition:oldPosition];
+}
+
+// The Find bar reveals each match through this (BufferTextView is its
+// NSTextFinderClient), and jumping to a match up in the scrollback is the
+// user scrolling up as much as a wheel or paging key is: tell the delegate,
+// so it can pause auto-scrolling while unattended output keeps arriving.
+- (void)scrollRangeToVisible:(NSRange)range {
+    GlkTextBufferWindow *delegate = (GlkTextBufferWindow *)self.delegate;
+    CGFloat oldPosition = self.enclosingScrollView.contentView.bounds.origin.y;
+    [super scrollRangeToVisible:range];
+    [delegate userDidScrollUpFromPosition:oldPosition];
 }
 
 - (void)changeAttributes:(id)sender {
@@ -298,30 +321,11 @@
 
 #pragma mark Text Finder
 
-- (NSTextFinder *)textFinder {
-    // Create the text finder on demand
-    if (_textFinder == nil) {
-        _textFinder = [[NSTextFinder alloc] init];
-        _textFinder.client = self;
-        _textFinder.findBarContainer = self.enclosingScrollView;
-        _textFinder.incrementalSearchingEnabled = YES;
-        _textFinder.incrementalSearchingShouldDimContentView = NO;
-    }
-
-    return _textFinder;
-}
-
-- (void)resetTextFinder {
-    if (_textFinder != nil) {
-        [_textFinder noteClientStringWillChange];
-    }
-}
-
-// This is where the commands are actually sent to the text finder
+// The finder must not run while the input line is editable.
 - (void)performTextFinderAction:(id<NSValidatedUserInterfaceItem>)sender {
     BOOL waseditable = self.editable;
     self.editable = NO;
-    [self.textFinder performAction:sender.tag];
+    [super performTextFinderAction:sender];
     self.editable = waseditable;
 }
 
@@ -341,18 +345,12 @@
     return (((GlkTextBufferWindow *)self.delegate).glkctl).createCustomRotors;
 }
 
+// Margin images compute their own accessibilityFrame on demand.
 - (NSArray *)accessibilityChildren {
     NSArray *children = super.accessibilityChildren;
-
-    for (MarginImage *mi in ((MarginContainer *)self.textContainer).marginImages) {
-        children = [children arrayByAddingObject:mi];
-        NSRect bounds = [mi boundsWithLayout:self.layoutManager];
-        bounds = NSAccessibilityFrameInView(self, bounds);
-        bounds.origin.x += self.textContainerInset.width;
-        bounds.origin.y -= self.textContainerInset.height;
-
-        mi.accessibilityFrame = bounds;
-    }
+    NSArray<MarginImage *> *marginImages = ((MarginContainer *)self.textContainer).marginImages;
+    if (marginImages.count)
+        children = [children arrayByAddingObjectsFromArray:marginImages];
     return children;
 }
 

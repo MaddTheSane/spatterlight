@@ -11,8 +11,10 @@ glui32 glk_gestalt_ext(glui32 id, glui32 val, glui32 *arr,
     switch (id) {
 
         case gestalt_Version:
-            /* This implements Glk spec version 0.7.5. */
-            return 0x00000705;
+            /* Glk spec version 0.7.6: 0.7.5 plus GLK_MODULE_IMAGE2
+               (glk_image_draw_scaled_ext), although the comment at the
+               top of glk.h still says 0.7.5. */
+            return 0x00000706;
 
         case gestalt_LineInput:
             if (val >= 32 && val < 127)
@@ -71,6 +73,7 @@ glui32 glk_gestalt_ext(glui32 id, glui32 val, glui32 *arr,
             return gli_enable_graphics;
             
         case gestalt_DrawImage:
+        case gestalt_DrawImageScale:
             if (val == wintype_Graphics)
                 return gli_enable_graphics;
             if (val == wintype_TextBuffer)

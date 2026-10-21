@@ -9,7 +9,7 @@
 #import <Foundation/Foundation.h>
 #import <CoreData/CoreData.h>
 
-@class Game, GlkStyle, Interpreter, Theme, NSColor;
+@class Game, GlkStyle, Theme, NSColor;
 
 typedef NS_ENUM(int32_t, kSpacesFormatType) {
     TAG_SPACES_GAME,
@@ -58,9 +58,16 @@ typedef NS_ENUM(int32_t, kZ6GraphicsPrefsType) {
     kZ6Blorb
 };
 
+typedef NS_ENUM(int32_t, kComprehendGraphicsPrefsType) {
+    kComprehendGraphicsMoreColors,  // PCjr (DOS v1) or DHGR (Apple II) — default
+    kComprehendGraphicsLessColors,  // CGA (DOS v1) or standard hi-res (Apple II)
+};
+
 NS_ASSUME_NONNULL_BEGIN
 
 @interface Theme : NSManagedObject
+
++ (NSFetchRequest<Theme *> *)fetchRequest NS_SWIFT_NAME(fetchRequest());
 
 @property (nonatomic) BOOL autosave;
 @property (nonatomic) BOOL autosaveOnTimer;
@@ -80,8 +87,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic) kBZArrowsPrefsType bZTerminator;
 @property (nonatomic) double cellHeight;
 @property (nonatomic) double cellWidth;
+@property (nonatomic) kComprehendGraphicsPrefsType comprehendGraphicsType;
 @property (nonatomic) kCoverImagePrefsType coverArtStyle;
-@property (nonatomic) int32_t cursorShape;
 @property (nonatomic) int32_t dashes;
 @property (nonatomic) int32_t defaultCols;
 @property (nonatomic) int32_t defaultRows;
@@ -109,26 +116,24 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic) int32_t sADisplayStyle;
 @property (nonatomic) int32_t sAInventory;
 @property (nonatomic) int32_t sAPalette;
+@property (nonatomic) int32_t scrollbackLimit;
 @property (nonatomic) BOOL slowDrawing;
 @property (nonatomic) BOOL smartQuotes;
 @property (nonatomic) BOOL smoothScroll;
 @property (nonatomic) kSpacesFormatType spaceFormat;
 @property (nullable, nonatomic, retain) NSColor *spacingColor;
-@property (nonatomic) int32_t winSpacingX;
-@property (nonatomic) int32_t winSpacingY;
-@property (nonatomic) int32_t zMachineTerp;
-@property (nullable, nonatomic, copy) NSString *zMachineLetter;
-@property (nonatomic) BOOL zMachineNoErrWin;
-
-@property (nonatomic) double vOHackDelay;
 @property (nonatomic) BOOL vODelayOn;
+@property (nonatomic) double vOHackDelay;
 @property (nonatomic) int32_t vOSpeakCommand;
 @property (nonatomic) kVOImagePrefsType vOSpeakImages;
 @property (nonatomic) kVOMenuPrefsType vOSpeakMenu;
-
-@property (nonatomic) kZ6GraphicsPrefsType z6GraphicsType;
+@property (nonatomic) int32_t winSpacingX;
+@property (nonatomic) int32_t winSpacingY;
 @property (nonatomic) BOOL z6Colorize1Bit;
-
+@property (nonatomic) kZ6GraphicsPrefsType z6GraphicsType;
+@property (nullable, nonatomic, copy) NSString *zMachineLetter;
+@property (nonatomic) BOOL zMachineNoErrWin;
+@property (nonatomic) int32_t zMachineTerp;
 @property (nullable, nonatomic, retain) GlkStyle *bufAlert;
 @property (nullable, nonatomic, retain) GlkStyle *bufBlock;
 @property (nullable, nonatomic, retain) GlkStyle *bufEmph;
@@ -155,13 +160,22 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nullable, nonatomic, retain) GlkStyle *gridSubH;
 @property (nullable, nonatomic, retain) GlkStyle *gridUsr1;
 @property (nullable, nonatomic, retain) GlkStyle *gridUsr2;
-@property (nullable, nonatomic, retain) Interpreter *interpreter;
 @property (nullable, nonatomic, retain) Theme *lightTheme;
-@property (nullable, nonatomic, retain) Game *overrides;
 
+//! \c name if no theme has it (case-insensitively), else "name 2", "name 3"…
++ (NSString *)unusedNameBasedOn:(NSString *)name inContext:(NSManagedObjectContext *)context;
+
+//! The theme this one was cloned from at the start: the theme named as this
+//! one before " (modified)", if there is one, else the root of the
+//! \c defaultParent chain, else nil.
+@property (NS_NONATOMIC_IOSONLY, readonly, nullable) Theme *ancestor;
+
+//! An editable copy with copies of the styles, named as the original: the
+//! caller gives it a name of its own.
 @property (NS_NONATOMIC_IOSONLY, readonly, strong) Theme * _Nonnull clone;
 - (void)copyAttributesFrom:(Theme *)theme;
 - (void)populateStyles;
+- (void)resetCommonValues;
 @property (NS_NONATOMIC_IOSONLY, readonly, copy) NSArray<GlkStyle *> * _Nonnull allStyles;
 @property (NS_NONATOMIC_IOSONLY, readonly) BOOL hasCustomStyles;
 
@@ -178,7 +192,6 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)removeGamesObject:(Game *)value;
 - (void)addGames:(NSSet<Game *> *)values;
 - (void)removeGames:(NSSet<Game *> *)values;
-- (void)resetCommonValues;
 
 @end
 

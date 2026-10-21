@@ -123,17 +123,25 @@ FILE* os_open_script_file(void);
 L9BOOL os_find_file(char* NewName);
 
 /* routines provided by level9 interpreter */
+int CountTapeParts(const char* filename);
+int DiskCatalogue(L9BYTE* raw, L9UINT32 rawlen, const char* ext3,
+                  void (*cb)(const char* name8, L9BYTE* data, L9UINT32 len, void* ctx),
+                  void* ctx);
 L9BOOL LoadGame(char* filename, char* picname);
 L9BOOL RunGame(void);
 void StopGame(void);
 void RestoreGame(char* filename);
 void FreeMemory(void);
 void GetPictureSize(int* width, int* height);
+L9BOOL GraphicOpsAvailable(void);
 L9BOOL RunGraphics(void);
 
 /* bitmap routines provided by level9 interpreter */
 BitmapType DetectBitmaps(char* dir);
 Bitmap* DecodeBitmap(char* dir, BitmapType type, int num, int x, int y);
+/* Choose colour (default) or authentic monochrome rendering of the
+   Amstrad CPC / Spectrum +3 (C64-format) pictures. */
+void bitmap_zx_set_colour(L9BOOL colour);
 
 #ifdef __cplusplus
 }

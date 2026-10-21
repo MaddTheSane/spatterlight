@@ -4,6 +4,7 @@
  */
 
 #import "TempStream.h"
+#include "fileref.h"
 
 @interface TempStream () <NSSecureCoding> {
 
@@ -15,7 +16,6 @@
     int unicode;
     int readable;
     int writable;
-    int append;
 
     /* The pointers needed for stream operation. We keep separate sets for the one-byte and four-byte cases. */
     unsigned char *buf;
@@ -95,10 +95,8 @@
         if (_type == strtype_Memory && !unicode && ubuf)
             NSLog(@"TempStream initiWithCStruct: memory stream %d is not unicode, but has ubuf", str->tag);
         
-        _next = _prev = 0;
+        _prev = 0;
         
-        if (str->next)
-            _next = (str->next)->tag;
         if (str->prev)
             _prev = (str->prev)->tag;
         
@@ -124,7 +122,6 @@
     _rock = [decoder decodeInt32ForKey:@"rock"];
 
     _prev = [decoder decodeInt32ForKey:@"prev"];
-    _next = [decoder decodeInt32ForKey:@"next"];
 
     wintag = [decoder decodeInt32ForKey:@"wintag"];
 
@@ -134,7 +131,6 @@
     writecount = [decoder decodeInt32ForKey:@"writecount"];
     readable = [decoder decodeInt32ForKey:@"readable"];
     writable = [decoder decodeInt32ForKey:@"writable"];
-    append = [decoder decodeIntForKey:@"append"];
 
     isbinary = [decoder decodeInt32ForKey:@"isbinary"];
     resfilenum = [decoder decodeInt32ForKey:@"resfilenum"];
@@ -179,11 +175,7 @@
         tempbufeof = [decoder decodeInt32ForKey:@"bufeof"];
     }
 
-    NSData *bookmark =  [decoder decodeObjectOfClass:[NSData class] forKey:@"bookmark"];
-
-    URL = [NSURL URLByResolvingBookmarkData:bookmark options:NSURLBookmarkResolutionWithoutUI relativeToURL:nil bookmarkDataIsStale:nil error:nil];
-    if (!URL)
-        URL = [decoder decodeObjectOfClass:[NSURL class] forKey:@"URL"];
+    URL = gli_decode_file_url(decoder, YES);
     lastop = [decoder decodeInt32ForKey:@"lastop"];
 
     offsetinfile = [decoder decodeInt64ForKey:@"offsetinfile"];
@@ -198,7 +190,6 @@
 	[encoder encodeInt32:_rock forKey:@"rock"];
 
     [encoder encodeInt32:_prev forKey:@"prev"];
-    [encoder encodeInt32:_next forKey:@"next"];
 
     if (_type == strtype_Window)
         [encoder encodeInt32:wintag forKey:@"wintag"];
@@ -208,7 +199,6 @@
 	[encoder encodeInt32:writecount forKey:@"writecount"];
     [encoder encodeInt32:readable forKey:@"readable"];
     [encoder encodeInt32:writable forKey:@"writable"];
-    [encoder encodeInt32:append forKey:@"append"];
 
     [encoder encodeInt32:lastop forKey:@"lastop"];
     [encoder encodeInt32:isbinary forKey:@"isbinary"];
@@ -223,7 +213,7 @@
         }
 
         long bufaddr = 0;
-        int elemsize;
+        int elemsize = 0;
         if (!unicode) {
             if (buf && buflen) {
                 bufaddr = (*gli_locate_arr)(buf, buflen, "&+#!Cn", arrayrock, &elemsize);
@@ -231,10 +221,11 @@
                 [encoder encodeInt32:(int32_t)(bufptr - buf) forKey:@"bufptr"];
                 [encoder encodeInt32:(int32_t)(bufeof - buf) forKey:@"bufeof"];
                 [encoder encodeInt32:(int32_t)(bufend - buf) forKey:@"bufend"];
-                if (elemsize) {
-                    NSAssert(elemsize == 1, @"GlkStreamMemory encoding char array: wrong elemsize");
+                if (elemsize == 1) {
                     // could trim trailing zeroes here
                     [encoder encodeBytes:(uint8_t *)buf length:buflen forKey:@"bufdata"];
+                } else if (elemsize) {
+                    NSLog(@"encodeWithCoder: char array of stream %d has elemsize %d; not saving its contents", _tag, elemsize);
                 }
             }
             else if (buflen)
@@ -247,21 +238,15 @@
                 [encoder encodeInt32:(int32_t)(ubufptr - ubuf) forKey:@"ubufptr"];
                 [encoder encodeInt32:(int32_t)(ubufeof - ubuf) forKey:@"ubufeof"];
                 [encoder encodeInt32:(int32_t)(ubufend - ubuf) forKey:@"ubufend"];
-                if (elemsize) {
-                    NSAssert(elemsize == 4, @"GlkStreamMemory encoding uni array: wrong elemsize");
+                if (elemsize == 4) {
                     // could trim trailing zeroes here
                     [encoder encodeBytes:(uint8_t *)ubuf length:sizeof(glui32)*buflen forKey:@"ubufdata"];
+                } else if (elemsize) {
+                    NSLog(@"encodeWithCoder: uni array of stream %d has elemsize %d; not saving its contents", _tag, elemsize);
                 }
             }
-            else {
-                [encoder encodeInt64:0 forKey:@"ubuf"];
-                [encoder encodeInt32:0 forKey:@"ubufptr"];
-                [encoder encodeInt32:0 forKey:@"ubufeof"];
-                [encoder encodeInt32:0 forKey:@"ubufend"];
-                [encoder encodeBytes:0 length:0 forKey:@"ubufdata"];
-                if (buflen)
-                    NSLog(@"Encoding unicode stream %d with buflen %lu but no ubuf!", _tag, (unsigned long)buflen);
-            }
+            else if (buflen)
+                NSLog(@"Encoding unicode stream %d with buflen %lu but no ubuf!", _tag, (unsigned long)buflen);
         }
     }
     else if (_type == strtype_Resource) {
@@ -271,36 +256,6 @@
             [encoder encodeInt32:(int32_t)(bufend - buf) forKey:@"bufend"];
         }
     }
-    else {
-        [encoder encodeInt64:0 forKey:@"buf"];
-        [encoder encodeInt32:0 forKey:@"bufptr"];
-        [encoder encodeInt32:0 forKey:@"bufeof"];
-        [encoder encodeInt32:0 forKey:@"bufend"];
-
-        [encoder encodeInt64:0 forKey:@"ubuf"];
-        [encoder encodeInt32:0 forKey:@"ubufptr"];
-        [encoder encodeInt32:0 forKey:@"ubufeof"];
-        [encoder encodeInt32:0 forKey:@"ubufend"];
-    }
-
-    // [self flush];
-
-    NSData *bookmark = nil;
-    if (URL)
-    {
-        NSError* theError = nil;
-        bookmark = [URL bookmarkDataWithOptions:NSURLBookmarkCreationSuitableForBookmarkFile
-      includingResourceValuesForKeys:nil
-                       relativeToURL:nil
-                               error:&theError];
-        if (theError || !bookmark)
-            NSLog(@"Error when encoding bookmark %@: %@", URL.path, theError);
-    }
-
-    if (bookmark)
-        [encoder encodeObject:bookmark forKey:@"bookmark"];
-    if (URL)
-        [encoder encodeObject:URL forKey:@"URL"];
 
     offsetinfile = 0;
     if (_file)
@@ -309,6 +264,9 @@
         fflush(_file);
     }
     [encoder encodeInt64:offsetinfile forKey:@"offsetinfile"];
+
+    /* After the fflush, so that a temp file's stored contents are current */
+    gli_encode_file_url(encoder, URL);
 }
 
 - (void) updateRegisterArray {
@@ -328,7 +286,9 @@
 				if (tempbufdatalen > buflen)
 					tempbufdatalen = buflen;
 				memcpy(buf, tempbufdata, tempbufdatalen);
+#ifdef DEBUG
                 NSLog(@"Copied data for stream %d with length %lu", _tag, (unsigned long)buflen);
+#endif
 				free(tempbufdata);
 				tempbufdata = nil;
 			}
@@ -346,7 +306,9 @@
 				if (tempbufdatalen > sizeof(glui32)*buflen)
 					tempbufdatalen = sizeof(glui32)*buflen;
 				memcpy(ubuf, tempbufdata, tempbufdatalen);
+#ifdef DEBUG
                 NSLog(@"Copied unicode data for stream %d with length %lu", _tag, (unsigned long)buflen);
+#endif
 				free(tempbufdata);
 				tempbufdata = nil;
 			}
@@ -358,7 +320,6 @@
     if (_type == strtype_Memory)
         [self updateRegisterArray];
 
-    str->magicnum = MAGIC_STREAM_NUM;
 
     str->tag = _tag;
     str->rock = _rock;
@@ -376,9 +337,6 @@
     str->isbinary = isbinary;
     str->resfilenum = resfilenum;
 
-    //    /* for strtype_Memory and strtype_Resource. Separate pointers for
-    //     one-byte and four-byte streams */
-
     str->buf = buf;
     str->bufptr = bufptr;
     str->bufend = bufend;
@@ -390,19 +348,8 @@
     str->arrayrock.ptr = arrayrock.ptr;
     str->arrayrock.num = arrayrock.num;
     str->file = NULL;
-    if (URL)
-    {
-        const char *path = URL.fileSystemRepresentation;
-        size_t len = strlen(path);
-        char *urlpath = malloc(1 + len);
-        strncpy(urlpath, path, len);
-        urlpath[len] = '\0';
-        str->filename = urlpath;
-    }
-    else
-    {
-        str->filename = NULL;
-    }
+    const char *path = URL.fileSystemRepresentation;
+    str->filename = path ? strdup(path) : NULL;
     str->buflen = buflen;
 }
 
@@ -413,21 +360,19 @@
     stream_t *str = gli_stream_for_tag(_tag);
     const char *path = URL.fileSystemRepresentation;
 
+    if (!str || !path)
+        return NO;
+
     if (![[NSFileManager defaultManager] fileExistsAtPath:URL.path]) {
 
-        NSString *parent = @(gli_parentdir);
-        NSString *filename = URL.lastPathComponent;
-        NSString *newPath = [parent stringByAppendingPathComponent:filename];
-        if ([[NSFileManager defaultManager] fileExistsAtPath:newPath]) {
+        NSString *newPath = nil;
+        if (gli_parentdir)
+            newPath = [@(gli_parentdir) stringByAppendingPathComponent:URL.lastPathComponent];
+        if (newPath && [[NSFileManager defaultManager] fileExistsAtPath:newPath]) {
             NSLog(@"TempStream reopenInternal: Changed path from %@ to %@ for stream %d.", URL.path, newPath, _tag);
             path = newPath.fileSystemRepresentation;
-            if (str->filename != NULL)
-                free(str->filename);
-            size_t len = strlen(path);
-            char *urlpath = malloc(1 + len);
-            strncpy(urlpath, path, len);
-            urlpath[len] = '\0';
-            str->filename = urlpath;
+            free(str->filename);
+            str->filename = strdup(path);
         } else if (str->writable) {
             // If a file is writable (and not, say, a blorb file) we create a new one as a last resort
             str->file = fopen(path,"w");
@@ -467,14 +412,17 @@
     giblorb_err_t err;
     giblorb_result_t res;
     giblorb_map_t *map = giblorb_get_resource_map();
-    if (!map)
-        [NSException raise:@"GlkException" format:@"Error when loading resource map!"];
+    if (!map || !str) {
+        NSLog(@"TempStream updateResource: no resource map or stream for stream %d", _tag);
+        return;
+    }
 
+    /* On failure the stream keeps no buffer and reads as empty. */
     err = giblorb_load_resource(map, giblorb_method_Memory, &res, giblorb_ID_Data, resfilenum);
-   if (err)
-//        [NSException raise:@"GlkException" format:@"Error when loading blorb resource!"];
-        NSLog(@"Error %d when loading blorb resource!", err);
-
+    if (err) {
+        NSLog(@"TempStream updateResource: error %d when loading blorb resource %u for stream %d", err, resfilenum, _tag);
+        return;
+    }
 
     if (res.data.ptr && res.length) {
         buf = (unsigned char *)res.data.ptr;
@@ -490,7 +438,7 @@
         str->bufend = bufend;
         str->bufeof = bufeof;
     }
-    else [NSException raise:@"GlkException" format:@"Error when loading blorb resource!"];
+    else NSLog(@"TempStream updateResource: blorb resource %u for stream %d is empty", resfilenum, _tag);
 }
 
 - (void) sanityCheck
@@ -502,20 +450,19 @@
 
     switch (_type)
     {
-        case strtype_Window: {
+        case strtype_Window:
             if (!gli_window_for_tag(wintag))
                 NSLog(@"SANITY: window stream has no window");
             break;
 
-        case strtype_File: {
+        case strtype_File:
             if (!URL)
                 NSLog(@"SANITY: file stream lacks pathname");
             if (!_file)
                 NSLog(@"SANITY: file stream lacks file handle");
-        }
             break;
 
-        case strtype_Memory: {
+        case strtype_Memory:
             // Remember, the buffer may be nil as long as the length limit is zero
             if (unicode && buf)
                 NSLog(@"SANITY: memory stream %d is unicode, but has buf", _tag);
@@ -523,13 +470,10 @@
                 NSLog(@"SANITY: memory stream %d is not unicode, but has ubuf", _tag);
             if (!buf && !ubuf && buflen)
                 NSLog(@"SANITY: memory stream has no buffer, but positive buflen");
-        }
             break;
 
         default:
             break;
-
-        }
     }
 }
 

@@ -26,10 +26,12 @@ typedef int32_t glsi32;
 #define GLK_MODULE_UNICODE
 #define GLK_MODULE_UNICODE_NORM
 #define GLK_MODULE_IMAGE
+#define GLK_MODULE_IMAGE2
 #define GLK_MODULE_SOUND
 #define GLK_MODULE_SOUND2
 #define GLK_MODULE_HYPERLINKS
 #define GLK_MODULE_DATETIME
+#define GLK_MODULE_GARGLK_FILE_RESOURCES
 #define GLK_MODULE_RESOURCE_STREAM
 #define GLK_MODULE_GARGLKTEXT
 
@@ -78,6 +80,7 @@ typedef struct glk_schannel_struct *schanid_t;
 #define gestalt_Sound2 (21)
 #define gestalt_ResourceStream (22)
 #define gestalt_GraphicsCharInput (23)
+#define gestalt_DrawImageScale (24)
 #define gestalt_GarglkText (0x1100)
 
 #define evtype_None (0)
@@ -366,6 +369,24 @@ extern void glk_window_fill_rect(winid_t win, glui32 color,
                                  glsi32 left, glsi32 top, glui32 width, glui32 height);
 extern void glk_window_set_background_color(winid_t win, glui32 color);
 
+#ifdef GLK_MODULE_IMAGE2
+/* Note that this section is nested inside the #ifdef GLK_MODULE_IMAGE.
+   GLK_MODULE_IMAGE must be defined if GLK_MODULE_IMAGE2 is. */
+
+#define imagerule_WidthOrig (0x01)
+#define imagerule_WidthFixed (0x02)
+#define imagerule_WidthRatio (0x03)
+#define imagerule_WidthMask (0x03)
+#define imagerule_HeightOrig (0x04)
+#define imagerule_HeightFixed (0x08)
+#define imagerule_AspectRatio (0x0C)
+#define imagerule_HeightMask (0x0C)
+
+extern glui32 glk_image_draw_scaled_ext(winid_t win, glui32 image,
+                                        glsi32 val1, glsi32 val2, glui32 width, glui32 height,
+                                        glui32 imagerule, glui32 maxwidth);
+
+#endif /* GLK_MODULE_IMAGE2 */
 #endif /* GLK_MODULE_IMAGE */
 
 #ifdef GLK_MODULE_SOUND
@@ -448,6 +469,7 @@ extern strid_t glk_stream_open_resource_uni(glui32 filenum, glui32 rock);
 
 #endif /* GLK_MODULE_RESOURCE_STREAM */
 
+#define GLKUNIX_FILEREF_GET_FILENAME (1)
 extern char* glkunix_fileref_get_filename(frefid_t fref);
 extern char* garglk_fileref_get_name(frefid_t fref);
 
@@ -468,6 +490,15 @@ extern glui32 garglk_unput_string_count_uni(glui32 *str);
 
 extern frefid_t garglk_fileref_create_in_game_dir(glui32 usage, char *name,
                                            glui32 rock);
+
+/* Register `len` bytes at `offset` of `filename` -- a file in the game's own
+ * directory, named without any path -- as a picture (giblorb_ID_Pict) or
+ * sound (giblorb_ID_Snd), and return the resource number to draw or play it
+ * by, or 0 if it cannot be had.  In Spatterlight (fileresource.c) the name
+ * may differ from the file's in case, and a `len` of 0 means the rest of the
+ * file; portable callers pass the real length. */
+extern glui32 garglk_add_resource_from_file(glui32 usage, const char *filename,
+                                            glui32 offset, glui32 len);
 
 #define zcolor_Transparent   ((glui32)0xfffffffc)
 #define zcolor_Cursor        ((glui32)0xfffffffd)

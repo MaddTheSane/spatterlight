@@ -1,0 +1,37 @@
+in
+make pitstop
+out
+take cell phone
+take twix bar
+eat candy
+out
+take baseball bat
+in
+d
+open entertainment center
+turn on stereo
+tear up note
+out
+ask shannon to elaborate
+e
+get ring from Squirt
+w
+present shannon with ring
+w
+ask leo if he's seen emily
+s
+kiss emily
+n
+e
+e
+in
+hit slick with bat
+tie up slick
+call cops
+get tv
+out
+w
+in
+place tv on shelf
+turn on tv
+embrace emily

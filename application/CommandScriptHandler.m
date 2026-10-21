@@ -14,13 +14,51 @@
 
 #import "CommandScriptHandler.h"
 
+#import "DebugLog.h"
+#import "NSAlert+Spatterlight.h"
+#import "Constants.h"
+
 extern NSArray *gDocFileTypes;
 extern NSArray *gSaveFileTypes;
+
+NSNotificationName const GlkCommandScriptDidCompleteNotification = @"GlkCommandScriptDidComplete";
 
 @implementation CommandScriptHandler
 
 + (BOOL) supportsSecureCoding {
     return YES;
+}
+
+// Under XCTest a modal alert stalls the whole run: the main thread sits in the
+// modal session, so no test timeout can fire until someone clicks. There the
+// problem is logged instead, and the test fails on its own terms.
+static BOOL SPRunningUnderTests(void) {
+    return NSProcessInfo.processInfo.environment[@"XCTestConfigurationFilePath"] != nil;
+}
+
+static void SPReportScriptProblem(NSString *message, NSString *informativeText) {
+    if (SPRunningUnderTests()) {
+        NSLog(@"CommandScriptHandler: %@ %@", message, informativeText);
+        return;
+    }
+    [[NSAlert alertWithMessage:message info:informativeText buttons:nil] runModal];
+}
+
+// Asks the user to confirm, with a "Do not show this message again" box
+// whose state is kept under suppressionKey. Returns YES to go ahead.
+static BOOL SPConfirmUnlessSuppressed(NSString *suppressionKey, NSString *message, NSString *informativeText) {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+
+    if ([defaults boolForKey:suppressionKey] || SPRunningUnderTests()) {
+        NSLog(@"%@ suppressed", suppressionKey);
+        return YES;
+    }
+
+    NSAlert *anAlert = [NSAlert alertWithMessage:message
+                                            info:informativeText
+                                         buttons:@[NSLocalizedString(@"Okay", nil), NSLocalizedString(@"Cancel", nil)]];
+    [anAlert showSuppressionButtonWithTitle:nil];
+    return [anAlert runModalSuppressingWithKey:suppressionKey] != NSAlertSecondButtonReturn;
 }
 
 - (instancetype)initWithCoder:(NSCoder *)decoder {
@@ -39,7 +77,9 @@ extern NSArray *gSaveFileTypes;
 - (void)encodeWithCoder:(NSCoder *)encoder {
     [encoder encodeObject:_commandString forKey:@"commandString"];
     [encoder encodeObject:_commandArray forKey:@"commandArray"];
-    [encoder encodeInteger:(NSInteger)_commandIndex - 1 forKey:@"commandIndex"];
+    // Step back one line so that the command in progress is sent again
+    // after an autorestore. (Unsigned: don't step back from 0.)
+    [encoder encodeInteger:_commandIndex ? (NSInteger)_commandIndex - 1 : 0 forKey:@"commandIndex"];
     [encoder encodeInteger:_lastCommandWindow forKey:@"lastCommandWindow"];
     [encoder encodeInteger:(NSInteger)_lastCommandType forKey:@"lastCommandType"];
     [encoder encodeObject:_untypedCharacters forKey:@"untypedCharacters"];
@@ -66,23 +106,32 @@ extern NSArray *gSaveFileTypes;
 }
 
 - (nullable NSString *)nextCommandScriptLine {
-    if (_commandIndex >= _commandArray.count) {
-        // At last command
-        _commandString = nil;
-        _commandArray = nil;
-        _glkctl.commandScriptRunning = NO;
+    for (;;) {
+        if (_commandIndex >= _commandArray.count) {
+            // At last command
+            _commandString = nil;
+            _commandArray = nil;
+            _glkctl.commandScriptRunning = NO;
+
+            // Post notification that command script has completed
+            [[NSNotificationCenter defaultCenter] postNotificationName:GlkCommandScriptDidCompleteNotification
+                                                                object:self
+                                                              userInfo:nil];
+        }
+        if (!_commandString)
+            return nil;
+        NSString *command = [_commandString substringWithRange:_commandArray[_commandIndex].rangeValue];
+        command = [command stringByTrimmingCharactersInSet:[NSCharacterSet newlineCharacterSet]];
+        _commandIndex++;
+        if (command.length > 10000) {
+            NSLog(@"Command with %ld characters too long, bailing!", command.length);
+            _commandString = nil;
+            return nil;
+        }
+        if ([command hasPrefix:@"# "])
+            continue;
+        return command;
     }
-    if (!_commandString)
-        return nil;
-    NSString *command = [_commandString substringWithRange:_commandArray[_commandIndex].rangeValue];
-    command = [command stringByTrimmingCharactersInSet:[NSCharacterSet newlineCharacterSet]];
-    _commandIndex++;
-    if (command.length > 10000) {
-        NSLog(@"Command with %ld characters too long, bailing!", command.length);
-        _commandString = nil;
-        return nil;
-    }
-    return command;
 }
 
 - (void)sendCommandLineToWindow:(GlkWindow *)win {
@@ -144,7 +193,7 @@ extern NSArray *gSaveFileTypes;
     NSString *string = nil;
 
     if ( [pboard.types containsObject:NSPasteboardTypeString] ) {
-        string = [pboard  stringForType:NSPasteboardTypeString];
+        string = [pboard stringForType:NSPasteboardTypeString];
     } else if ( [pboard.types containsObject:NSPasteboardTypeURL] ) {
         NSURL *fileURL = [NSURL URLFromPasteboard:pboard];
         if ([gDocFileTypes indexOfObject:fileURL.pathExtension.lowercaseString] != NSNotFound) {
@@ -170,116 +219,63 @@ extern NSArray *gSaveFileTypes;
 }
 
 - (void)runCommandsFromFile:(NSString *)filename inWindow:(nullable GlkWindow *)win {
-    NSURL *fileURL = [NSURL fileURLWithPath:filename  isDirectory:NO];
+    NSURL *fileURL = [NSURL fileURLWithPath:filename isDirectory:NO];
     NSError *error = nil;
     NSAttributedString *attStr = [[NSAttributedString alloc] initWithURL:fileURL options:@{} documentAttributes:nil error:&error];
     NSString *string = attStr.string;
     if (error || !string.length) {
-        NSAlert *alert = [[NSAlert alloc] init];
-        alert.messageText = NSLocalizedString(@"Could not read command script.", nil);
-        alert.informativeText = [NSString stringWithFormat:NSLocalizedString(@"\"%@\" is not a valid text file", nil), filename.lastPathComponent];
-        [alert runModal];
+        SPReportScriptProblem(NSLocalizedString(@"Could not read command script.", nil),
+                              [NSString stringWithFormat:NSLocalizedString(@"\"%@\" is not a valid text file", nil), filename.lastPathComponent]);
         return;
     }
 
     if (!win)
         win = [self findGlkWindowWithInput];
     if (!win) {
-        NSAlert *alert = [[NSAlert alloc] init];
-        alert.messageText = NSLocalizedString(@"No prompt.", nil);
-        alert.informativeText = NSLocalizedString(@"Cannot find an input prompt for this command script.", nil);
-        [alert runModal];
+        SPReportScriptProblem(NSLocalizedString(@"No prompt.", nil),
+                              NSLocalizedString(@"Cannot find an input prompt for this command script.", nil));
         return;
     }
 
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-
-    if ([defaults boolForKey:@"CommandScriptAlertSuppression"]) {
-        NSLog(@"Command script alert suppressed");
-    } else {
-        NSAlert *anAlert = [[NSAlert alloc] init];
-        anAlert.messageText = NSLocalizedString(@"Run command script?", nil);
-
-        anAlert.informativeText = [NSString stringWithFormat:@"Do you want to run the command script %@ with this game?", filename.lastPathComponent];
-        anAlert.showsSuppressionButton = YES; // Uses default checkbox title
-
-        [anAlert addButtonWithTitle:NSLocalizedString(@"Okay", nil)];
-        [anAlert addButtonWithTitle:NSLocalizedString(@"Cancel", nil)];
-
-        NSInteger choice = [anAlert runModal];
-
-        if (anAlert.suppressionButton.state == NSOnState) {
-            // Suppress this alert from now on
-            [defaults setBool:YES forKey:@"CommandScriptAlertSuppression"];
-        }
-        if (choice == NSAlertSecondButtonReturn) {
-            return;
-        }
-    }
+    if (!SPConfirmUnlessSuppressed(kCommandScriptAlertSuppressionKey,
+                                   NSLocalizedString(@"Run command script?", nil),
+                                   [NSString stringWithFormat:NSLocalizedString(@"Do you want to run the command script %@ with this game?", nil), filename.lastPathComponent]))
+        return;
 
     [self startCommandScript:string inWindow:win];
 }
 
-- (nullable GlkWindow *)findGlkWindowWithInput {
-    GlkWindow *foundWin = nil;
+- (nullable GlkWindow *)windowWithLineRequest {
     for (GlkWindow *win in _glkctl.gwindows.allValues) {
-        if ([win hasLineRequest]) {
-            foundWin = win;
-            break;
-        }
+        if ([win hasLineRequest])
+            return win;
     }
-    if (!foundWin) {
-        // Found no window with line input request
-        for (GlkWindow *win in _glkctl.gwindows.allValues) {
-            if ([win hasCharRequest]) {
-                foundWin = win;
-                // Found window with char input request
-                break;
-            }
-        }
+    return nil;
+}
+
+// A window with a line request, or failing that one with a char request.
+- (nullable GlkWindow *)findGlkWindowWithInput {
+    GlkWindow *foundWin = [self windowWithLineRequest];
+    if (foundWin)
+        return foundWin;
+    for (GlkWindow *win in _glkctl.gwindows.allValues) {
+        if ([win hasCharRequest])
+            return win;
     }
-    return foundWin;
+    return nil;
 }
 
 - (void)restoreFromSaveFile:(NSString *)filename {
-    GlkWindow *win = nil;
-    for (GlkWindow *foundwin in _glkctl.gwindows.allValues) {
-        if ([foundwin hasLineRequest]) {
-            win = foundwin;
-            break;
-        }
-    }
+    GlkWindow *win = [self windowWithLineRequest];
     if (!win) {
-        NSAlert *alert = [[NSAlert alloc] init];
-        alert.messageText = NSLocalizedString(@"No prompt.", nil);
-        alert.informativeText = NSLocalizedString(@"Cannot find an input prompt to restore this save from.", nil);
-        [alert runModal];
+        SPReportScriptProblem(NSLocalizedString(@"No prompt.", nil),
+                              NSLocalizedString(@"Cannot find an input prompt to restore this save from.", nil));
         return;
     }
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-
-    if ([defaults boolForKey:@"SaveFileAlertSuppression"]) {
-        NSLog(@"Save file alert suppressed");
-    } else {
-        NSAlert *anAlert = [[NSAlert alloc] init];
-        anAlert.messageText = NSLocalizedString(@"Restore from save file?", nil);
-
-        anAlert.informativeText = [NSString stringWithFormat:@"Do you want to restore this game from the save file %@?", filename.lastPathComponent];
-        anAlert.showsSuppressionButton = YES; // Uses default checkbox title
-
-        [anAlert addButtonWithTitle:NSLocalizedString(@"Okay", nil)];
-        [anAlert addButtonWithTitle:NSLocalizedString(@"Cancel", nil)];
-
-        NSInteger choice = [anAlert runModal];
-
-        if (anAlert.suppressionButton.state == NSOnState) {
-            // Suppress this alert from now on
-            [defaults setBool:YES forKey:@"SaveFileAlertSuppression"];
-        }
-        if (choice == NSAlertSecondButtonReturn) {
-            return;
-        }
-    }
+    if (!SPConfirmUnlessSuppressed(kSaveFileAlertSuppressionKey,
+                                   NSLocalizedString(@"Restore from save file?", nil),
+                                   [NSString stringWithFormat:NSLocalizedString(@"Do you want to restore this game from the save file %@?", nil), filename.lastPathComponent]))
+        return;
     _glkctl.pendingSaveFilePath = filename;
     [win sendCommandLine:@"restore"];
 }

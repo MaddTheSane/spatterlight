@@ -1,22 +1,23 @@
 #import "GlkWindow.h"
 #import "GlkController.h"
+#import "GlkController+Speech.h"
+#import "GlkController+InterpreterGlue.h"
+#import "GlkEvent.h"
 #import "GlkTextGridWindow.h"
+
+#import "Constants.h"
+#import "GlkStyle.h"
 
 #import "InputHistory.h"
 #import "MarginImage.h"
 #import "MyAttachmentCell.h"
+#import "SPAccessibility.h"
 #import "Theme.h"
 #import "ZColor.h"
 
 #include "glkimp.h"
 
-#ifdef DEBUG
-#define NSLog(FORMAT, ...)                                                     \
-fprintf(stderr, "%s\n",                                                    \
-[[NSString stringWithFormat:FORMAT, ##__VA_ARGS__] UTF8String]);
-#else
-#define NSLog(...)
-#endif
+#import "DebugLog.h"
 
 @implementation GlkWindow
 
@@ -90,6 +91,9 @@ fprintf(stderr, "%s\n",                                                    \
         _pendingTerminators = [decoder decodeObjectOfClass:[NSMutableDictionary class] forKey:@"pendingTerminators"];
         _terminatorsPending = [decoder decodeBoolForKey:@"terminatorsPending"];
         char_request = [decoder decodeBoolForKey:@"char_request"];
+        line_request = [decoder decodeBoolForKey:@"line_request"];
+        hyper_request = [decoder decodeBoolForKey:@"hyper_request"];
+        mouse_request = [decoder decodeBoolForKey:@"mouse_request"];
         _styleHints = [decoder decodeObjectOfClass:[NSArray class] forKey:@"styleHints"];
         styles = [decoder decodeObjectOfClass:[NSMutableArray class] forKey:@"styles"];
         currentZColor =  [decoder decodeObjectOfClass:[ZColor class] forKey:@"currentZColor"];
@@ -115,6 +119,9 @@ fprintf(stderr, "%s\n",                                                    \
     [encoder encodeObject:_pendingTerminators forKey:@"pendingTerminators"];
     [encoder encodeBool:_terminatorsPending forKey:@"terminatorsPending"];
     [encoder encodeBool:char_request forKey:@"char_request"];
+    [encoder encodeBool:line_request forKey:@"line_request"];
+    [encoder encodeBool:hyper_request forKey:@"hyper_request"];
+    [encoder encodeBool:mouse_request forKey:@"mouse_request"];
     [encoder encodeObject:_styleHints forKey:@"styleHints"];
     [encoder encodeObject:styles forKey:@"styles"];
     [encoder encodeObject:currentZColor forKey:@"currentZColor"];
@@ -130,7 +137,7 @@ fprintf(stderr, "%s\n",                                                    \
     [encoder encodeBool:underlineLinks forKey:@"underlineLinks"];
 }
 
-- (NSArray *)deepCopyOfStyleHintsArray:(NSArray *)array {
++ (NSArray *)deepCopyOfStyleHintsArray:(NSArray *)array {
     NSMutableArray *newArray = [[NSMutableArray alloc] initWithCapacity:style_NUMSTYLES];
     for (NSUInteger i = 0; i < style_NUMSTYLES; i++) {
         [newArray addObject:[[NSArray alloc] initWithArray:array[i] copyItems:YES]];
@@ -173,19 +180,86 @@ fprintf(stderr, "%s\n",                                                    \
     return dict;
 }
 
+- (GlkStyle *)themeStyle:(NSUInteger)style {
+    return nil;
+}
+
+- (NSColor *)themeBackground {
+    return self.theme.bufferBackground;
+}
+
+- (NSDictionary *)themeAttributesForStyle:(NSUInteger)style {
+    GlkStyle *glkStyle = [self themeStyle:style];
+    if (self.theme.doStyles)
+        return [glkStyle attributesWithHints:self.styleHints[style]];
+    return glkStyle.attributeDict;
+}
+
+- (int32_t)themeLinkStyle {
+    return NSUnderlineStyleNone;
+}
+
+- (BOOL)syncStyleFlagsWithTheme {
+    BOOL different = NO;
+
+    if (usingStyles != self.theme.doStyles) {
+        different = YES;
+        usingStyles = self.theme.doStyles;
+    }
+
+    BOOL newUnderlineLinks = (self.themeLinkStyle != NSUnderlineStyleNone);
+    if (underlineLinks != newUnderlineLinks) {
+        different = YES;
+        underlineLinks = newUnderlineLinks;
+    }
+
+    return different;
+}
+
+- (void)updateLinkTextAttributesOf:(NSTextView *)textView {
+    NSMutableDictionary *linkAttributes = [textView.linkTextAttributes mutableCopy];
+    linkAttributes[NSUnderlineStyleAttributeName] = @(self.themeLinkStyle);
+    linkAttributes[NSForegroundColorAttributeName] = styles[style_Normal][NSForegroundColorAttributeName];
+    textView.linkTextAttributes = linkAttributes;
+}
+
+- (NSDictionary *)baseAttributesForStyle:(NSUInteger)stylevalue {
+    if (stylevalue >= style_NUMSTYLES)
+        return nil;
+
+    if (styles.count <= stylevalue || [styles[stylevalue] isEqual:[NSNull null]]) {
+        return [self themeStyle:stylevalue].attributeDict;
+    }
+
+    return styles[stylevalue];
+}
+
 // A possible optimization would be to cache this
 // instead of recreating it on every print operation.
 - (NSMutableDictionary *)getCurrentAttributesForStyle:(NSUInteger)stylevalue {
 
+    if (stylevalue >= styles.count)
+        stylevalue = style_Normal;
+    if (stylevalue >= styles.count)
+        return nil;
+
+    if ([styles[stylevalue] isEqual:[NSNull null]]) {
+        GlkStyle *themeStyle = [self themeStyle:stylevalue];
+        if (!themeStyle)
+            return nil;
+        styles[stylevalue] = themeStyle.attributeDict;
+    }
+
     NSMutableDictionary *attributes = [styles[stylevalue] mutableCopy];
 
-    if (((NSArray *)self.styleHints[stylevalue]).count == 0)
+    NSArray *hintsForStyle = self.styleHints[stylevalue];
+    if (hintsForStyle.count <= stylehint_ReverseColor)
         return attributes;
 
     if (currentZColor) {
         attributes[@"ZColor"] = currentZColor;
         if (self.theme.doStyles) {
-            if ([self.styleHints[stylevalue][stylehint_ReverseColor] isEqualTo:@(1)]) {
+            if ([hintsForStyle[stylehint_ReverseColor] isEqualTo:@(1)]) {
                 // If the style has reverseColor hint set, we apply the zcolors in reverse
                 attributes = [currentZColor reversedAttributes:attributes];
             } else {
@@ -196,9 +270,9 @@ fprintf(stderr, "%s\n",                                                    \
 
     if (self.currentReverseVideo) {
         attributes[@"ReverseVideo"] = @(YES);
-        if (!self.theme.doStyles || [self.styleHints[stylevalue][stylehint_ReverseColor] isNotEqualTo:@(1)]) {
+        if (!self.theme.doStyles || [hintsForStyle[stylehint_ReverseColor] isNotEqualTo:@(1)]) {
             // Current style has stylehint_ReverseColor unset, so we reverse colors
-            attributes = [self reversedAttributes:attributes background:[self isKindOfClass:[GlkTextGridWindow class]] ? self.theme.gridBackground : self.theme.bufferBackground];
+            attributes = [self reversedAttributes:attributes background:self.themeBackground];
         }
     }
 
@@ -232,6 +306,30 @@ fprintf(stderr, "%s\n",                                                    \
     }
 }
 
++ (unsigned)keycodeForEvent:(NSEvent *)evt mapNumericPad:(BOOL)mapNumericPad {
+    NSString *str = evt.characters;
+    unsigned ch = keycode_Unknown;
+    if (str.length)
+        ch = chartokeycode([str characterAtIndex:str.length - 1]);
+    if (mapNumericPad && (evt.modifierFlags & NSEventModifierFlagNumericPad) && ch >= '0' && ch <= '9')
+        ch = keycode_Pad0 - (ch - '0');
+    return ch;
+}
+
+- (BOOL)forwardKeyDownToFocusedWindow:(NSEvent *)evt {
+    if (self.wantsFocus)
+        return NO;
+    for (GlkWindow *win in self.glkctl.gwindows.allValues) {
+        if (win != self && win.wantsFocus) {
+            NSLog(@"%@ %ld: Passing on keypress to %@ %ld", self.class, self.name, win.class, win.name);
+            [win grabFocus];
+            [win keyDown:evt];
+            return YES;
+        }
+    }
+    return NO;
+}
+
 - (void)flushDisplay {
     if (dirty)
         self.needsDisplay = YES;
@@ -242,12 +340,23 @@ fprintf(stderr, "%s\n",                                                    \
     return NO;
 }
 
+// The methods below that call this are overridden by the window types that
+// support them. A game that asks the wrong kind of window for something only
+// gets this log line.
+- (void)subclassResponsibility:(SEL)selector {
+    NSLog(@"%@ in %@ not implemented", NSStringFromSelector(selector), [self class]);
+}
+
+- (NSTextView *)textview {
+    return nil;
+}
+
 - (void)setBgColor:(NSInteger)bc {
-    NSLog(@"set background color in %@ not allowed", [self class]);
+    [self subclassResponsibility:_cmd];
 }
 
 - (void)fillRects:(struct fillrect *)rects count:(NSInteger)n {
-    NSLog(@"fillrect in %@ not implemented", [self class]);
+    [self subclassResponsibility:_cmd];
 }
 
 - (void)drawImage:(NSImage *)buf
@@ -255,16 +364,18 @@ fprintf(stderr, "%s\n",                                                    \
              val2:(NSInteger)v2
             width:(NSInteger)w
            height:(NSInteger)h
+        imagerule:(NSUInteger)imagerule
+         maxwidth:(NSUInteger)maxwidth
             style:(NSUInteger)style {
-    NSLog(@"drawimage in %@ not implemented", [self class]);
+    [self subclassResponsibility:_cmd];
 }
 
 - (void)flowBreak {
-    NSLog(@"flowbreak in %@ not implemented", [self class]);
+    [self subclassResponsibility:_cmd];
 }
 
 - (void)makeTransparent {
-    NSLog(@"makeTransparent in %@ not implemented", [self class]);
+    [self subclassResponsibility:_cmd];
 }
 
 - (void)markLastSeen {
@@ -273,24 +384,24 @@ fprintf(stderr, "%s\n",                                                    \
 }
 
 - (void)clear {
-    NSLog(@"clear in %@ not implemented", [self class]);
+    [self subclassResponsibility:_cmd];
 }
 
 - (void)putString:(NSString *)buf style:(NSUInteger)style {
-    NSLog(@"print in %@ not implemented", [self class]);
+    [self subclassResponsibility:_cmd];
 }
 
 - (NSUInteger)unputString:(NSString *)buf {
-    NSLog(@"unprint in %@ not implemented", [self class]);
+    [self subclassResponsibility:_cmd];
     return 0;
 }
 
 - (void)moveToColumn:(NSUInteger)x row:(NSUInteger)y {
-    NSLog(@"move cursor in %@ not implemented", [self class]);
+    [self subclassResponsibility:_cmd];
 }
 
 - (void)initLine:(NSString *)buf maxLength:(NSUInteger)maxLength {
-    NSLog(@"line input in %@ not implemented", [self class]);
+    [self subclassResponsibility:_cmd];
 }
 
 - (NSString *)cancelLine {
@@ -298,25 +409,26 @@ fprintf(stderr, "%s\n",                                                    \
 }
 
 - (void)initChar {
-    NSLog(@"char input in %@ not implemented", [self class]);
+    [self subclassResponsibility:_cmd];
 }
 
 - (void)cancelChar {
 }
 
 - (void)initMouse {
-    NSLog(@"mouse input in %@ not implemented", [self class]);
+    mouse_request = YES;
 }
 
 - (void)cancelMouse {
+    mouse_request = NO;
 }
 
 - (void)initHyperlink {
-    NSLog(@"hyperlink input in %@ not implemented", [self class]);
+    hyper_request = YES;
 }
 
 - (void)cancelHyperlink {
-    NSLog(@"hyperlink input in %@ not implemented", [self class]);
+    hyper_request = NO;
 }
 
 - (void)setZColorText:(NSInteger)fg background:(NSInteger)bg {
@@ -335,13 +447,14 @@ fprintf(stderr, "%s\n",                                                    \
 
 - (NSMutableAttributedString *)applyZColorsAndThenReverse:(NSMutableAttributedString *)attStr {
     NSUInteger textstoragelength = attStr.length;
+    
+    NSArray *styleHints = self.styleHints;
+
+    if (textstoragelength == 0 || styleHints.count == 0)
+        return attStr;
 
     GlkWindow * __weak weakSelf = self;
-    NSColor *blockBgCol;
-    if ([self isKindOfClass:[GlkTextGridWindow class]])
-        blockBgCol = self.theme.gridBackground;
-    else
-        blockBgCol = self.theme.bufferBackground;
+    NSColor *blockBgCol = self.themeBackground;
 
     if (self.theme.doStyles) {
         [attStr
@@ -358,8 +471,13 @@ fprintf(stderr, "%s\n",                                                    \
              options:0
              usingBlock:^(NSDictionary *dict, NSRange range2, BOOL *stop2) {
                 NSUInteger stylevalue = (NSUInteger)((NSNumber *)dict[@"GlkStyle"]).integerValue;
+                if (stylevalue >= styleHints.count)
+                    return;
+                NSArray *hintsForStyle = styleHints[stylevalue];
+                if (hintsForStyle.count <= stylehint_ReverseColor)
+                    return;
                 NSMutableDictionary *mutDict = [dict mutableCopy];
-                if ([weakSelf.styleHints[stylevalue][stylehint_ReverseColor] isEqualTo:@(1)]) {
+                if ([hintsForStyle[stylehint_ReverseColor] isEqualTo:@(1)]) {
                     // Style has stylehint_ReverseColor set,
                     // So we apply Zcolor with reversed attributes
                     mutDict = [z reversedAttributes:mutDict];
@@ -385,8 +503,13 @@ fprintf(stderr, "%s\n",                                                    \
          options:0
          usingBlock:^(NSDictionary *dict, NSRange range2, BOOL *stop2) {
             NSUInteger stylevalue = (NSUInteger)((NSNumber *)dict[@"GlkStyle"]).integerValue;
+            if (stylevalue >= styleHints.count)
+                return;
+            NSArray *hintsForStyle = styleHints[stylevalue];
+            if (hintsForStyle.count <= stylehint_ReverseColor)
+                return;
             BOOL zcolorValue = (dict[@"ZColor"] != nil);
-            if (!([weakSelf.styleHints[stylevalue][stylehint_ReverseColor] isEqualTo:@(1)] && !zcolorValue)) {
+            if (!([hintsForStyle[stylehint_ReverseColor] isEqualTo:@(1)] && !zcolorValue)) {
                 NSMutableDictionary *mutDict = [dict mutableCopy];
                 mutDict = [weakSelf reversedAttributes:mutDict background:blockBgCol];
                 [attStr addAttributes:mutDict range:range2];
@@ -401,11 +524,7 @@ fprintf(stderr, "%s\n",                                                    \
     NSUInteger textstoragelength = attStr.length;
 
     GlkWindow * __weak weakSelf = self;
-    NSColor *blockBgCol;
-    if ([self isKindOfClass:[GlkTextGridWindow class]])
-        blockBgCol = self.theme.gridBackground;
-    else
-        blockBgCol = self.theme.bufferBackground;
+    NSColor *blockBgCol = self.themeBackground;
 
     [attStr
      enumerateAttribute:@"ReverseVideo"
@@ -429,7 +548,7 @@ fprintf(stderr, "%s\n",                                                    \
 }
 
 - (void)postRestoreAdjustments:(GlkWindow *)win {
-    NSLog(@"postRestoreAdjustments in %@ not implemented", [self class]);
+    [self subclassResponsibility:_cmd];
 }
 
 - (BOOL)hasCharRequest {
@@ -437,26 +556,38 @@ fprintf(stderr, "%s\n",                                                    \
 }
 
 - (BOOL)hasLineRequest {
-    NSLog(@"hasLineRequest in %@ not implemented", [self class]);
+    [self subclassResponsibility:_cmd];
     return NO;
 }
 
 - (void)sendCommandLine:(NSString *)command {
-    NSLog(@"sendCommandLine in %@ not implemented", [self class]);
+    [self subclassResponsibility:_cmd];
 }
 
+// Queue a character event and end the char request.
 - (void)sendKeypress:(unsigned)ch {
-    NSLog(@"sendKeypress in %@ not implemented", [self class]);
+    GlkEvent *gev = [[GlkEvent alloc] initCharEvent:ch forWindow:self.name];
+    [self.glkctl queueEvent:gev];
+    char_request = NO;
+}
+
+// Queue a mouse event at `point`, in the window's Glk coordinates (pixels
+// for graphics windows, cells for grids), and end the mouse request.
+- (void)sendMouseEventAtPoint:(NSPoint)point {
+    [self.glkctl markLastSeen];
+    GlkEvent *gev = [[GlkEvent alloc] initMouseEvent:point forWindow:self.name];
+    [self.glkctl queueEvent:gev];
+    mouse_request = NO;
 }
 
 
 - (NSArray *)links {
-    NSLog(@"links in %@ not implemented", [self class]);
+    [self subclassResponsibility:_cmd];
     return @[];
 }
 
 - (NSArray *)images {
-    NSLog(@"images in %@ not implemented", [self class]);
+    [self subclassResponsibility:_cmd];
     return @[];
 }
 
@@ -519,7 +650,7 @@ fprintf(stderr, "%s\n",                                                    \
 
     panel.nameFieldStringValue = newName;
 
-    NSTextView *localTextView = (NSTextView *)((GlkTextGridWindow *)self).textview;
+    NSTextView *localTextView = self.textview;
     NSAttributedString *localTextStorage = localTextView.textStorage;
 
     panel.accessoryView = [self saveScrollbackAccessoryViewHasImages:localTextStorage.containsAttachments];
@@ -695,31 +826,111 @@ fprintf(stderr, "%s\n",                                                    \
     return @[ @"name" ];
 }
 
++ (NSArray<Class> *) allowedClassesForRestorableStateKeyPath:(NSString *) keyPath {
+    return @[[NSString class]];
+}
+
 #pragma mark Accessibility
 
 - (void)repeatLastMove:(id)sender {
-    NSLog(@"repeatLastMove in %@ not implemented", [self class]);
+    [self subclassResponsibility:_cmd];
 }
 
 - (void)speakPrevious {
-    NSLog(@"speakPrevious in %@ not implemented", [self class]);
+    if (!self.moveRanges.count)
+        return;
+    NSString *prefix = @"";
+    if (moveRangeIndex > 0) {
+        moveRangeIndex--;
+    } else {
+        prefix = @"At first move.\n";
+        moveRangeIndex = 0;
+    }
+    NSString *str = [prefix stringByAppendingString:[self speakableStringForMoveRange:self.moveRanges[moveRangeIndex]]];
+    [self.glkctl speakStringNow:str];
 }
+
 - (void)speakNext {
-    NSLog(@"speakNext in %@ not implemented", [self class]);
+    if (!self.moveRanges.count)
+        return;
+    NSString *prefix = @"";
+    if (moveRangeIndex < self.moveRanges.count - 1) {
+        moveRangeIndex++;
+    } else {
+        prefix = @"At last move.\n";
+        moveRangeIndex = self.moveRanges.count - 1;
+    }
+    NSString *str = [prefix stringByAppendingString:[self speakableStringForMoveRange:self.moveRanges[moveRangeIndex]]];
+    [self.glkctl speakStringNow:str];
+}
+
+- (NSString *)speakableStringForMoveRange:(NSValue *)range {
+    [self subclassResponsibility:_cmd];
+    return @"";
+}
+
+#pragma mark Command history
+
+- (void)travelInHistoryForward:(BOOL)forward {
+    NSString *input = self.historyInputText;
+    if (!input)
+        return;
+    NSString *entry = forward ? [history travelForward] : [history travelBackward:input];
+    if (entry)
+        [self replaceInputWithHistoryEntry:entry];
+
+    if (entry.length) {
+        // Post on the next run loop pass, after AppKit has reported the
+        // input text change, so the announcement is the last thing said.
+        dispatch_async(dispatch_get_main_queue(), ^{
+            SPAnnounce(entry, NSAccessibilityPriorityHigh, nil);
+        });
+    } else {
+        [self announceHistoryEdgeForward:forward];
+    }
+}
+
+- (NSString *)historyInputText {
+    return nil;
+}
+
+- (void)replaceInputWithHistoryEntry:(NSString *)entry {
+    [self subclassResponsibility:_cmd];
+}
+
+- (void)announceHistoryEdgeForward:(BOOL)forward {
+    NSString *message;
+    if (history.isEmpty)
+        message = NSLocalizedString(@"No commands entered", nil);
+    else if (forward)
+        message = NSLocalizedString(@"End of command history", nil);
+    else
+        message = NSLocalizedString(@"Start of command history", nil);
+    [self.glkctl speakStringNow:message];
+}
+
+// Cancel any pending Z-machine menu or form announcement timers, so they
+// don't talk over what we are about to speak.
+- (void)cancelPendingMenuAnnouncements {
+    GlkController *glkctl = self.glkctl;
+    if (glkctl.zmenu)
+        [NSObject cancelPreviousPerformRequestsWithTarget:glkctl.zmenu];
+    if (glkctl.form)
+        [NSObject cancelPreviousPerformRequestsWithTarget:glkctl.form];
 }
 
 - (void)speakStatus {
-    NSLog(@"speakStatus in %@ not implemented", [self class]);
+    [self subclassResponsibility:_cmd];
 }
 
 
 - (BOOL)setLastMove {
-    NSLog(@"setLastMove in %@ not implemented", [self class]);
+    [self subclassResponsibility:_cmd];
     return NO;
 }
 
 - (void)recalcBackground {
-    NSLog(@"recalcBackground in %@ not implemented", [self class]);
+    [self subclassResponsibility:_cmd];
 }
 
 - (NSArray *)accessibilityCustomRotors  {

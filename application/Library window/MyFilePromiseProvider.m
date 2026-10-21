@@ -7,13 +7,14 @@
 
 #import "MyFilePromiseProvider.h"
 
-#import "ImageView.h"
+#import "ImageDragSource.h"
 
 @implementation MyFilePromiseProvider
 
 - (NSArray<NSPasteboardType> *)writableTypesForPasteboard:(NSPasteboard *)pasteboard {
     NSMutableArray<NSPasteboardType> *types = [super writableTypesForPasteboard:pasteboard].mutableCopy;
-    NSArray *myTypes = @[NSPasteboardTypePNG];
+    // A file URL too, for receivers that don't take file promises (Terminal).
+    NSArray *myTypes = @[NSPasteboardTypePNG, NSPasteboardTypeFileURL];
 
     [types addObjectsFromArray:myTypes];
 
@@ -24,15 +25,20 @@
     if ([type isEqual: NSPasteboardTypePNG]) {
         return 0;
     }
+    // Only write the file if a receiver asks for it.
+    if ([type isEqual: NSPasteboardTypeFileURL]) {
+        return NSPasteboardWritingPromised;
+    }
     return [super writingOptionsForType: type pasteboard: pasteboard];
 }
 
 - (id)pasteboardPropertyListForType:(NSPasteboardType)type {
 
-    ImageView *imageView = (ImageView *)self.delegate;
-
     if ([type isEqual: NSPasteboardTypePNG]) {
-        return imageView.pngData;
+        return ((ImageDragSource *)self.delegate).pngData;
+    }
+    if ([type isEqual: NSPasteboardTypeFileURL]) {
+        return [((ImageDragSource *)self.delegate).temporaryFileURL pasteboardPropertyListForType:NSPasteboardTypeFileURL];
     }
 
     return [super pasteboardPropertyListForType: type];

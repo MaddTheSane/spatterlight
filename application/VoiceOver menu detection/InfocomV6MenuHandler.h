@@ -7,30 +7,26 @@
 
 #import <Foundation/Foundation.h>
 
+#import "VoiceOverMenu.h"
+
 #include "glkimp.h"
 
-@class GlkController;
+@class GlkController, GlkTextBufferWindow;
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface InfocomV6MenuHandler : NSObject
+@interface InfocomV6MenuHandler : NSObject <VoiceOverMenu, VoiceOverHelper>
 
-- (instancetype)initWithDelegate:(GlkController *)delegate;
+- (instancetype)initWithGlkController:(GlkController *)glkctl;
 
 - (void)handleMenuItemOfType:(InfocomV6MenuType)type index:(NSUInteger)index total:(NSUInteger)total text:(char *)buf length:(NSUInteger)len;
-//- (void)describeMenu;
 
-- (NSString *)menuLineStringWithTitle:(BOOL)useTitle index:(BOOL)useIndex total:(BOOL)useTotal instructions:(BOOL)useInstructions;
-- (NSString *)constructMenuInstructionString;
 - (void)updateMoveRanges:(GlkTextBufferWindow *)window;
 
-@property (weak) GlkController *delegate;
+@property (weak, nullable) GlkController *glkctl;
 
-@property NSMutableArray<NSString *> *menuItems;
-@property NSUInteger numberOfItems;
-@property NSString *title;
-@property NSUInteger selectedLine;
-@property BOOL hasDescribedMenu;
+@property (readonly) NSUInteger selectedLine;
+@property BOOL haveSpokenMenu;
 
 @end
 

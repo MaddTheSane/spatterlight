@@ -13,6 +13,52 @@
 
 @interface ParagraphPopOver ()
 
+@property (weak) IBOutlet NSButton *btnAlignmentLeft;
+@property (weak) IBOutlet NSButton *btnAlignmentRight;
+@property (weak) IBOutlet NSButton *btnAlignmentCenter;
+@property (weak) IBOutlet NSButton *btnAlignmentJustified;
+
+- (IBAction)changeAlignment:(id)sender;
+
+@property (weak) IBOutlet NSTextField *lineSpacingTextField;
+@property (weak) IBOutlet NSStepper *lineSpacingStepper;
+
+@property (weak) IBOutlet NSTextField *characterSpacingTextField;
+@property (weak) IBOutlet NSStepper *characterSpacingStepper;
+
+@property (weak) IBOutlet NSTextField *spacingBeforeTextField;
+@property (weak) IBOutlet NSStepper *spacingBeforeStepper;
+
+@property (weak) IBOutlet NSTextField *spacingAfterTextField;
+@property (weak) IBOutlet NSStepper *spacingAfterStepper;
+
+@property (weak) IBOutlet NSTextField *indentLeadingTextField;
+@property (weak) IBOutlet NSStepper *indentLeadingStepper;
+
+@property (weak) IBOutlet NSTextField *indentTrailingTextField;
+@property (weak) IBOutlet NSStepper *indentTrailingStepper;
+
+@property (weak) IBOutlet NSTextField *indentFirstLineTextField;
+@property (weak) IBOutlet NSStepper *indentFirstLineStepper;
+
+@property (weak) IBOutlet NSTextField *lineMultipleTextField;
+@property (weak) IBOutlet NSStepper *lineMultipleStepper;
+
+@property (weak) IBOutlet NSTextField *baseLineOffsetTextField;
+@property (weak) IBOutlet NSStepper *baseLineOffsetStepper;
+
+@property (weak) IBOutlet NSTextField *maxLineHeightTextField;
+@property (weak) IBOutlet NSStepper *maxLineHeightStepper;
+
+@property (weak) IBOutlet NSTextField *minLineHeightTextField;
+@property (weak) IBOutlet NSStepper *minLineHeightStepper;
+
+@property (weak) IBOutlet NSTextField *hyphenationTextField;
+@property (weak) IBOutlet NSStepper *hyphenationStepper;
+
+@property (weak) GlkStyle *style;
+@property NSMutableParagraphStyle *para;
+
 @end
 
 @implementation ParagraphPopOver
@@ -23,73 +69,72 @@
 
     [self refreshAlignmentButtons];
 
-    _lineSpacingTextField.doubleValue = _para.lineSpacing;
-    _lineSpacingStepper.doubleValue = _para.lineSpacing;
-
-    CGFloat characterSpacing = [style.attributeDict[NSKernAttributeName] doubleValue];
-    _characterSpacingTextField.doubleValue = characterSpacing;
-    if ([_characterSpacingTextField.stringValue isEqualToString:@"-0"])
-        _characterSpacingTextField.stringValue = @"0";
-    _characterSpacingStepper.doubleValue = characterSpacing;
-
-    _spacingBeforeTextField.doubleValue = _para.paragraphSpacingBefore;
-    _spacingBeforeStepper.doubleValue = _para.paragraphSpacingBefore;
-
-    _spacingAfterTextField.doubleValue = _para.paragraphSpacing;
-    _spacingAfterStepper.doubleValue = _para.paragraphSpacing;
-
-    _indentLeadingTextField.doubleValue = _para.headIndent;
-    _indentLeadingStepper.doubleValue = _para.headIndent;
-
-    // To avoid -0
-    if (_para.tailIndent == 0)
-        _indentTrailingTextField.doubleValue = 0;
-    else
-        _indentTrailingTextField.doubleValue = -_para.tailIndent;
-
-    _indentTrailingStepper.doubleValue = -_para.tailIndent;
-
-    _indentFirstLineTextField.doubleValue = _para.firstLineHeadIndent;
-    _indentFirstLineStepper.doubleValue = _para.firstLineHeadIndent;
-
-    _lineMultipleTextField.doubleValue = _para.lineHeightMultiple;
-    _lineMultipleStepper.doubleValue = _para.lineHeightMultiple;
-
-    CGFloat baselineOffset = [style.attributeDict[NSBaselineOffsetAttributeName] doubleValue];
-
-    _baseLineOffsetTextField.doubleValue = baselineOffset;
-    _baseLineOffsetStepper.doubleValue = baselineOffset;
-
-    _maxLineHeightTextField.doubleValue = _para.maximumLineHeight;
-    _maxLineHeightStepper.doubleValue = _para.maximumLineHeight;
-
-    _minLineHeightTextField.doubleValue = _para.minimumLineHeight;
-    _minLineHeightStepper.doubleValue = _para.minimumLineHeight;
-
-    _hyphenationTextField.doubleValue = _para.hyphenationFactor;
-    _hyphenationStepper.doubleValue = _para.hyphenationFactor;
+    [self showValue:_para.lineSpacing textField:_lineSpacingTextField stepper:_lineSpacingStepper];
+    [self showValue:[style.attributeDict[NSKernAttributeName] doubleValue]
+          textField:_characterSpacingTextField stepper:_characterSpacingStepper];
+    [self showValue:_para.paragraphSpacingBefore textField:_spacingBeforeTextField stepper:_spacingBeforeStepper];
+    [self showValue:_para.paragraphSpacing textField:_spacingAfterTextField stepper:_spacingAfterStepper];
+    [self showValue:_para.headIndent textField:_indentLeadingTextField stepper:_indentLeadingStepper];
+    // tailIndent is stored negative (measured from the trailing margin)
+    [self showValue:-_para.tailIndent textField:_indentTrailingTextField stepper:_indentTrailingStepper];
+    [self showValue:_para.firstLineHeadIndent textField:_indentFirstLineTextField stepper:_indentFirstLineStepper];
+    [self showValue:_para.lineHeightMultiple textField:_lineMultipleTextField stepper:_lineMultipleStepper];
+    [self showValue:[style.attributeDict[NSBaselineOffsetAttributeName] doubleValue]
+          textField:_baseLineOffsetTextField stepper:_baseLineOffsetStepper];
+    [self showValue:_para.maximumLineHeight textField:_maxLineHeightTextField stepper:_maxLineHeightStepper];
+    [self showValue:_para.minimumLineHeight textField:_minLineHeightTextField stepper:_minLineHeightStepper];
+    [self showValue:_para.hyphenationFactor textField:_hyphenationTextField stepper:_hyphenationStepper];
 }
 
 - (void)refreshAlignmentButtons {
-    _btnAlignmentLeft.state = NSOffState;
-    _btnAlignmentRight.state = NSOffState;
-    _btnAlignmentCenter.state = NSOffState;
-    _btnAlignmentJustified.state = NSOffState;
+    _btnAlignmentLeft.state = NSControlStateValueOff;
+    _btnAlignmentRight.state = NSControlStateValueOff;
+    _btnAlignmentCenter.state = NSControlStateValueOff;
+    _btnAlignmentJustified.state = NSControlStateValueOff;
 
     switch (_para.alignment) {
         case NSTextAlignmentRight:
-            _btnAlignmentRight.state = NSOnState;
+            _btnAlignmentRight.state = NSControlStateValueOn;
             break;
         case NSTextAlignmentCenter:
-            _btnAlignmentCenter.state = NSOnState;
+            _btnAlignmentCenter.state = NSControlStateValueOn;
             break;
         case NSTextAlignmentJustified:
-            _btnAlignmentJustified.state = NSOnState;
+            _btnAlignmentJustified.state = NSControlStateValueOn;
             break;
         default:
-            _btnAlignmentLeft.state = NSOnState;
+            _btnAlignmentLeft.state = NSControlStateValueOn;
             break;
     }
+}
+
+// Shows value in a text field + stepper pair, without a "-0"
+- (void)showValue:(CGFloat)value textField:(NSTextField *)textField stepper:(NSStepper *)stepper {
+    if (value == 0)
+        value = 0;
+    textField.doubleValue = value;
+    stepper.doubleValue = value;
+}
+
+// Sets an NSParagraphStyle property of _para by key, shows it and saves
+- (void)setParagraphValue:(CGFloat)value forKey:(NSString *)key
+                textField:(NSTextField *)textField stepper:(NSStepper *)stepper {
+    if ([[_para valueForKey:key] doubleValue] == value)
+        return;
+    [_para setValue:@(value) forKey:key];
+    [self showValue:value textField:textField stepper:stepper];
+    [self saveChange];
+}
+
+// Sets a non-paragraph attribute (kerning, baseline offset), shows it and saves
+- (void)setAttributeValue:(CGFloat)value forKey:(NSAttributedStringKey)key
+                textField:(NSTextField *)textField stepper:(NSStepper *)stepper {
+    NSMutableDictionary *attDict = _style.attributeDict.mutableCopy;
+    if ([attDict[key] doubleValue] == value)
+        return;
+    attDict[key] = @(value);
+    [self showValue:value textField:textField stepper:stepper];
+    [self saveNonParagraphChange:attDict];
 }
 
 - (void)saveChange {
@@ -99,10 +144,17 @@
 // Baseline offset and character spacing are not NSParagraphStyle properties,
 // so the methods that change those pass their modified attribute dictionary here
 - (void)saveNonParagraphChange:(NSMutableDictionary *)attDict {
-    Theme *theme = [[Preferences instance] cloneThemeIfNotEditable];
     GlkStyle *style = _style;
-    NSUInteger stylevalue = (NSUInteger)((NSNumber *)(style.attributeDict)[@"GlkStyle"]).integerValue;
-    NSString *styleName = [style testGridStyle] ? gGridStyleNames[stylevalue] : gBufferStyleNames[stylevalue];
+    // Without a valid GlkStyle index we can't find the matching style in the
+    // cloned theme, and index 0 would silently edit the wrong style
+    NSNumber *styleNumber = style.attributeDict[@"GlkStyle"];
+    NSArray *styleNames = [style testGridStyle] ? gGridStyleNames : gBufferStyleNames;
+    if (!styleNumber || styleNumber.integerValue < 0 || (NSUInteger)styleNumber.integerValue >= styleNames.count) {
+        NSLog(@"ParagraphPopOver: style has no valid GlkStyle index: %@", styleNumber);
+        return;
+    }
+    NSString *styleName = styleNames[(NSUInteger)styleNumber.integerValue];
+    Theme *theme = [[Preferences instance] cloneThemeIfNotEditable];
     _style = [theme valueForKey:styleName];
     style = _style;
     attDict[NSParagraphStyleAttributeName] = _para.copy;
@@ -112,146 +164,93 @@
         [Preferences rebuildTextAttributes];
     else
         [[NSNotificationCenter defaultCenter]
-         postNotification:[NSNotification notificationWithName:@"PreferencesChanged" object:theme]];
+         postNotification:[NSNotification notificationWithName:kPreferencesChangedNotification object:theme]];
 }
 
 - (IBAction)changeAlignment:(id)sender {
-    if ([sender tag] == _para.alignment)
+    // Map by button rather than by tag: the NSTextAlignment values of Right
+    // and Center differ between x86_64 and arm64
+    NSTextAlignment alignment;
+    if (sender == _btnAlignmentLeft)
+        alignment = NSTextAlignmentLeft;
+    else if (sender == _btnAlignmentRight)
+        alignment = NSTextAlignmentRight;
+    else if (sender == _btnAlignmentCenter)
+        alignment = NSTextAlignmentCenter;
+    else if (sender == _btnAlignmentJustified)
+        alignment = NSTextAlignmentJustified;
+    else
         return;
-    _para.alignment = [sender tag];
+    if (alignment == _para.alignment)
+        return;
+    _para.alignment = alignment;
     [self saveChange];
     [self refreshAlignmentButtons];
 }
 
 - (IBAction)changeCharacterSpacing:(id)sender {
-    NSMutableDictionary *attDict =_style.attributeDict.mutableCopy;
-    if ([attDict[NSKernAttributeName] doubleValue] == [sender doubleValue]) {
-        return;
-    }
-
-    attDict[NSKernAttributeName] = @([sender doubleValue]);
-    _characterSpacingTextField.doubleValue = [sender doubleValue];
-    if ([_characterSpacingTextField.stringValue isEqualToString:@"-0"])
-        _characterSpacingTextField.stringValue = @"0";
-    _characterSpacingStepper.doubleValue = [sender doubleValue];
-
-    [self saveNonParagraphChange:attDict];
+    [self setAttributeValue:[sender doubleValue] forKey:NSKernAttributeName
+                  textField:_characterSpacingTextField stepper:_characterSpacingStepper];
 }
 
 - (IBAction)changeLineSpacing:(id)sender {
-    if (_para.lineSpacing == [sender doubleValue]) {
-        return;
-    }
-    _para.lineSpacing = [sender doubleValue];
-    _lineSpacingTextField.doubleValue = _para.lineSpacing;
-    _lineSpacingStepper.doubleValue = _para.lineSpacing;
-    [self saveChange];
+    [self setParagraphValue:[sender doubleValue] forKey:@"lineSpacing"
+                  textField:_lineSpacingTextField stepper:_lineSpacingStepper];
 }
 
 - (IBAction)changeParagraphSpacingBefore:(id)sender {
-    if (_para.paragraphSpacingBefore == [sender doubleValue]) {
-        return;
-    }
-    _para.paragraphSpacingBefore = [sender doubleValue];
-    _spacingBeforeTextField.doubleValue = _para.paragraphSpacingBefore;
-    _spacingBeforeStepper.doubleValue = _para.paragraphSpacingBefore;
-    [self saveChange];
+    [self setParagraphValue:[sender doubleValue] forKey:@"paragraphSpacingBefore"
+                  textField:_spacingBeforeTextField stepper:_spacingBeforeStepper];
 }
 
 - (IBAction)changeParagraphSpacingAfter:(id)sender {
-    if (_para.paragraphSpacing == [sender doubleValue]) {
-        return;
-    }
-    _para.paragraphSpacing = [sender doubleValue];
-    _spacingAfterTextField.doubleValue = _para.paragraphSpacing;
-    _spacingAfterStepper.doubleValue = _para.paragraphSpacing;
-    [self saveChange];
+    [self setParagraphValue:[sender doubleValue] forKey:@"paragraphSpacing"
+                  textField:_spacingAfterTextField stepper:_spacingAfterStepper];
 }
 
 - (IBAction)changeLeadingIndent:(id)sender {
-    if (_para.headIndent == [sender doubleValue]) {
-        return;
-    }
-    _para.headIndent = [sender doubleValue];
-    _indentLeadingTextField.doubleValue = _para.headIndent;
-    _indentLeadingStepper.doubleValue = _para.headIndent;
-    [self saveChange];
+    [self setParagraphValue:[sender doubleValue] forKey:@"headIndent"
+                  textField:_indentLeadingTextField stepper:_indentLeadingStepper];
 }
 
 - (IBAction)changeTrailingIndent:(id)sender {
-    if (_para.tailIndent == -[sender doubleValue]) {
+    // Shown positive, stored negative
+    CGFloat value = [sender doubleValue];
+    if (_para.tailIndent == -value)
         return;
-    }
-    _para.tailIndent = -[sender doubleValue];
-    _indentTrailingTextField.doubleValue = -_para.tailIndent;
-    if ([_indentTrailingTextField.stringValue isEqualToString:@"-0"])
-        _indentTrailingTextField.stringValue = @"0";
-    _indentTrailingStepper.doubleValue = -_para.tailIndent;
+    _para.tailIndent = -value;
+    [self showValue:value textField:_indentTrailingTextField stepper:_indentTrailingStepper];
     [self saveChange];
 }
 
 - (IBAction)changeFirstLineIndent:(id)sender {
-    if (_para.firstLineHeadIndent == [sender doubleValue]) {
-        return;
-    }
-    _para.firstLineHeadIndent = [sender doubleValue];
-    _indentFirstLineTextField.doubleValue = _para.firstLineHeadIndent;
-    _indentFirstLineStepper.doubleValue = _para.firstLineHeadIndent;
-    [self saveChange];
+    [self setParagraphValue:[sender doubleValue] forKey:@"firstLineHeadIndent"
+                  textField:_indentFirstLineTextField stepper:_indentFirstLineStepper];
 }
 
 - (IBAction)changeLineMultiple:(id)sender {
-    if (_para.lineHeightMultiple == [sender doubleValue]) {
-        return;
-    }
-    _para.lineHeightMultiple = [sender doubleValue];
-    _lineMultipleTextField.doubleValue = _para.lineHeightMultiple;
-    _lineMultipleStepper.doubleValue = _para.lineHeightMultiple;
-    [self saveChange];
+    [self setParagraphValue:[sender doubleValue] forKey:@"lineHeightMultiple"
+                  textField:_lineMultipleTextField stepper:_lineMultipleStepper];
 }
 
 - (IBAction)changeBaselineOffset:(id)sender {
-    NSMutableDictionary *attDict =_style.attributeDict.mutableCopy;
-    if ([attDict[NSBaselineOffsetAttributeName] doubleValue] == [sender doubleValue]) {
-        return;
-    }
-
-    attDict[NSBaselineOffsetAttributeName] = @([sender doubleValue]);
-    _baseLineOffsetTextField.doubleValue = [sender doubleValue];
-    _baseLineOffsetStepper.doubleValue = [sender doubleValue];
-
-    [self saveNonParagraphChange:attDict];
+    [self setAttributeValue:[sender doubleValue] forKey:NSBaselineOffsetAttributeName
+                  textField:_baseLineOffsetTextField stepper:_baseLineOffsetStepper];
 }
 
 - (IBAction)changeMaxLineHeight:(id)sender {
-    if (_para.maximumLineHeight == [sender doubleValue]) {
-        return;
-    }
-    _para.maximumLineHeight = [sender doubleValue];
-    _maxLineHeightTextField.doubleValue = _para.maximumLineHeight;
-    _maxLineHeightStepper.doubleValue = _para.maximumLineHeight;
-    [self saveChange];
+    [self setParagraphValue:[sender doubleValue] forKey:@"maximumLineHeight"
+                  textField:_maxLineHeightTextField stepper:_maxLineHeightStepper];
 }
 
 - (IBAction)changeMinLineHeight:(id)sender {
-    if (_para.minimumLineHeight == [sender doubleValue]) {
-        return;
-    }
-    _para.minimumLineHeight = [sender doubleValue];
-    _minLineHeightTextField.doubleValue = _para.minimumLineHeight;
-    _minLineHeightStepper.doubleValue = _para.minimumLineHeight;
-    [self saveChange];
+    [self setParagraphValue:[sender doubleValue] forKey:@"minimumLineHeight"
+                  textField:_minLineHeightTextField stepper:_minLineHeightStepper];
 }
 
 - (IBAction)changeHyphenation:(id)sender {
-    if (_para.hyphenationFactor == [sender floatValue]) {
-        return;
-    }
-    _para.hyphenationFactor = [sender floatValue];
-    _hyphenationTextField.floatValue = _para.hyphenationFactor;
-    _hyphenationStepper.floatValue = _para.hyphenationFactor;
-    [self saveChange];
+    [self setParagraphValue:[sender floatValue] forKey:@"hyphenationFactor"
+                  textField:_hyphenationTextField stepper:_hyphenationStepper];
 }
-
 
 @end

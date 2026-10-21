@@ -7,46 +7,36 @@
 
 static channel_t *gli_channellist = NULL;
 
-extern char *gli_workdir;
-
 static int loadsound(int sound)
 {
     glui32 chunktype;
     FILE *file;
-    char *buf;
     long pos = 0;
     long len;
     char filename[PATH_MAX];
-    
+
     if (win_findsound(sound))
         return TRUE;
-    
+
     if (!giblorb_is_resource_map())
     {
-        int namelength = sound / 10 + 6;
-        snprintf(filename, namelength + gli_parentdirlength, "%s/SND%d", gli_parentdir, sound);
-
-        fprintf(stderr, "loadsound %s\n", filename);
+        /* A file beside the game; the app reads it itself, all that is
+           needed here is its name and length. */
+        snprintf(filename, sizeof(filename), "%s/SND%d", gli_parentdir, sound);
 
         file = fopen(filename, "rb");
         if (!file)
             return FALSE;
 
-        fseek(file, 0, 2);
-        len = ftell(file);
-        fseek(file, 0, 0);
-
-        buf = malloc(len);
-        if (!buf)
+        if (fseek(file, 0, SEEK_END) != 0)
         {
             fclose(file);
             return FALSE;
         }
-
-        fread(buf, len, 1, file);
-
+        len = ftell(file);
         fclose(file);
-        free(buf);
+        if (len == -1)
+            return FALSE;
     }
     else
     {
@@ -83,10 +73,10 @@ schanid_t glk_schannel_create_ext(glui32 rock, glui32 volume)
 	return NULL;
     
     chan = malloc(sizeof(channel_t));
-    
+
     if (!chan)
 	return NULL;
-    
+
     chan->rock = rock;
     chan->peer = win_newchan(volume);
     if (chan->peer == -1)
@@ -103,10 +93,12 @@ schanid_t glk_schannel_create_ext(glui32 rock, glui32 volume)
     if (chan->next) {
         chan->next->prev = chan;
     }
-    
+
     if (gli_register_obj)
 	chan->disprock = (*gli_register_obj)(chan, gidisp_Class_Schannel);
-    
+    else
+	chan->disprock.ptr = NULL;
+
     return chan;
 }
 
@@ -120,10 +112,12 @@ void glk_schannel_destroy(schanid_t chan)
     }
     
     glk_schannel_stop(chan);
-    
-    if (gli_unregister_obj)
+
+    if (gli_unregister_obj) {
 	(*gli_unregister_obj)(chan, gidisp_Class_Schannel, chan->disprock);
-    
+	chan->disprock.ptr = NULL;
+    }
+
     win_delchan(chan->peer);
     
     prev = chan->prev;
@@ -188,7 +182,7 @@ glui32 glk_schannel_play_ext(schanid_t chan, glui32 snd, glui32 repeats,
     }
     
     if (!loadsound(snd)) {
-        fprintf(stderr, "loadsound %d returned false\n", snd);
+        gli_debug_log("loadsound %d returned false\n", snd);
         return FALSE;
     }
     
@@ -214,8 +208,6 @@ void glk_schannel_pause(schanid_t chan)
     }
 
     win_pause(chan->peer);
-
-//    chan->paused = TRUE;
 }
 
 void glk_schannel_unpause(schanid_t chan)
@@ -227,8 +219,6 @@ void glk_schannel_unpause(schanid_t chan)
     }
 
     win_unpause(chan->peer);
-
-//    chan->paused = 0;
 }
 
 
@@ -255,6 +245,13 @@ glui32 glk_schannel_play_multi(schanid_t *chanarray, glui32 chancount,
 {
     glui32 i;
     glui32 successes = 0;
+
+    if (chancount != soundcount)
+    {
+        gli_strict_warning("schannel_play_multi: channel and sound counts differ.");
+        if (soundcount < chancount)
+            chancount = soundcount;
+    }
 
     for (i = 0; i < chancount; i++)
     {

@@ -11,7 +11,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface NSData (Categories)
 
-@property (NS_NONATOMIC_IOSONLY, readonly, copy) NSString * _Nonnull md5String;
 @property (NS_NONATOMIC_IOSONLY, readonly, copy) NSString * _Nonnull sha256String;
 
 // Computes the game signature, which is a 64-character string unique to the
@@ -26,6 +25,11 @@ NS_ASSUME_NONNULL_BEGIN
 + (nullable NSData *)imageDataFromRetroURL:(NSURL *)url;
 + (nullable NSData *)imageDataFromNeoURL:(NSURL *)url;
 + (nullable NSData *)imageDataFromMG1URL:(NSURL *)url;
+
+// Reads length bytes at offset in a file, or everything from offset to the
+// end if length is 0. The result can be short. Returns nil, and sets
+// outError, if the file cannot be opened or nothing is read.
++ (nullable NSData *)dataFromFileURL:(NSURL *)url offset:(NSUInteger)offset length:(NSUInteger)length error:(NSError **)outError;
 
 @end
 

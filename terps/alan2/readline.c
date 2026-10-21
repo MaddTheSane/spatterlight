@@ -10,6 +10,7 @@
 #include "main.h"
 #include "glk.h"
 #include "glkio.h"
+#include "glkmedia.h"
 
 /*======================================================================
 
@@ -23,6 +24,11 @@
 Boolean readline(char usrbuf[])
 {
   event_t event;
+#ifdef SPATTERLIGHT
+  /* Nothing the media layer is holding back may sit there across a
+     prompt, waiting for text that will not come until the player types */
+  glkmedia_flush_output();
+#endif
   glk_request_line_event(glkMainWin, usrbuf, 255, 0);
   /* FIXME: buffer size should be infallible: all existing calls use 256 or
      80 character buffers, except parse which uses LISTLEN (currently 100)
@@ -308,7 +314,7 @@ static void upArrow(char ch)
   histp = (histp+HISTORYLENGTH-1)%HISTORYLENGTH;
 
   /* Copy the history and write it */
-  strcpy((char *)buffer, (char *)history[histp]);
+  strncpy((char *)buffer, (char *)history[histp], LINELENGTH);
   bufidx = strlen((char *)buffer);
   write(1, (void *)buffer, strlen((char *)buffer));
 
@@ -330,7 +336,7 @@ static void downArrow(char ch)
 
   /* If we are not at the most recent history entry, copy the history and write it */
   if (histp != histidx) {
-    strcpy((char *)buffer, (char *)history[histp]);
+    strncpy((char *)buffer, (char *)history[histp], LINELENGTH);
     bufidx = strlen((char *)buffer);
     write(1, (void *)buffer, strlen((char *)buffer));
   } else {
@@ -398,7 +404,7 @@ static void delFwd(char ch)
     int i;
 
     change = TRUE;
-    strcpy((char *)&buffer[bufidx], (char *)&buffer[bufidx+1]);
+    strncpy((char *)&buffer[bufidx], (char *)&buffer[bufidx+1], LINELENGTH - bufidx);
     write(1, (void *)&buffer[bufidx], strlen((char *)&buffer[bufidx]));
     write(1, " ", 1);
     for (i = 0; i <= strlen((char *)&buffer[bufidx]); i++) backspace();
@@ -424,7 +430,7 @@ static void newLine(char ch)
   if (change && strlen((char *)buffer) > 0) {
     if (history[histidx] == NULL)
       history[histidx] = (unsigned char *)allocate(LINELENGTH+1);
-    strcpy((char *)history[histidx], (char *)buffer);
+    strncpy((char *)history[histidx], (char *)buffer, LINELENGTH);
     histidx = (histidx+1)%HISTORYLENGTH;
   }
 }
@@ -527,7 +533,7 @@ Boolean readline(char usrbuf[])
     execute(keymap, ch);
   }
   echoOn();
-  strcpy(usrbuf, (char *)buffer);  
+  strncpy(usrbuf, (char *)buffer, LINELENGTH);
   return TRUE;
 }
 

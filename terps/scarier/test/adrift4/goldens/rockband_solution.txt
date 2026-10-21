@@ -1,0 +1,28 @@
+1
+look
+get guitar
+turn on television
+turn on xbox
+play the game
+# The song is ten randomly coloured notes -- the game prints "You see a X
+# note!" and only `use X button` scores -- so this block is valid for one RNG
+# thread only.  Re-derived 2026-09-13 at SCR_SEED=1 under SCR_RNG=xoshiro, with
+# harness/rockband_notes.py.
+use blue button
+use red button
+use red button
+use red button
+use red button
+use yellow button
+use green button
+use yellow button
+use green button
+use green button
+north
+look
+open closet door
+look
+get finger
+south
+use finger on xbox
+unplug the power cord

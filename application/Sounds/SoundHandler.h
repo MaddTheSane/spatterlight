@@ -7,60 +7,15 @@
 
 #import <Foundation/Foundation.h>
 
-@class GlkSoundChannel, GlkController, SoundHandler;
+#import "SoundResource.h"
 
-typedef uint32_t glui32;
-typedef int32_t glsi32;
-
-
-typedef NS_ENUM(NSInteger, GlkSoundBlorbFormatType) {
-	GlkSoundBlorbFormatNone,
-    GlkSoundBlorbFormatMod,
-	GlkSoundBlorbFormatOggVorbis,
-	GlkSoundBlorbFormatFORM,
-	GlkSoundBlorbFormatAIFF,
-	GlkSoundBlorbFormatMP3,
-	GlkSoundBlorbFormatWave,
-	GlkSoundBlorbFormatMIDI,
-};
-
-#define MAXSND 32
+@class GlkSoundChannel, GlkController;
 
 NS_ASSUME_NONNULL_BEGIN
-
-@interface SoundFile : NSObject
-
-- (instancetype)initWithPath:(NSString *)path;
-- (void)resolveBookmark;
-
-@property (nullable) NSData *bookmark;
-@property (nullable) NSURL *URL;
-@property (weak) SoundHandler *handler;
-
-@end
-
-
-@interface SoundResource : NSObject
-
-- (instancetype)initWithFilename:(NSString *)filename offset:(NSUInteger)offset length:(NSUInteger)length;
-
-@property (NS_NONATOMIC_IOSONLY, readonly) BOOL load;
-
-@property (copy, nullable) NSData *data;
-@property (strong, nullable) SoundFile *soundFile;
-@property NSString *filename;
-@property NSUInteger offset;
-@property NSUInteger length;
-@property GlkSoundBlorbFormatType type;
-+ (GlkSoundBlorbFormatType)detectSoundFormatFromData:(NSData*)data;
-
-@end
-
 
 @interface SoundHandler : NSObject
 
 @property (strong) NSMutableDictionary <NSNumber *, SoundResource *> *resources;
-@property (strong) NSMutableDictionary *sfbplayers;
 @property (strong) NSMutableDictionary <NSNumber *, GlkSoundChannel *> *glkchannels;
 @property (strong) NSMutableDictionary <NSString *, SoundFile *> *files;
 @property glsi32 lastsoundresno;
@@ -72,6 +27,16 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)restartAll;
 - (void)stopAllAndCleanUp;
+
+- (void)nowPlayingStateDidChange;
+/// The game's title and cover image data, for system Now Playing.
+@property (readonly, nullable) NSString *nowPlayingTitle;
+@property (readonly, nullable) NSData *nowPlayingArtworkData;
+/// Channels holding music-like sound (see GlkSoundChannel.claimsNowPlaying).
+@property (readonly) NSArray<GlkSoundChannel *> *eligibleNowPlayingChannels;
+- (void)pauseEligibleNowPlayingChannels;
+- (void)unpauseEligibleNowPlayingChannels;
+- (BOOL)hasPlayingEligibleNowPlayingChannel;
 
 - (int)handleNewSoundChannel:(glui32)volume;
 - (void)handleDeleteChannel:(int)channel;
@@ -86,6 +51,9 @@ NS_ASSUME_NONNULL_BEGIN
                 channel:(int)channel
                duration:(glui32)duration
                  notify:(glui32)notify;
+
+- (void)playSpectrumBeepFrequency:(int)frequency duration:(int)millisecs;
+- (void)primeBeepAudio;
 
 - (void)handlePlaySoundOnChannel:(int)channel repeats:(glsi32)repeats notify:(glui32)notify;
 - (void)handleStopSoundOnChannel:(int)channel;

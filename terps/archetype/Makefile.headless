@@ -1,0 +1,202 @@
+# Headless build of the Archetype interpreter for automated/regression testing.
+#
+# Instead of linking against Spatterlight's glkimp (which speaks a binary
+# protocol to the Cocoa front-end and aborts when run from a plain shell),
+# this links the interpreter against Andrew Plotkin's CheapGlk -- a stdio Glk
+# library shared with the Comprehend / Saga harnesses. The result,
+# `archetype_hl`, runs entirely in the terminal: it reads player commands from
+# stdin and writes the transcript to stdout.
+#
+# Usage:
+#   make -f Makefile.headless
+#   ./archetype_hl GORREVEN.ACX < commands.txt > transcript.txt
+#
+# where commands.txt is one command per line.
+
+CHEAPGLK_DIR := ../cheapglk
+COMMON_DIR   := ../common_utils
+OBJDIR       := headless_obj
+
+CXX ?= clang++
+CC  ?= clang
+
+# -I$(CHEAPGLK_DIR) first so glk.h / glkstart.h resolve to CheapGlk's headers.
+COMMON_INC := -I. -I$(CHEAPGLK_DIR) -I$(COMMON_DIR)
+CXXFLAGS   := -std=c++14 -O0 -g -Wall -Wno-unknown-pragmas \
+              -Wno-macro-redefined -Wno-format $(COMMON_INC) \
+              -DGARGLK -DSPATTERLIGHT -DARCHETYPE_HEADLESS
+CFLAGS     := -O0 -g -Wall -w $(COMMON_INC) -DGARGLK -DSPATTERLIGHT -DARCHETYPE_HEADLESS
+
+CXX_SRCS := \
+    archetype_compat.cpp \
+    archetype.cpp \
+    archetype_string.cpp \
+    array.cpp \
+    crypt.cpp \
+    error.cpp \
+    expression.cpp \
+    game_stat.cpp \
+    glk_main.cpp \
+    heap_sort.cpp \
+    id_table.cpp \
+    interpreter.cpp \
+    keywords.cpp \
+    linked_list.cpp \
+    misc.cpp \
+    parser.cpp \
+    saveload.cpp \
+    semantic.cpp \
+    sys_object.cpp \
+    timestamp.cpp \
+    token.cpp
+
+C_SRCS := glkstart.c
+
+OBJS := $(addprefix $(OBJDIR)/,$(CXX_SRCS:.cpp=.o) $(C_SRCS:.c=.o) randomness.o)
+
+CHEAPGLK_LIB := $(CHEAPGLK_DIR)/libcheapglk.a
+
+archetype_hl: $(OBJS) $(CHEAPGLK_LIB)
+	$(CXX) -o $@ $(OBJS) $(CHEAPGLK_LIB)
+
+$(CHEAPGLK_LIB):
+	$(MAKE) -C $(CHEAPGLK_DIR)
+
+$(OBJDIR):
+	mkdir -p $(OBJDIR)
+
+$(OBJDIR)/%.o: %.cpp | $(OBJDIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(OBJDIR)/%.o: %.c | $(OBJDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OBJDIR)/randomness.o: $(COMMON_DIR)/randomness.c | $(OBJDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -rf $(OBJDIR) archetype_hl
+
+# Regression test: replay a full winning walkthrough of "The Gorreven Papers"
+# and diff the transcript against the committed ground truth. The story file
+# is not vendored here; point GORREVEN at a copy of GORREVEN.ACX (it ships
+# with the Archetype 1.01 distribution).
+GORREVEN ?= $(HOME)/Downloads/arch101/GORREVEN.ACX
+
+regress: archetype_hl
+	@if [ ! -f "$(GORREVEN)" ]; then \
+		echo "regress: story file not found at $(GORREVEN); set GORREVEN=/path/to/GORREVEN.ACX"; exit 2; fi
+	@./archetype_hl "$(GORREVEN)" < test/gorreven_walkthrough.txt 2>&1 \
+		| sed '/Cheap Glk Implementation/d' > /tmp/gorreven_got.txt
+	@if diff -u test/gorreven_expected.txt /tmp/gorreven_got.txt > /tmp/gorreven_diff.txt; then \
+		grep -q "saved the free world" /tmp/gorreven_got.txt \
+			&& echo "regress: PASS (byte-exact, game won)" \
+			|| { echo "regress: FAIL (transcript matched but no win marker)"; exit 1; }; \
+	else \
+		echo "regress: FAIL (transcript diverged):"; head -40 /tmp/gorreven_diff.txt; exit 1; \
+	fi
+
+# Regression test: replay a full winning walkthrough of "Starship Solitaire"
+# and diff the transcript against the committed ground truth. As with Gorreven,
+# the story file is not vendored; point STARSHIP at a copy of STARSHIP.ACX (it
+# ships with the Archetype 1.01 distribution).
+STARSHIP ?= $(HOME)/Downloads/arch101/STARSHIP.ACX
+
+regress-starship: archetype_hl
+	@if [ ! -f "$(STARSHIP)" ]; then \
+		echo "regress-starship: story file not found at $(STARSHIP); set STARSHIP=/path/to/STARSHIP.ACX"; exit 2; fi
+	@./archetype_hl "$(STARSHIP)" < test/starship_walkthrough.txt 2>&1 \
+		| sed '/Cheap Glk Implementation/d' > /tmp/starship_got.txt
+	@if diff -u test/starship_expected.txt /tmp/starship_got.txt > /tmp/starship_diff.txt; then \
+		grep -q "You have succeeded" /tmp/starship_got.txt \
+			&& echo "regress-starship: PASS (byte-exact, game won)" \
+			|| { echo "regress-starship: FAIL (transcript matched but no win marker)"; exit 1; }; \
+	else \
+		echo "regress-starship: FAIL (transcript diverged):"; head -40 /tmp/starship_diff.txt; exit 1; \
+	fi
+
+# Regression test: replay a full walkthrough of "Bare Bones" (BARE), the
+# tutorial demo game from the Archetype distribution. It has no win condition,
+# so the walkthrough instead tours every feature (the gated trapdoor exit, the
+# openable furniture, the plural/indefinite naming, the custom 'put...in' verb,
+# falling into the rat-infested basement and escaping with the rope) and ends
+# on a clean quit. As before, the story file is not vendored; point BARE at a
+# copy of BARE.ACX from the Archetype 1.01 distribution.
+BARE ?= $(HOME)/Downloads/arch101/BARE.ACX
+
+regress-bare: archetype_hl
+	@if [ ! -f "$(BARE)" ]; then \
+		echo "regress-bare: story file not found at $(BARE); set BARE=/path/to/BARE.ACX"; exit 2; fi
+	@./archetype_hl "$(BARE)" < test/bare_walkthrough.txt 2>&1 \
+		| sed '/Cheap Glk Implementation/d' > /tmp/bare_got.txt
+	@if diff -u test/bare_expected.txt /tmp/bare_got.txt > /tmp/bare_diff.txt; then \
+		grep -q "Goodbye; thanks for playing" /tmp/bare_got.txt \
+			&& echo "regress-bare: PASS (byte-exact, completed)" \
+			|| { echo "regress-bare: FAIL (transcript matched but no completion marker)"; exit 1; }; \
+	else \
+		echo "regress-bare: FAIL (transcript diverged):"; head -40 /tmp/bare_diff.txt; exit 1; \
+	fi
+
+# Regression test for the engine-level meta commands (transcript / undo /
+# restart), which the interpreter layers on top of any story since the Archetype
+# games themselves define none. The BARE walkthrough exercises an in-play UNDO
+# (revert a trapdoor push), a transcript on/off toggle, and -- the headline --
+# UNDO *after death*: it walks into the rat pit, gets killed, picks UNDO from the
+# end-of-game menu, and goes on to escape. ARCHETYPE_TRANSCRIPT points the
+# headless transcript at a throwaway file (no interactive file prompt); CheapGlk
+# sanitizes the name to a .txt in the CWD, which we remove afterwards.
+regress-meta: archetype_hl
+	@if [ ! -f "$(BARE)" ]; then \
+		echo "regress-meta: story file not found at $(BARE); set BARE=/path/to/BARE.ACX"; exit 2; fi
+	@ARCHETYPE_TRANSCRIPT=bare_meta_transcript ./archetype_hl "$(BARE)" \
+		< test/bare_meta_walkthrough.txt 2>&1 \
+		| sed '/Cheap Glk Implementation/d' > /tmp/bare_meta_got.txt
+	@rm -f bare_meta_transcript.txt
+	@if diff -u test/bare_meta_expected.txt /tmp/bare_meta_got.txt > /tmp/bare_meta_diff.txt; then \
+		grep -q "Goodbye; thanks for playing" /tmp/bare_meta_got.txt \
+			&& grep -q "chew me to pieces" /tmp/bare_meta_got.txt \
+			&& echo "regress-meta: PASS (byte-exact; undo/transcript/undo-after-death)" \
+			|| { echo "regress-meta: FAIL (transcript matched but markers missing)"; exit 1; }; \
+	else \
+		echo "regress-meta: FAIL (transcript diverged):"; head -40 /tmp/bare_meta_diff.txt; exit 1; \
+	fi
+
+# Unit regression for the SORT system object (heap_sort.cpp). Needs no story
+# file: it drives drop_str_on_heap / pop_heap directly and checks ascending
+# order. Reuses the interpreter objects and CheapGlk via its own glk_main()
+# (test/heap_sort_test.cpp), so glk_main.o / glkstart.o are swapped out.
+HEAP_TEST_OBJS := $(filter-out $(OBJDIR)/glk_main.o $(OBJDIR)/glkstart.o,$(OBJS)) $(OBJDIR)/heap_sort_test.o
+
+$(OBJDIR)/heap_sort_test.o: test/heap_sort_test.cpp | $(OBJDIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+archetype_heap_test: $(HEAP_TEST_OBJS) $(CHEAPGLK_LIB)
+	$(CXX) -o $@ $(HEAP_TEST_OBJS) $(CHEAPGLK_LIB)
+
+regress-heap: archetype_heap_test
+	@./archetype_heap_test 2>&1 | sed '/Cheap Glk Implementation/d' > /tmp/heap_got.txt
+	@if grep -q "HEAP SORT TEST: PASS" /tmp/heap_got.txt; then \
+		echo "regress-heap: PASS (sorter returns ascending order)"; \
+	else \
+		echo "regress-heap: FAIL:"; cat /tmp/heap_got.txt; exit 1; \
+	fi
+
+# Regression for the article-stripping fix (String::del). Filler words a/an/the
+# must be removed without corrupting the surrounding command, so a command typed
+# with articles must parse identically to the same command without them. Runs
+# both forms through Gorreven and asserts byte-identical transcripts (needs
+# GORREVEN; catches the del() off-by-one, which glued the article onto the verb).
+regress-article: archetype_hl
+	@if [ ! -f "$(GORREVEN)" ]; then \
+		echo "regress-article: story file not found at $(GORREVEN); set GORREVEN=/path/to/GORREVEN.ACX"; exit 2; fi
+	@./archetype_hl "$(GORREVEN)" < test/article_with.txt 2>&1 | sed '/Cheap Glk Implementation/d' > /tmp/article_with.txt
+	@./archetype_hl "$(GORREVEN)" < test/article_without.txt 2>&1 | sed '/Cheap Glk Implementation/d' > /tmp/article_without.txt
+	@if diff -u /tmp/article_without.txt /tmp/article_with.txt > /tmp/article_diff.txt; then \
+		echo "regress-article: PASS (articles stripped without corrupting the command)"; \
+	else \
+		echo "regress-article: FAIL (article changed parsing):"; head -40 /tmp/article_diff.txt; exit 1; \
+	fi
+
+regress-all: regress regress-starship regress-bare regress-meta regress-heap regress-article
+
+.PHONY: clean regress regress-starship regress-bare regress-meta regress-heap regress-article regress-all

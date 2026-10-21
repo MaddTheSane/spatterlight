@@ -58,6 +58,7 @@ extern int gli_flicker;
 extern int gli_zmachine_terp;
 extern int gli_z6_graphics;
 extern int gli_z6_colorize;
+extern int gli_comprehend_graphics;
 extern int gli_zmachine_no_err_win;
 extern int gli_voiceover_on;
 
@@ -105,7 +106,7 @@ void win_maketransparent(int name);
 void win_initchar(int name);
 void win_cancelchar(int name);
 void win_initline(int name, int cap, int len, void *buf);
-void win_cancelline(int name, int cap, int *len, char *buf);
+int win_cancelline(int name, int cap, int unicode, void *buf);
 void win_setlink(int name, int val);
 void win_initlink(int name);
 void win_cancellink(int name);
@@ -128,10 +129,16 @@ void win_moveto(int name, int x, int y);
 
 // Infocom beep 1 or 2
 void win_beep(int type);
+// ZX Spectrum BEEP from raw Quill (pitch, duration) bytes (unquill)
+void win_beep_spectrum(int pitch, int duration);
+// Accurate ZX Spectrum BEEP from ROM-beeper (pitch=HL, cycles=DE) values (Taylor)
+void win_beep_zx(int pitch, int cycles);
+// Synthesised square-wave tone at a given frequency (Hz) and length (ms) (AGiliTy)
+void win_beep_freq(int frequency, int millisecs);
 void win_timer(int millisecs);
 void win_select(event_t *event, int block);
 void win_flush(void);
-void win_print(int name, int ch, int at);
+void win_print(int name, glui32 ch, int at);
 
 // Glk extension from Gargoyle needed to support
 // pre-loaded line input. If the string str matches
@@ -143,7 +150,8 @@ void win_flowbreak(int name);
 int  win_findimage(int resno);
 void win_loadimage(int resno, const char *filename, int offset, int reslen);
 void win_sizeimage(glui32 *width, glui32 *height);
-void win_drawimage(int name, glui32 val1, glui32 val2, glui32 width, glui32 height);
+void win_drawimage(int name, glui32 val1, glui32 val2, glui32 width, glui32 height,
+                   glui32 imagerule, glui32 maxwidth);
 
 void win_stylehint(int type, int styl, int hint, int val);
 void win_clearhint(int type, int styl, int hint);
@@ -153,7 +161,12 @@ int win_newchan(glui32 volume);
 void win_delchan(int chan);
 void win_setvolume(int chan, int vol, int duration, int notify);
 int  win_findsound(int resno);
-void win_loadsound(int resno, char *filename, int offset, int reslen);
+void win_loadsound(int resno, const char *filename, int offset, int reslen);
+
+/* garglk_add_resource_from_file() for any path, not only a name in the game's
+ * directory: a temp file the terp decoded, a subfolder.  See fileresource.c. */
+glui32 gli_add_resource_from_path(glui32 usage, const char *path,
+                                  glui32 offset, glui32 length);
 void win_playsound(int chan, int repeats, int notify);
 void win_stopsound(int chan);
 void win_pause(int chan);
@@ -170,7 +183,7 @@ void win_reset(void);
 int win_cols(int name);
 int win_lines(int name);
 int win_canprint(glui32 val);
-void win_purgeimage(glui32 imageindex, const char *filename, int reslen);
+void win_purgeimage(glui32 imageindex, const char *filename);
 
 typedef enum JourneyMenuType {
     kJMenuTypeParty,
@@ -198,6 +211,8 @@ typedef enum InfocomV6MenuType {
 
 void win_menuitem(int type, glui32 column, glui32 line, glui32 stopflag, char *str, int len);
 
+void win_testresult(int result);
+
 void gli_close_all_file_streams(void);
 
 /* unicode case mapping */
@@ -213,10 +228,6 @@ and that's followed by length unicode values. */
 typedef glui32 gli_decomp_block_t[2]; /* count, position */
 /* The position points to a subarray of the unigen_decomp_array.
  If the count is zero, there is no decomposition. */
-
-void gli_putchar_utf8(glui32 val, FILE *fl);
-glui32 gli_getchar_utf8(FILE *fl);
-glui32 gli_parse_utf8(unsigned char *buf, glui32 buflen, glui32 *out, glui32 outlen);
 
 /* blorb resources */
 
@@ -237,14 +248,16 @@ extern gidispatch_rock_t (*gli_restore_arr)(long bufkey, glui32 len, char *typec
 /* This macro is called whenever the library code catches an error
  or illegal operation from the game program. */
 
-//#define gli_strict_warning(msg) do { fprintf(stderr, "glk: %s\n", msg); } while (0)
+#define gli_strict_warning(msg) do { win_showerror(msg); if (gli_error_handling == ERRORS_ARE_FATAL) { exit(0); } } while (0)
 
-#define gli_strict_warning(msg) { win_showerror(msg); if (gli_error_handling == ERRORS_ARE_FATAL) { exit(0); } }
+/* Tracing for debugging glkimp itself. Compiled out of release builds;
+   real errors go to stderr with a plain fprintf. */
+#ifdef DEBUG
+#define gli_debug_log(...) fprintf(stderr, __VA_ARGS__)
+#else
+#define gli_debug_log(...) do { } while (0)
+#endif
 
-/* The overall screen size, as set by command-line options. A
- better implementation would check the real screen size
- somehow. */
-extern int gli_screenwidth, gli_screenheight;
 /* Should we assume that the terminal (or whatever is handling our
  stdin/stdout) is expecting UTF-8 encoding? Normally input and output
  will be the same, but they don't have to be. */
@@ -269,11 +282,6 @@ typedef struct grect_struct
     glui32 x1, y1;
 } grect_t;
 
-#define MAGIC_WINDOW_NUM (9876)
-#define MAGIC_STREAM_NUM (8769)
-#define MAGIC_FILEREF_NUM (7698)
-
-
 typedef struct attr_s
 {
     unsigned fgset   : 1;
@@ -288,7 +296,6 @@ typedef struct attr_s
 
 struct glk_window_struct {
 
-    glui32 magicnum;
     glui32 rock;
     glui32 type;
 
@@ -328,9 +335,6 @@ struct glk_window_struct {
     int char_request_uni;
     int mouse_request;
     int hyper_request;
-    //int more_request;
-    //int scroll_request;
-    //int image_loaded;
 
     glui32 echo_line_input;
     glui32 *line_terminators;
@@ -338,10 +342,6 @@ struct glk_window_struct {
 
     glui32 style;
 
-    //void *linebuf;
-    //glui32 linebuflen;
-    //int linecap;
-    //gidispatch_rock_t inarrayrock;
 
     attr_t attr;
 
@@ -378,7 +378,6 @@ void gli_delete_window(window_t *win);
 
 
 struct glk_stream_struct {
-    glui32 magicnum;
     glui32 rock;
 
     int tag;			/* for serialization */
@@ -396,7 +395,6 @@ struct glk_stream_struct {
     FILE *file;
     char *filename; /* Only needed for serialization */
     glui32 lastop; /* 0, filemode_Write, or filemode_Read */
-    //int textfile;
 
     /* for strtype_Resource */
     int isbinary;
@@ -420,7 +418,6 @@ struct glk_stream_struct {
 };
 
 struct glk_fileref_struct {
-    glui32 magicnum;
     glui32 rock;
 
     int tag;			/* for serialization */
@@ -438,7 +435,6 @@ struct glk_fileref_struct {
 extern void gli_initialize_misc(void);
 
 extern window_t *gli_new_window(glui32 type, glui32 rock); /* does not touch hierarchy */
-//extern window_t *gli_new_window(glui32 rock);
 
 extern void gli_delete_window(window_t *win);
 extern window_t *gli_window_get(void);
@@ -447,6 +443,10 @@ extern void gli_window_set_root(window_t *win);
 
 /* For autorestore */
 
+/* Bump this whenever the autosave archive changes incompatibly (a field
+   added, removed or reinterpreted). Older autosaves are then discarded
+   instead of misread. The app writes the same number into its GUI
+   autosave, so a bump discards both. Never rename an existing plist key. */
 #define AUTOSAVE_SERIAL_VERSION (10)
 
 extern void gli_replace_window_list(window_t *win);
@@ -468,7 +468,6 @@ extern void gli_sanity_check_filerefs(void);
 extern stream_t *gli_new_stream(int type, int readable, int writable,
                                 glui32 rock);
 extern void gli_delete_stream(stream_t *str);
-//extern strid_t gli_stream_open_pathname(char *pathname, int textmode, glui32 rock);
 extern strid_t gli_stream_open_pathname(char *pathname, int writemode,
                         int textmode, glui32 rock);
 extern void gli_stream_set_current(stream_t *str);
@@ -492,7 +491,6 @@ void gli_stop_all_sound_channels(void);
 
 struct glk_schannel_struct
 {
-    glui32 magicnum;
     glui32 rock;
 
     int peer;

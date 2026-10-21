@@ -1,0 +1,27 @@
+# After a reveal walk, enter Cellar, unlock, visit Door Room; end on Hub.
+# Expect Cellar--Door Room dotted (restricted exit, both seen).  Only Cellar's
+# side is drawn; the unrestricted Door Room--N link back loses the lineshow
+# race and would otherwise overpaint it solid.
+n
+s
+e
+ne
+w
+e
+s
+n
+u
+d
+in
+out
+out
+in
+sw
+ne
+se
+nw
+s
+open door
+s
+n
+n

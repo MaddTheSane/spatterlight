@@ -1,0 +1,133 @@
+# The ADRIFT Project (Mystery / Dana Crane, InsideADRIFT Summer Comp 2004).
+# Route: the author's own transcript from the comp package
+# (competition/wthroughs/"The ADRIFT Project Walkthrough.txt"), with three
+# repairs.  Score: 90/100, which is the game's ceiling -- the author's own run
+# ends "You finished 10 points short" and the missing ten really are
+# unreachable, see below.
+# The first two lines are NOT commands: the game asks for a player name and
+# then a gender before the first turn.  "Drifter" and "male" are ours; the
+# author played as "Mystery", which is why his transcript's endgame chant
+# reads differently.
+# (A former Repair 1 reordered "take slime" before "put pill in cup", because
+# TASK 41 "#Put Pill IN Slime" used to eat the put turn with its fail message
+# "Not yet." instead of falling through to the library put.  Settled live
+# against run400 on 2026-08-02 -- the real Runner's put-in runs when it can
+# complete, and the engine now matches -- so the author's original order is
+# restored: the pill goes into the cup via the library, and "take slime"
+# (TASK 40) chains the radioactive mix and its +10.  Details in
+# RUNNER_TESTS_TODO.md.)
+# Repair 2: one extra "z" before the endgame dash.  The bomb fuse is
+# random -- TASK 38 rerolls "bigboom = random(1,500863)" every single turn --
+# so the blast lands on a different turn under our pinned seed than it did in
+# the author's live run, and the escape route has to start one turn later.
+# Repair 3: a "score" before the winning "push button", so the golden records
+# the tally (80, +10 for the button = 90).
+# Four <waitkey> pauses (measured with SCR_MARK_WAITKEY=1).  The row sets
+# SCR_SKIP_WAITKEY=1; before that, 2026-08-16, the blank fillers meant to
+# answer them were landing on the Runner's name and gender prompts instead --
+# the player came out called "Anonymous", the gender question was asked and
+# refused twice, and the golden recorded all of it.  "Drifter" and "male"
+# below now reach the prompts they were written for.
+Drifter
+male
+x captain's chair
+get all from captain's chair
+wear suit
+open door
+s
+s
+stand on phone
+put battery in charger
+n
+sw
+x table
+take cup
+x sofa
+take string and tin
+ne
+se
+open wardrobe
+take gum and orb
+chew gum
+put gum on string
+put gum in drain
+nw
+sw
+open box
+unlock box
+open it
+take remote
+put batter in remote
+look
+put battery in remote
+ne
+d
+s
+s
+take pill
+open tin
+take pill
+put pill in cup
+take slime
+n
+n
+up
+s
+s
+pour slime in box
+put green orb in tube
+x tray
+take orb
+z
+z
+z
+z
+z
+z
+z
+z
+z
+z
+z
+z
+z
+z
+z
+z
+z
+activate orb
+look
+twist green orb
+where is sweeper
+n
+n
+d
+n
+up
+where is sweeper
+n
+s
+push button
+where is darwin
+z
+z
+z
+z
+z
+z
+where is darwin
+z
+zz
+z
+where is darwin
+z
+z
+n
+s
+d
+s
+x vent
+up
+x screen
+score
+push button

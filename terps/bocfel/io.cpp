@@ -1,4 +1,4 @@
-// Copyright 2010-2021 Chris Spiegel.
+// Copyright 2010-2025 Chris Spiegel.
 //
 // SPDX-License-Identifier: MIT
 
@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstring>
 #include <new>
+#include <optional>
 #include <stdexcept>
 #include <vector>
 
@@ -24,8 +25,13 @@ extern "C" {
 #include "util.h"
 
 #ifdef ZTERP_NO_STDIO
+#pragma message("warning: macro ZTERP_NO_STDIO is deprecated in favor of ZTERP_GLK_NO_STDIO")
+#define ZTERP_GLK_NO_STDIO
+#endif
+
+#ifdef ZTERP_GLK_NO_STDIO
 #ifndef ZTERP_GLK_UNIX
-#error ZTERP_NO_STDIO requires a Unix Glk
+#error ZTERP_GLK_NO_STDIO requires a Unix Glk
 #endif
 
 extern "C" {
@@ -33,7 +39,7 @@ extern "C" {
 }
 
 #ifndef GLKUNIX_FILEREF_CREATE_UNCLEANED
-#error ZTERP_NO_STDIO requires the extension glkunix_fileref_create_by_name_uncleaned
+#error ZTERP_GLK_NO_STDIO requires the extension glkunix_fileref_create_by_name_uncleaned
 // Prototype so that usage of this function doesn’t cause a compile error.
 frefid_t glkunix_fileref_create_by_name_uncleaned(glui32 usage, const char *name, glui32 rock);
 #endif
@@ -43,7 +49,9 @@ frefid_t glkunix_fileref_create_by_name_uncleaned(glui32 usage, const char *name
 // that an enum class actually contains a valid value. When checking the
 // value of the I/O object’s type, this method is used as a sort of
 // run-time type checker.
-void IO::bad_type() const {
+[[noreturn]]
+void IO::bad_type() const
+{
     die("internal error: unknown IO type %d", static_cast<int>(m_type));
 }
 
@@ -52,7 +60,8 @@ void IO::bad_type() const {
 // expect newline translation to be properly handled in these cases,
 // even though UNICODE_LINEFEED (10), as required by Glk (Glk API 0.7.0
 // §2.2), is used internally.
-bool IO::textmode() const {
+bool IO::textmode() const
+{
     return m_purpose == Purpose::Transcript || m_purpose == Purpose::Input;
 }
 
@@ -69,13 +78,13 @@ bool IO::textmode() const {
 // be able to access any file on the filesystem, and the latter needs to
 // prompt. This is a headache.
 //
-// Prompting is assumed to be necessary if “filename” is null.
-IO::IO(const std::string *filename, Mode mode, Purpose purpose) :
+// Prompting is assumed to be necessary if “filename” is std::nullopt.
+IO::IO(const std::optional<std::string> &filename, Mode mode, Purpose purpose, StreamRock namedglkrock) :
     m_mode(mode),
     m_purpose(purpose)
 {
 
-#if !defined(ZTERP_GLK) || !defined(ZTERP_NO_STDIO)
+#if !defined(ZTERP_GLK) || !defined(ZTERP_GLK_NO_STDIO)
     char smode[] = "wb";
 
     if (m_mode == Mode::ReadOnly) {
@@ -90,25 +99,35 @@ IO::IO(const std::string *filename, Mode mode, Purpose purpose) :
 #endif
 
     // No need to prompt.
-    if (filename != nullptr) {
-        // Use stdio in non-Glk mode always, and in Glk mode unless
-        // non-stdio mode is requested.
-#if !defined(ZTERP_GLK) || !defined(ZTERP_NO_STDIO)
-        m_type = Type::StandardIO;
-        m_file = File(std::fopen(filename->c_str(), smode), true);
-        if (m_file.stdio == nullptr) {
-            throw OpenError();
-        }
-#else
+    if (filename.has_value()) {
+        // In no-stdio mode, always use Glk. Otherwise, if Glk is
+        // enabled, use Glk I/O if a rock is provided. If no rock is
+        // provided, use stdio.
+#ifdef ZTERP_GLK_NO_STDIO
         open_as_glk([&filename](glui32 usage, glui32) {
             return glkunix_fileref_create_by_name_uncleaned(usage, filename->c_str(), 0);
-        });
+        }, namedglkrock);
+#else
+#if defined(ZTERP_GLK)
+        if (namedglkrock != StreamRock::None) {
+            open_as_glk([&filename](glui32 usage, glui32 filemode) {
+                return glk_fileref_create_by_name(usage, const_cast<char *>(filename->c_str()), 0);
+            }, namedglkrock);
+        } else
+#endif
+        {
+            m_type = Type::StandardIO;
+            m_file = File(std::fopen(filename->c_str(), smode), true);
+            if (m_file.stdio == nullptr) {
+                throw OpenError();
+            }
+        }
 #endif
     } else { // Prompt.
 #ifdef ZTERP_GLK
         open_as_glk([](glui32 usage, glui32 filemode) {
             return glk_fileref_create_by_prompt(usage, filemode, 0);
-        });
+        }, namedglkrock);
 #else
         std::string fn, prompt;
 
@@ -144,11 +163,9 @@ IO::IO(const std::string *filename, Mode mode, Purpose purpose) :
 }
 
 #ifdef ZTERP_GLK
-void IO::open_as_glk(const std::function<frefid_t(glui32 usage, glui32 filemode)> &create_fref)
+void IO::open_as_glk(const std::function<frefid_t(glui32 usage, glui32 filemode)> &create_fref, StreamRock rock)
 {
-    frefid_t ref;
-    glui32 usage, filemode;
-    usage = fileusage_BinaryMode;
+    glui32 usage = fileusage_BinaryMode, filemode;
 
     switch (m_purpose) {
     case Purpose::Data:
@@ -181,13 +198,13 @@ void IO::open_as_glk(const std::function<frefid_t(glui32 usage, glui32 filemode)
         throw OpenError();
     }
 
-    ref = create_fref(usage, filemode);
+    frefid_t ref = create_fref(usage, filemode);
     if (ref == nullptr) {
         throw OpenError();
     }
 
     m_type = Type::Glk;
-    m_file = File(glk_stream_open_file(ref, filemode, 0));
+    m_file = File(glk_stream_open_file(ref, filemode, static_cast<glui32>(rock)));
     glk_fileref_destroy(ref);
     if (m_file.glk == nullptr) {
         throw OpenError();
@@ -203,16 +220,15 @@ void IO::open_as_glk(const std::function<frefid_t(glui32 usage, glui32 filemode)
 // eliminates the need for code duplication.
 //
 // The I/O object starts out with the contents of the passed-in buffer,
-// which may be empty. The offset always starts at 0.
+// which may be empty.
 IO::IO(std::vector<uint8_t> buf, Mode mode) :
     m_file(File(std::move(buf))),
     m_type(Type::Memory),
     m_mode(mode),
     m_purpose(Purpose::Data)
 {
-    // Append isn’t used with memory-backed I/O, so it’s not supported.
-    if (m_mode != Mode::ReadOnly && m_mode != Mode::WriteOnly) {
-        throw OpenError();
+    if (mode == Mode::Append) {
+        m_file.backing.offset = m_file.backing.memory.size();
     }
 }
 
@@ -268,8 +284,8 @@ void IO::seek(long offset, SeekFrom whence)
         }
 
         // If seeking beyond the end, write zeros.
-        while (offset > m_file.backing.memory.size()) {
-            write8(0);
+        if (offset > m_file.backing.memory.size()) {
+            m_file.backing.memory.resize(offset, 0);
         }
 
         m_file.backing.offset = offset;
@@ -335,7 +351,7 @@ size_t IO::read(void *buf, size_t n)
                 return 0;
             }
 
-            s = remaining < n ? remaining : n;
+            s = remaining < (n - total) ? remaining : (n - total);
             if (s != 0) {
                 std::memcpy(buf, &b->memory[b->offset], s);
                 b->offset += s;
@@ -398,7 +414,7 @@ size_t IO::write(const void *buf, size_t n)
         Backing *b = &m_file.backing;
         auto remaining = b->memory.size() - b->offset;
 
-        if (m_mode != Mode::WriteOnly) {
+        if (m_mode != Mode::WriteOnly && m_mode != Mode::Append) {
             return 0;
         }
 
@@ -465,7 +481,7 @@ uint32_t IO::read32()
 
 void IO::write8(uint8_t v)
 {
-    return write_exact(&v, sizeof v);
+    write_exact(&v, sizeof v);
 }
 
 void IO::write16(uint16_t v)
@@ -475,7 +491,7 @@ void IO::write16(uint16_t v)
     buf[0] = v >> 8;
     buf[1] = v & 0xff;
 
-    return write_exact(buf, sizeof buf);
+    write_exact(buf, sizeof buf);
 }
 
 void IO::write32(uint32_t v)
@@ -487,7 +503,7 @@ void IO::write32(uint32_t v)
     buf[2] = (v >>  8) & 0xff;
     buf[3] = (v >>  0) & 0xff;
 
-    return write_exact(buf, sizeof buf);
+    write_exact(buf, sizeof buf);
 }
 
 // getc() and putc() are meant to operate in terms of characters, not
@@ -497,27 +513,27 @@ void IO::write32(uint32_t v)
 // Read a UTF-8 character, returning it. If limit16 is true, any Unicode
 // values which are greater than UINT16_MAX will be converted to the
 // Unicode replacement character. Otherwise, values are returned as-is.
-// -1 is returned on EOF.
+// std::nullopt is returned on EOF.
 //
 // If an invalid UTF-8 sequence is found, the Unicode replacement
 // character is returned.
-long IO::getc(bool limit16)
+std::optional<uint32_t> IO::getc(bool limit16)
 {
-    long ret;
+    uint32_t ret;
     uint8_t c;
     class NotUnicode : public std::exception {};
 
     try {
         c = read8();
     } catch (const IOError &) {
-        return -1;
+        return std::nullopt;
     }
 
     // Read a byte and make sure it’s part of a valid UTF-8 sequence.
     auto read_byte = [this] {
         uint8_t b = read8();
 
-        if ((b & 0x80) != 0x80) {
+        if ((b & 0xc0) != 0x80) {
             throw NotUnicode();
         } else {
             return b;
@@ -537,7 +553,7 @@ long IO::getc(bool limit16)
             ret = (c & 0x0f) << 12;
             ret |= (read_byte() & 0x3f) << 6;
             ret |= (read_byte() & 0x3f);
-            if (ret < 0x800) {
+            if (ret < 0x800 || (ret >= 0xd800 && ret <= 0xdfff)) {
                 throw NotUnicode();
             }
         } else if ((c & 0xf8) == 0xf0) { // Four bytes.
@@ -552,7 +568,7 @@ long IO::getc(bool limit16)
             ret = UNICODE_REPLACEMENT;
         }
     } catch (const IOError &) {
-        return -1;
+        return std::nullopt;
     } catch (const NotUnicode &) {
         return UNICODE_REPLACEMENT;
     }
@@ -609,9 +625,9 @@ std::vector<uint16_t> IO::readline()
     std::vector<uint16_t> result;
 
     while (true) {
-        long c = getc(true);
+        auto c = getc(true);
 
-        if (c == -1) {
+        if (!c.has_value()) {
             throw EndOfFile();
         }
 
@@ -619,13 +635,13 @@ std::vector<uint16_t> IO::readline()
             break;
         }
 
-        result.push_back(c);
+        result.push_back(*c);
     }
 
     return result;
 }
 
-long IO::filesize() const
+std::optional<unsigned long> IO::filesize() const
 {
     switch (m_type) {
     case Type::StandardIO:
@@ -644,9 +660,11 @@ long IO::filesize() const
         return size;
     }
 #endif
+    default:
+        bad_type();
     }
 
-    return -1;
+    return std::nullopt;
 }
 
 void IO::flush()

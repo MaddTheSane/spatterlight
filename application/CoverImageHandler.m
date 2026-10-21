@@ -1,5 +1,5 @@
 //
-//  CoverImageWindowController.m
+//  CoverImageHandler.m
 //  Spatterlight
 //
 //  Created by Administrator on 2021-05-29.
@@ -8,11 +8,16 @@
 #import "CoverImageHandler.h"
 #import "CoverImageView.h"
 #import "GlkController.h"
+#import "GlkController+Autorestore.h"
+#import "GlkController+BorderColor.h"
+#import "GlkController+FullScreen.h"
 #import "Theme.h"
 #import "Game.h"
 #import "Metadata.h"
+#import "Preferences.h"
 #import "Image.h"
 #import "NotificationBezel.h"
+#import "DebugLog.h"
 
 #import <QuartzCore/QuartzCore.h>
 
@@ -35,9 +40,42 @@
 @end
 
 
-@interface CoverImageHandler ()
+// Timings, in seconds. The values are tuned by hand and hard to test, so
+// change them with care.
+// The cover image fades in when shown, and out when a key is pressed. The
+// background window starts fading out after a delay.
+static const NSTimeInterval kCoverFadeInDuration = 0.2;
+static const NSTimeInterval kCoverFadeOutDuration = 0.5;
+static const NSTimeInterval kBackgroundFadeDelay = 0.3;
+static const NSTimeInterval kBackgroundFadeDuration = 0.3;
+// The "logo" style: the image shows up a moment after the interpreter has
+// started, stays for a while, fades out, and its window is removed after
+// the animation has finished.
+static const NSTimeInterval kLogoShowDelay = 0.2;
+static const NSTimeInterval kLogoHoldDuration = 1.5;
+static const NSTimeInterval kLogoFadeDuration = 0.5;
+static const NSTimeInterval kLogoAnimationDuration = 3;
+static const NSTimeInterval kLogoRemoveDelay = 4;
 
-@end
+static NSWindow *SPBorderlessWindow(NSRect contentRect) {
+    return [[NSWindow alloc] initWithContentRect:contentRect
+                                       styleMask:NSWindowStyleMaskBorderless
+                                         backing:NSBackingStoreBuffered
+                                           defer:YES];
+}
+
+// A one-shot opacity animation that holds its final value
+static CABasicAnimation *SPOpacityAnimation(float from, float to, CFTimeInterval beginTime, CFTimeInterval duration) {
+    CABasicAnimation *animation = [CABasicAnimation animationWithKeyPath:@"opacity"];
+    animation.fromValue = @(from);
+    animation.toValue = @(to);
+    animation.additive = NO;
+    animation.removedOnCompletion = NO;
+    animation.beginTime = beginTime;
+    animation.duration = duration;
+    animation.fillMode = kCAFillModeForwards;
+    return animation;
+}
 
 @implementation CoverImageHandler
 
@@ -58,10 +96,7 @@
                             kCGWindowImageBoundsIgnoreFraming);
 
     CALayer *snapshotLayer = [[CALayer alloc] init];
-    NSWindow *newWin = [[NSWindow alloc] initWithContentRect:_glkctl.window.contentView.frame
-                                                   styleMask: NSWindowStyleMaskBorderless
-                                                     backing: NSBackingStoreBuffered
-                                                       defer: YES];
+    NSWindow *newWin = SPBorderlessWindow(_glkctl.window.contentView.frame);
     newWin.opaque = NO;
     newWin.backgroundColor = NSColor.clearColor;
     newWin.contentView.wantsLayer = YES;
@@ -75,10 +110,7 @@
 }
 
 - (NSWindow *)backgroundColorWindow {
-    NSWindow *newWin = [[NSWindow alloc] initWithContentRect:_glkctl.window.contentView.frame
-                                                   styleMask: NSWindowStyleMaskBorderless
-                                                     backing: NSBackingStoreBuffered
-                                                       defer: YES];
+    NSWindow *newWin = SPBorderlessWindow(_glkctl.window.contentView.frame);
     newWin.opaque = YES;
     newWin.backgroundColor = _glkctl.bgcolor;
 
@@ -87,10 +119,7 @@
 }
 
 - (NSWindow *)fadeWindow {
-    NSWindow *newWin = [[NSWindow alloc] initWithContentRect:_glkctl.window.contentView.frame
-                                                   styleMask: NSWindowStyleMaskBorderless
-                                                     backing: NSBackingStoreBuffered
-                                                       defer: YES];
+    NSWindow *newWin = SPBorderlessWindow(_glkctl.window.contentView.frame);
     newWin.opaque = NO;
     newWin.backgroundColor = NSColor.clearColor;
 
@@ -171,26 +200,21 @@
         [glkctl.borderView addSubview:glkctl.gameView];
         [glkctl adjustContentView];
 
-        CABasicAnimation *fadeOutAnimation = [CABasicAnimation animationWithKeyPath:@"opacity"];
-        fadeOutAnimation.fromValue = @1.0f;
-        fadeOutAnimation.toValue = @0.0f;
-        fadeOutAnimation.additive = NO;
-        fadeOutAnimation.removedOnCompletion = NO;
-        fadeOutAnimation.beginTime = 0.0;
-        fadeOutAnimation.duration = 0.5;
-        fadeOutAnimation.fillMode = kCAFillModeForwards;
+        CABasicAnimation *fadeOutAnimation = SPOpacityAnimation(1, 0, 0.0, kCoverFadeOutDuration);
 
         glkctl.showingCoverImage = NO;
         // FIXME: Just fork the interpreter NSTask here instead
         glkctl.borderView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
         glkctl.gameView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
 
+        // The ordering of this restart and the fades below is fragile, and
+        // the full-screen cases can only be tested by hand.
         [glkctl performSelector:@selector(deferredRestart:) withObject:nil afterDelay:0.0];
 
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^(void){
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kBackgroundFadeDelay * NSEC_PER_SEC)), dispatch_get_main_queue(), ^(void){
             [NSAnimationContext
              runAnimationGroup:^(NSAnimationContext *context) {
-                context.duration = 0.3;
+                context.duration = kBackgroundFadeDuration;
                 [backgroundColorWin animator].alphaValue = 0;
             } completionHandler:^{
                 [backgroundColorWin orderOut:nil];
@@ -199,7 +223,7 @@
 
         [NSAnimationContext
          runAnimationGroup:^(NSAnimationContext *context) {
-            context.duration = 0.5;
+            context.duration = kCoverFadeOutDuration;
             context.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
             [imageWindow.contentView.layer addAnimation:fadeOutAnimation forKey:nil];
         } completionHandler:^{
@@ -268,7 +292,7 @@
     [[NSNotificationCenter defaultCenter]
      addObserver:self
      selector:@selector(notePreferencesChanged:)
-     name:@"PreferencesChanged"
+     name:kPreferencesChangedNotification
      object:nil];
 
     [[NSNotificationCenter defaultCenter]
@@ -297,26 +321,18 @@
 
     [window makeFirstResponder:_imageView];
 
-    CABasicAnimation *fadeInAnimation = [CABasicAnimation animationWithKeyPath:@"opacity"];
-    fadeInAnimation.fromValue = @0.0f;
-    fadeInAnimation.toValue = @1.0f;
-    fadeInAnimation.additive = NO;
-    fadeInAnimation.removedOnCompletion = NO;
-    fadeInAnimation.beginTime = 0.0;
-    fadeInAnimation.duration = 0.2;
-    fadeInAnimation.fillMode = kCAFillModeForwards;
+    CABasicAnimation *fadeInAnimation = SPOpacityAnimation(0, 1, 0.0, kCoverFadeInDuration);
 
     [_imageView.layer addAnimation:fadeInAnimation forKey:nil];
 }
 
 - (void)showLogoAndFade {
     [_glkctl forkInterpreterTask];
-    CoverImageView __block *imageView;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^(void){
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kLogoShowDelay * NSEC_PER_SEC)), dispatch_get_main_queue(), ^(void){
 
         NSWindow *fadeWindow = [self fadeWindow];
 
-        imageView = [[CoverImageView alloc] initWithFrame:fadeWindow.contentView.bounds delegate:self];
+        CoverImageView *imageView = [[CoverImageView alloc] initWithFrame:fadeWindow.contentView.bounds delegate:self];
 
         [fadeWindow.contentView addSubview:imageView];
         [imageView positionImage];
@@ -337,21 +353,13 @@
         layer.opacity = 1;
         [self.glkctl.window addChildWindow:fadeWindow ordered:NSWindowAbove];
 
-        CABasicAnimation *fadeOutAnimation = [CABasicAnimation animationWithKeyPath:@"opacity"];
-        fadeOutAnimation.fromValue = @1.0f;
-        fadeOutAnimation.toValue = @0.0f;
-        fadeOutAnimation.additive = NO;
-        fadeOutAnimation.removedOnCompletion = NO;
-        fadeOutAnimation.beginTime = 1.5;
-        fadeOutAnimation.duration = 0.5;
-        fadeOutAnimation.fillMode = kCAFillModeForwards;
-
+        CABasicAnimation *fadeOutAnimation = SPOpacityAnimation(1, 0, kLogoHoldDuration, kLogoFadeDuration);
 
         CFTimeInterval addTime = [layer convertTime:CACurrentMediaTime() fromLayer:nil];
         CAAnimationGroup *group = [CAAnimationGroup animation];
         group.animations = @[fadeOutAnimation];
         group.beginTime = addTime;
-        group.duration = 3;
+        group.duration = kLogoAnimationDuration;
         group.removedOnCompletion = NO;
         group.fillMode = kCAFillModeForwards;
 
@@ -359,7 +367,7 @@
 
         GlkController *blockController = self.glkctl;
 
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(4 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^(void){
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kLogoRemoveDelay * NSEC_PER_SEC)), dispatch_get_main_queue(), ^(void){
             [fadeWindow orderOut:nil];
             // Why do these need to be reset here?
             blockController.gameView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
@@ -394,7 +402,7 @@
     NSWindow *window = glkctl.window;
     glkctl.windowPreFullscreenFrame = window.frame;
     NSScreen *screen = window.screen;
-    NSInteger border = glkctl.theme.border;
+    CGFloat border = (CGFloat)glkctl.theme.border;
 
     NSWindow *imageWindow = self.enterFullscreenWindow;
 
@@ -416,7 +424,7 @@
     _backgroundView.hidden = YES;
 
     NSImageRep *rep = _imageView.image.representations.lastObject;
-    NSSize imageSize = NSMakeSize(rep.pixelsWide, rep.pixelsHigh);
+    NSSize imageSize = NSMakeSize((CGFloat)rep.pixelsWide, (CGFloat)rep.pixelsHigh);
 
     CGFloat ratio = imageSize.width / imageSize.height;
     NSRect imageFrame = NSMakeRect(0,0, fullScreenHeight * ratio, fullScreenHeight);
@@ -490,11 +498,7 @@
 
 - (NSWindow *)enterFullscreenWindow {
     if (!_enterFullscreenWindow) {
-        _enterFullscreenWindow =
-        [[NSWindow alloc] initWithContentRect:NSZeroRect
-                                    styleMask: NSWindowStyleMaskBorderless
-                                      backing: NSBackingStoreBuffered
-                                        defer: YES];
+        _enterFullscreenWindow = SPBorderlessWindow(NSZeroRect);
     }
     return _enterFullscreenWindow;
 }

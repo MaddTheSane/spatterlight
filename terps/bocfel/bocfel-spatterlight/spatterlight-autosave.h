@@ -36,6 +36,11 @@
 #include "stack.h"
 #include "v6_specific.h"
 
+// Defined in osdep.cpp, which can't be included here (its Style
+// clashes with MacTypes.h). While true, zterp_os_autosave_name()
+// names the temp file spatterlight_do_autosave renames into place.
+extern "C" bool zterp_os_autosave_to_tmp;
+
 void spatterlight_do_autosave(enum SaveOpcode saveopcode);
 bool spatterlight_restore_autosave(enum SaveOpcode *saveopcode);
 
@@ -53,15 +58,12 @@ enum inputMode {
     INPUT_NAME,
 };
 
+#define BOCFEL_MAX_JOURNEY_WORDS 4
+#define BOCFEL_MAX_MARGIN_IMAGES 100
+#define BOCFEL_V6_LAYOUT_VALUES (4 + 8 * 6)
+
 typedef struct library_state_data_struct {
-    int wintag0;
-    int wintag1;
-    int wintag2;
-    int wintag3;
-    int wintag4;
-    int wintag5;
-    int wintag6;
-    int wintag7;
+    int wintag[8];
     int curwintag;
     int mainwintag;
     int statuswintag;
@@ -73,11 +75,10 @@ typedef struct library_state_data_struct {
     uint16_t routine;
     int queued_sound;
     int sound_channel_tag;
-    long last_random_seed;
-    int random_calls_count;
+    int music_channel_tag;
+    uint32_t random_state;
+    bool random_predictable;
     int queued_volume;
-
-    int autosave_version;
 
     V6ScreenMode screenmode;
 
@@ -86,14 +87,17 @@ typedef struct library_state_data_struct {
     inputMode current_input_mode;
     int current_input_length;
     int number_of_journey_words;
-    struct JourneyWords journey_words[4];
+    struct JourneyWords journey_words[BOCFEL_MAX_JOURNEY_WORDS];
     int number_of_margin_images;
-    uint16_t margin_images[100];
+    uint16_t margin_images[BOCFEL_MAX_MARGIN_IMAGES];
 
     int current_graphics_win_tag;
     int graphics_fg_tag;
 
     int stored_lower_tag;
+
+    int z0_right_status_tag;
+    bool z0_shown_rebus_hint_message;
 
     int hints_depth;
     int slideshow_pic;
@@ -105,6 +109,18 @@ typedef struct library_state_data_struct {
     int shogun_menu_selection;
 
     int internal_read_char_hack;
+
+    // The window layout of V6 games other than Infocom's: the story
+    // window and the indices of the current, main and upper windows,
+    // followed by y, x, height, width, flags and stamp of every window.
+    int v6_layout_valid;
+    int v6_layout[BOCFEL_V6_LAYOUT_VALUES];
+
+    // The picture and the rule of the Mysterious Adventures which
+    // draw them themselves, as pairs of a colour and a pixel count.
+    // The memory belongs to whoever filled in the struct.
+    int mysterious_canvas_length;
+    const uint32_t *mysterious_canvas;
 
 } library_state_data;
 

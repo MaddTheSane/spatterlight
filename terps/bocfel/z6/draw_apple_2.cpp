@@ -1,126 +1,106 @@
 //
-//  draw_apple_2.c
-//  A2InfocomWozExtractor
+//  draw_apple_2.cpp
+//  Apple 2 Infocom Woz extractor
 //
 //  Created by Administrator on 2023-07-14.
 //
+//  Decompresses and renders Infocom V6 Apple II images. The compressed
+//  format uses a simple RLE scheme with vertical XOR delta encoding
+//  (each scanline is XOR'd against the one above). After decompression,
+//  the 4-bit palette indices are expanded to 32-bit RGBA pixels using
+//  an Apple II color palette approximating the AppleWin emulator output.
 
 #include <stdlib.h>
 #include <string.h>
 
 #include "draw_apple_2.h"
 
-struct rgb_struct {
-    uint8_t red;
-    uint8_t green;
-    uint8_t blue;
-};
-
-typedef struct rgb_struct rgb_t;
-
-// This palette is hand-crafted to approximate the output colours of the AppleWin emulator
-static const rgb_t apple2_palette[] =
+// 16-color Apple II palette, hand-crafted to approximate the output
+// colours of the AppleWin emulator. Indexed 0x0-0xF.
+static const uint8_t apple2_palette[16][3] =
 {
-    {0x0,  0x0,  0x0 }, /* Black */
-    {0xd4, 0x3a, 0x48}, /* Dark Red */
-    {0x91, 0x67, 0x21}, /* Brown */
-    {0xe6, 0x6f, 0x00}, /* Orange */
-    {0x39, 0x82, 0x38}, /* Dark Green */
-    {0x68, 0x68, 0x68}, /* Dark Gray */
-    {0x67, 0xdf, 0x42}, /* Light Green */
-    {0xff, 0xff, 0x00}, /* Yellow */
-    {0x0c, 0x1c, 0xa2}, /* Dark Blue */
-    {0xe6, 0x28, 0xff}, /* Purple */
-    {0xb8, 0xb8, 0xb8}, /* Light Grey */
-    {0xf3, 0xb3, 0xa2}, /* Pink */
-    {0x2f, 0x3e, 0xe5}, /* Medium Blue */ //0x0c
-    {0x79, 0xa6, 0xde}, /* Light Blue */
-    {0x58, 0xf4, 0xbf}, /* Aquamarine */
-    {0xff, 0xff, 0xff}  /* White */
+    {0x0,  0x0,  0x0 }, /* 0x0: Black */
+    {0xd4, 0x3a, 0x48}, /* 0x1: Dark Red */
+    {0x91, 0x67, 0x21}, /* 0x2: Brown */
+    {0xe6, 0x6f, 0x00}, /* 0x3: Orange */
+    {0x39, 0x82, 0x38}, /* 0x4: Dark Green */
+    {0x68, 0x68, 0x68}, /* 0x5: Dark Gray */
+    {0x67, 0xdf, 0x42}, /* 0x6: Light Green */
+    {0xff, 0xff, 0x00}, /* 0x7: Yellow */
+    {0x0c, 0x1c, 0xa2}, /* 0x8: Dark Blue */
+    {0xe6, 0x28, 0xff}, /* 0x9: Purple */
+    {0xb8, 0xb8, 0xb8}, /* 0xA: Light Grey */
+    {0xf3, 0xb3, 0xa2}, /* 0xB: Pink */
+    {0x2f, 0x3e, 0xe5}, /* 0xC: Medium Blue */
+    {0x79, 0xa6, 0xde}, /* 0xD: Light Blue */
+    {0x58, 0xf4, 0xbf}, /* 0xE: Aquamarine */
+    {0xff, 0xff, 0xff}  /* 0xF: White */
 };
 
-static uint8_t *deindex(uint8_t *data, size_t size, ImageStruct *image) {
-    uint8_t *pixmap = (uint8_t *)calloc(1, size * 4);
-    int pixpos = 0;
-    for (int i = 0; i < size; i++) {
-        rgb_t color;
-        uint8_t wordval = data[i];
-        if (!(image->transparency && image->transparent_color == wordval)) {
-            color = apple2_palette[wordval];
-            if (pixpos >= size * 4)
-                break;
-            uint8_t *ptr = &pixmap[pixpos];
-            *ptr++ = color.red;
-            *ptr++ = color.green;
-            *ptr++ = color.blue;
-            *ptr++ = 0xff;
-        }
-        pixpos += 4;
-    }
-    free(data);
-    return pixmap;
-}
-
+// Decompresses Apple II image data from an ImageStruct.
+// This is the same decoding as ZDISPL in Infocom's Apple II interpreter
+// sources (pic.asm) does.
+// The format is: a 3-byte length of the data that follows, then color
+// bytes (0x0-0xF), each optionally followed by a repeat count. If the next byte is
+// <= 0x0F or we're at the end of data, the repeat count defaults to 1
+// (0x0F - 0x0E). Otherwise, the repeat count is (byte - 0x0E).
+// After decoding each pixel, a vertical XOR pass is applied inline:
+// each pixel is XOR'd with the one directly above it (one scanline
+// width earlier), reconstructing the image from delta-encoded scanlines.
+// (XORing each line with the one above before run-length encoding turns
+// whatever repeats from line to line into runs of zeros. The Mac and Amiga
+// pictures are compressed the same way, see decompress_amiga.cpp.)
+// Only the low four bits of a color value are a palette index.
 static uint8_t *decompress_apple2(ImageStruct *image) {
     if (image == nullptr || image->data == nullptr)
         return nullptr;
 
-    uint8_t bytevalue, repeats, counter;
+    // The length of the rest of the data, which load_image() in
+    // extract_image_data.cpp has already used to set datasize.
+    static const size_t kHeaderSize = 3;
+    // A byte above kColorMask after a color is a run length, stored with
+    // kRunLengthBias added.
+    static const uint8_t kColorMask = 0x0f;
+    static const uint8_t kRunLengthBias = 0x0e;
 
-    uint8_t *ptr = image->data + 3;
-    size_t finalsize = image->width * image->height;
-    uint8_t *result = (uint8_t *)calloc(1, finalsize);
-    if (result == nullptr)
-        exit(1);
+    if (image->datasize < kHeaderSize)
+        return nullptr;
 
-    size_t writtenbytes = 0;
+    uint8_t *read_ptr = image->data + kHeaderSize;
+    uint8_t *data_end = image->data + image->datasize;
+    size_t pixel_count = 0;
+    uint8_t *pixel_buffer = image_alloc(image->width, image->height, 1, &pixel_count);
+    if (pixel_buffer == nullptr)
+        return nullptr;
 
-    do {
-        // Check if we are out of bounds
-        long bytesread = ptr - image->data;
-        if (bytesread >= image->datasize)
-            return result;
+    size_t pixel_offset = 0;
 
-        bytevalue = *ptr++;
-        // Check if we are out of bounds again
-        if (bytesread + 1 >= image->datasize || *ptr <= 0xf) {
-            repeats = 0xf;
+    while (pixel_offset < pixel_count && read_ptr < data_end) {
+        uint8_t color_value = *read_ptr++ & kColorMask;
+
+        uint8_t run_length;
+        if (read_ptr >= data_end || *read_ptr <= kColorMask) {
+            run_length = 1;
         } else {
-            repeats = *ptr++;
+            run_length = *read_ptr++ - kRunLengthBias;
         }
 
-        for (counter = repeats - 0xe; counter != 0; counter--) {
-            result[writtenbytes] = bytevalue;
-            if (writtenbytes >= image->width) {
-                result[writtenbytes] = result[writtenbytes] ^ result[writtenbytes - image->width];
+        for (uint8_t remaining = run_length; remaining != 0; remaining--) {
+            pixel_buffer[pixel_offset] = color_value;
+            if (pixel_offset >= (size_t)image->width) {
+                pixel_buffer[pixel_offset] ^= pixel_buffer[pixel_offset - image->width];
             }
-            writtenbytes++;
-            if (writtenbytes == finalsize) {
-                // Shave off any excess bytes
-                if (ptr - image->data < image->datasize) {
-                    size_t newsize = ptr - image->data;
-                    uint8_t *temp = (uint8_t *)malloc(newsize);
-                    if (temp == nullptr) {
-                        fprintf(stderr, "Out of memory\n");
-                        exit(1);
-                    }
-                    memcpy(temp, image->data, newsize);
-                    free(image->data);
-                    image->data = temp;
-                    fprintf(stderr, "decompress_apple2: Shaved off %lu bytes. New size: %lu\n", image->datasize - newsize, newsize);
-                    image->datasize = newsize;
-                }
-                return result;
-            }
+            pixel_offset++;
+            if (pixel_offset == pixel_count)
+                return pixel_buffer;
         }
-
-    } while (writtenbytes < finalsize);
-    return result;
+    }
+    return pixel_buffer;
 }
 
+// Public entry point: decompresses an Apple II image and converts the
+// palette-indexed result to a 32-bit RGBA pixmap ready for display.
 uint8_t *draw_apple2(ImageStruct *image) {
-    uint8_t *result = decompress_apple2(image);
-    if (result)
-        return deindex(result, image->width * image->height, image);
-    return nullptr;
+    ImageBuf indices(decompress_apple2(image));
+    return expand_indexed(indices.get(), image, apple2_palette);
 }

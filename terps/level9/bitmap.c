@@ -342,7 +342,7 @@ void bitmap_st2_name(int num, char* dir, char* out)
 	/* title picture is #30 */
 	if (num == 0)
 		num = 30;
-	sprintf(out,"%s%d.squ",dir,num);
+	snprintf(out,MAX_PATH,"%s%d.squ",dir,num);
 }
 
 /*
@@ -361,7 +361,7 @@ void bitmap_pc_name(int num, char* dir, char* out)
 	/* title picture is #30 */
 	if (num == 0)
 		num = 30;
-	sprintf(out,"%s%d.pic",dir,num);
+	snprintf(out,MAX_PATH,"%s%d.pic",dir,num);
 }
 
 /*
@@ -406,14 +406,14 @@ Colour bitmap_pc1_colour(int i)
 L9BOOL bitmap_pc1_decode(char* file, int x, int y)
 {
 	L9BYTE* data = NULL;
-	int i, xi, yi, max_x, max_y;
+	int i, xi, yi, max_x, max_y, width;
 
 	L9UINT32 size;
 	data = bitmap_load(file,&size);
 	if (data == NULL)
 		return FALSE;
 
-	max_x = data[2]+data[3]*256;
+	max_x = width = data[2]+data[3]*256;
 	max_y = data[4]+data[5]*256;
 	if (max_x > MAX_BITMAP_WIDTH || max_y > MAX_BITMAP_HEIGHT)
 	{
@@ -443,7 +443,7 @@ L9BOOL bitmap_pc1_decode(char* file, int x, int y)
 		for (xi = 0; xi < max_x; xi++)
 		{
 			bitmap->bitmap[(bitmap->width*(y+yi))+(x+xi)] =
-				(data[23+((yi*max_x)/2)+(xi/2)]>>((1-(xi&1))*4)) & 0x0f;
+				(data[23+((yi*width)/2)+(xi/2)]>>((1-(xi&1))*4)) & 0x0f;
 		}
 	}
 
@@ -607,7 +607,7 @@ L9BOOL bitmap_pc1_decode(char* file, int x, int y)
 L9BOOL bitmap_pc2_decode(char* file, int x, int y)
 {
 	L9BYTE* data = NULL;
-	int i, xi, yi, max_x, max_y;
+	int i, xi, yi, max_x, max_y, width;
 
 	L9BYTE theNewPixel, theNewPixelIndex;
 	L9BYTE theBufferBitCounter, theNewPixelIndexSelector, theBufferBitStripCount;
@@ -619,7 +619,7 @@ L9BOOL bitmap_pc2_decode(char* file, int x, int y)
 	if (data == NULL)
 		return FALSE;
 
-	max_x = data[37]+data[36]*256;
+	max_x = width = data[37]+data[36]*256;
 	max_y = data[39]+data[38]*256;
 	if (max_x > MAX_BITMAP_WIDTH || max_y > MAX_BITMAP_HEIGHT)
 	{
@@ -658,7 +658,9 @@ L9BOOL bitmap_pc2_decode(char* file, int x, int y)
 
 	for (yi = 0; yi < max_y; yi++)
 	{
-		for (xi = 0; xi < max_x; xi++)
+		/* decode the whole row to keep the bit stream in step,
+		   even where the picture is clipped */
+		for (xi = 0; xi < width; xi++)
 		{
 			theNewPixelIndexSelector = (theBitStreamBuffer & 0x00FF);
 			if (theNewPixelIndexSelector != 0xFF)
@@ -728,7 +730,8 @@ L9BOOL bitmap_pc2_decode(char* file, int x, int y)
 			/* extract the nex pixel from the table */
 			theNewPixel = (data+42)[theNewPixel];
 			/* store new pixel in the bitmap */
-			bitmap->bitmap[(bitmap->width*(y+yi))+(x+xi)] = theNewPixel;
+			if (xi < max_x)
+				bitmap->bitmap[(bitmap->width*(y+yi))+(x+xi)] = theNewPixel;
 		}
 	}
 
@@ -782,7 +785,7 @@ void bitmap_noext_name(int num, char* dir, char* out)
 	{
 		FILE* f;
 
-		sprintf(out,"%stitle",dir);
+		snprintf(out,MAX_PATH,"%stitle",dir);
 		f = fopen(out,"rb");
 		if (f != NULL)
 		{
@@ -793,7 +796,7 @@ void bitmap_noext_name(int num, char* dir, char* out)
 			num = 30;
 	}
 
-	sprintf(out,"%s%d",dir,num);
+	snprintf(out,MAX_PATH,"%s%d",dir,num);
 }
 
 int bitmap_amiga_intensity(int col)
@@ -844,15 +847,15 @@ Colour bitmap_amiga_colour(int i1, int i2)
 L9BOOL bitmap_amiga_decode(char* file, int x, int y)
 {
 	L9BYTE* data = NULL;
-	int i, xi, yi, max_x, max_y, p, b;
+	int i, xi, yi, max_x, max_y, width, height, p, b;
 
 	L9UINT32 size;
 	data = bitmap_load(file,&size);
 	if (data == NULL)
 		return FALSE;
 
-	max_x = (((((data[64]<<8)|data[65])<<8)|data[66])<<8)|data[67];
-	max_y = (((((data[68]<<8)|data[69])<<8)|data[70])<<8)|data[71];
+	max_x = width = (((((data[64]<<8)|data[65])<<8)|data[66])<<8)|data[67];
+	max_y = height = (((((data[68]<<8)|data[69])<<8)|data[70])<<8)|data[71];
 	if (max_x > MAX_BITMAP_WIDTH || max_y > MAX_BITMAP_HEIGHT)
 	{
 		free(data);
@@ -882,7 +885,7 @@ L9BOOL bitmap_amiga_decode(char* file, int x, int y)
 		{
 			p = 0;
 			for (b = 0; b < 5; b++)
-				p |= ((data[72+(max_x/8)*(max_y*b+yi)+xi/8]>>(7-(xi%8)))&1)<<b;
+				p |= ((data[72+(width/8)*(height*b+yi)+xi/8]>>(7-(xi%8)))&1)<<b;
 			bitmap->bitmap[(bitmap->width*(y+yi))+(x+xi)] = p;
 		}
 	}
@@ -976,14 +979,14 @@ BitmapType bitmap_noext_type(char* file)
 L9BOOL bitmap_mac_decode(char* file, int x, int y)
 {
 	L9BYTE* data = NULL;
-	int xi, yi, max_x, max_y;
+	int xi, yi, max_x, max_y, width;
 
 	L9UINT32 size;
 	data = bitmap_load(file,&size);
 	if (data == NULL)
 		return FALSE;
 
-	max_x = data[3]+data[2]*256;
+	max_x = width = data[3]+data[2]*256;
 	max_y = data[7]+data[6]*256;
 	if (max_x > MAX_BITMAP_WIDTH || max_y > MAX_BITMAP_HEIGHT)
 	{
@@ -1016,7 +1019,7 @@ L9BOOL bitmap_mac_decode(char* file, int x, int y)
 		for (xi = 0; xi < max_x; xi++)
 		{
 			bitmap->bitmap[(bitmap->width*(y+yi))+(x+xi)] = 
-				(data[10+(max_x/8)*yi+xi/8]>>(7-(xi%8)))&1;
+				(data[10+(width/8)*yi+xi/8]>>(7-(xi%8)))&1;
 		}
 	}
 
@@ -1068,9 +1071,9 @@ const Colour bitmap_bbc_colours[] = {
 void bitmap_c64_name(int num, char* dir, char* out)
 {
 	if (num == 0)
-		sprintf(out,"%stitle mpic",dir);
+		snprintf(out,MAX_PATH,"%stitle mpic",dir);
 	else
-		sprintf(out,"%spic%d",dir,num);
+		snprintf(out,MAX_PATH,"%spic%d",dir,num);
 }
 
 void bitmap_bbc_name(int num, char* dir, char* out)
@@ -1079,7 +1082,7 @@ void bitmap_bbc_name(int num, char* dir, char* out)
 
 	if (num == 0)
 	{
-		sprintf(out,"%sP.Title",dir);
+		snprintf(out,MAX_PATH,"%sP.Title",dir);
 		f = fopen(out,"rb");
 		if (f != NULL)
 		{
@@ -1087,11 +1090,11 @@ void bitmap_bbc_name(int num, char* dir, char* out)
 			return;
 		}
 
-		sprintf(out,"%stitle",dir);
+		snprintf(out,MAX_PATH,"%stitle",dir);
 	}
 	else
 	{
-		sprintf(out,"%sP.Pic%d",dir,num);
+		snprintf(out,MAX_PATH,"%sP.Pic%d",dir,num);
 		f = fopen(out,"rb");
 		if (f != NULL)
 		{
@@ -1099,18 +1102,18 @@ void bitmap_bbc_name(int num, char* dir, char* out)
 			return;
 		}
 
-		sprintf(out,"%spic%d",dir,num);
+		snprintf(out,MAX_PATH,"%spic%d",dir,num);
 	}
 }
 
 void bitmap_cpc_name(int num, char* dir, char* out)
 {
 	if (num == 0)
-		sprintf(out,"%stitle.pic",dir);
+		snprintf(out,MAX_PATH,"%stitle.pic",dir);
 	else if (num == 1)
-		sprintf(out,"%s1.pic",dir);
+		snprintf(out,MAX_PATH,"%s1.pic",dir);
 	else
-		sprintf(out,"%sallpics.pic",dir);
+		snprintf(out,MAX_PATH,"%sallpics.pic",dir);
 }
 
 BitmapType bitmap_c64_type(char* file)
@@ -1170,6 +1173,24 @@ BitmapType bitmap_c64_type(char* file)
 	each forming a picture, in the C64 game file format (minus the two
 	byte header).
 */
+
+static Colour bitmap_zx_colours[2] =
+{
+	{ 0x00, 0x00, 0x00 },	/* 0 = paper (black) */
+	{ 0xff, 0xff, 0xff },	/* 1 = ink   (white) */
+};
+
+/* Runtime selection between colour and monochrome rendering of the
+   CPC/Spectrum+3 picture files. Defaults to full colour; the front end
+   may flip it with bitmap_zx_set_colour(). Honoured by bitmap_c64_decode's
+   CPC_BITMAPS path below. */
+static L9BOOL zx_use_colour = TRUE;
+
+void bitmap_zx_set_colour(L9BOOL colour)
+{
+	zx_use_colour = colour;
+}
+
 L9BOOL bitmap_c64_decode(char* file, BitmapType type, int num)
 {
 	L9BYTE* data = NULL;
@@ -1285,6 +1306,71 @@ L9BOOL bitmap_c64_decode(char* file, BitmapType type, int num)
 		}
 		else
 			return FALSE;
+	}
+
+	/*
+	 * The Amstrad CPC and Spectrum +3 releases share these C64-format picture
+	 * files, but the Spectrum could not display the colour artwork.  When
+	 * colour is disabled (see bitmap_zx_set_colour) render the monochrome
+	 * image instead, reusing the offsets computed above: the 2-bit pixel still
+	 * selects one of {background, screen hi-nibble, screen lo-nibble, colour
+	 * map}, but the chosen colour nibble is looked up in a fixed dither table
+	 * to give an 8-pixel 1bpp fill.  This is the direct analogue of
+	 * bitmap_bbc_decode's colour-nibble -> pattern remap.  The full picture
+	 * width (max_x, i.e. 40 cells) is rendered, matching the colour path, so
+	 * the image is not truncated.
+	 */
+	if (type == CPC_BITMAPS && !zx_use_colour)
+	{
+		/* nibble (C64 colour 0-15) -> 8-pixel monochrome dither pattern */
+		static const L9BYTE zx_pat[16] =
+		{
+			0x00, 0xff, 0xaa, 0xaa, 0x55, 0x55, 0x55, 0xff,
+			0x55, 0xaa, 0xaa, 0x55, 0xff, 0xaa, 0x55, 0x55
+		};
+		L9BYTE t[4], scr, d, v;
+		int cell, g, ncols = max_x / 8;		/* 8 mono pixels per cell */
+
+		if (bitmap)
+			free(bitmap);
+		bitmap = bitmap_alloc(max_x,max_y);
+		if (bitmap == NULL)
+		{
+			free(data);
+			return FALSE;
+		}
+
+		for (cy = 0; cy < max_y/8; cy++)
+		{
+			for (cx = 0; cx < ncols; cx++)
+			{
+				cell = cy*ncols + cx;
+				scr = data[off_scr+cell];
+				t[0] = zx_pat[data[off_bg] & 0x0f];	/* p=0 background */
+				t[1] = zx_pat[(scr>>4) & 0x0f];		/* p=1 screen hi-nibble */
+				t[2] = zx_pat[scr & 0x0f];		/* p=2 screen lo-nibble */
+				if (col_comp)				/* p=3 colour map */
+					t[3] = zx_pat[(data[off_col+cell/2]>>((1-(cx%2))*4)) & 0x0f];
+				else
+					t[3] = zx_pat[data[off_col+cell] & 0x0f];
+
+				for (py = 0; py < 8; py++)
+				{
+					d = data[off+cell*8+py];
+					v = (t[(d>>6)&3] & 0xc0) | (t[(d>>4)&3] & 0x30)
+					  | (t[(d>>2)&3] & 0x0c) | (t[d&3] & 0x03);
+					for (g = 0; g < 8; g++)
+						bitmap->bitmap[(max_x*(cy*8+py)) + cx*8 + g] = (v>>(7-g)) & 1;
+				}
+			}
+		}
+
+		bitmap->npalette = 2;
+		for (i = 0; i < 2; i++)
+			bitmap->palette[i] = bitmap_zx_colours[i];
+
+		free(data);
+		return TRUE;
 	}
 
 	if (bitmap)
@@ -1565,7 +1651,10 @@ Bitmap* DecodeBitmap(char* dir, BitmapType type, int num, int x, int y)
 		bitmap_cpc_name(num,dir,file);
 		if (os_find_file(file))
 		{
-			if (bitmap_c64_decode(file,type,num)) /* Nearly identical to C64 */
+			/* CPC/Spectrum+3 share C64-format files; bitmap_c64_decode
+			   renders them in colour, or as authentic +3 monochrome when
+			   bitmap_zx_set_colour(FALSE) has been called. */
+			if (bitmap_c64_decode(file,type,num))
 				return bitmap;
 		}
 		break;

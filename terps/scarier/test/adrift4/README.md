@@ -1,0 +1,178 @@
+# ADRIFT 3.9/4.0 walkthroughs and harness
+
+Working home for the derived ADRIFT 4 walkthroughs and the headless tooling that
+produces and re-checks them. It grew out of the SCARE Battle System port
+(commit `bf2b595c`, "SCARE: implement the ADRIFT 4 Battle System"); see the
+memory notes `scare-battle-system-port`, `adrift-battle-formulas-re` and
+`adrift-walkthrough-derivation`.
+
+## Layout
+
+Mirrors `test/adrift5/` (same subfolder names, same policies):
+
+- `notes/` — `*_walkthrough.md`, one per game: the route, the score reached,
+  and the reasoning behind any non-obvious step. These are the deliverable.
+  Also `WALKTHROUGH_TODO.md` — the derivation method, the standing cautions
+  and an index; the corpus is complete, and the session-by-session log it used
+  to carry was pruned once it was (recover it from this file's git history) — and `TODO_assist_spatterlight_preference.md`, which
+  covers the `SCR_ASSUME_*` assists and the one piece of their exposure that
+  is still open. Walkthroughs here also cite two `TODO_*.md` docs that were
+  pruned once finished — `TODO_plover_walkthroughs.md` (`8a0bbb66`) and
+  `TODO_decode_sub_20_74.md` (`aa30ba4f`); recover either with
+  `git show <sha>^:terps/scarier/adrift-walkthroughs/<name>` (both predate the
+  2026-08-09 test-tree reorg, so they sit under the old path).
+- `goldens/` — a `*_solution.txt` (the command script) and
+  `*_solution.expected.txt` (its committed golden transcript) per route. Three
+  AIF games are the exception: *Archie's Birthday*, *Diary of a Stripper* and
+  *Camp Windy Lake : Part 2* are sexually explicit, so their solution and golden
+  are gitignored and only their `run_v4_walkthroughs.sh` row is committed. Those
+  rows NOSCRIPT on a fresh clone, which is not a failure.
+  A golden echoes the command it fed at each prompt (`\n> command\n`, the shape
+  `a5run_dump` gives the ADRIFT 5 goldens), so a reply can be read against the
+  command that produced it without counting prompts by hand, and a route that
+  slips a turn out of sync shows up in the diff instead of hiding in it. The
+  echo is `os_ansi`'s `SCR_ECHO_INPUT`, set for you by `run_v4_walkthroughs.sh`,
+  `play.sh` and `safeplay.sh`.
+- `games/` — the `.taf` corpus. **Untracked** (`.gitignore`): third-party game
+  data is never committed. Recreate it on another machine with
+  `sh test/fetch_games.sh fetch adrift4`, or point `GAMES_DIR` / `ALT_DIRS`
+  elsewhere.
+- `games.manifest.tsv` — the committed sha256 pin for every file in `games/`,
+  with its source URL where one exists. This is what makes the corpus
+  reproducible without redistributing it; read `../GAMES.md` before editing it,
+  and note that upstream has silently republished several of these games, so a
+  row without a source is not an oversight.
+- `downloaded/` — third-party walkthrough documents the routes were derived
+  from. **Untracked**, same policy as the games.
+- `harness/` — the headless tooling.
+
+## Harness
+
+Everything runs against `harness/scare`: a standalone, deterministic build of
+the ADRIFT 4 engine from `terps/scarier` — the plain ANSI port, no Glk, with
+`seed.cpp` pinning the RNG so a given (game, solution) always yields the same
+transcript.
+
+```sh
+cd harness
+sh build.sh                                   # -> harness/scare
+
+# replay a route and read the transcript
+sh play.sh ../games/IceCream.taf ../goldens/icecream_solution.txt
+
+# same, but capped at 12s CPU / 4MB output -- use this while probing an
+# unknown route, where a wrong turn can spin an event-heavy game forever
+sh safeplay.sh ../games/circus.taf ../goldens/circus_solution.txt
+
+# the regression: every route replayed and strict-diffed against its golden
+sh run_v4_walkthroughs.sh          # table + exit code
+sh run_v4_walkthroughs.sh -v foo   # dump the diff for matching rows
+sh run_v4_walkthroughs.sh --bless  # (re)record goldens
+
+# deterministic projectile-combat regression (five games, own golden)
+sh scproj_regress.sh
+
+# which rows a game's <waitkey> is silently eating commands from
+python3 waitkey_audit.py
+```
+
+`run_v4_walkthroughs.sh` is wired into `make -f Makefile.headless test` via the
+`v4walkthroughs` target (Scarier in isolation; no FrankenDrift), which skips the
+whole thing when no `games/` corpus exists on the machine. Rows whose `.taf` is
+missing SKIP rather than fail.
+
+Each row's measurement evidence and re-bless history lives in
+`notes/v4_walkthrough_rows.md`, under the row's solution file, not in the
+script itself.
+
+### Spatterlight autosave
+
+`harness/run_autosave_tests.py` is the one tool here that does **not** use
+`harness/scare`: autosave and autorestore exist only in the Spatterlight build
+(`#ifdef SPATTERLIGHT` in `glk/os_glk*.cpp`, plus libglkimp). It covers both
+engines -- the ADRIFT 5 cases (named `a5-*`) live here too. It runs
+`build/Debug/scarier` under `test/glkdrive.py`'s fake app. Each session ends
+with EVTQUIT, the window-closed exit that keeps the autosave, so the next
+session autorestores.
+
+```sh
+python3 harness/run_autosave_tests.py --build   # xcodebuild the Glk terp, then run
+python3 harness/run_autosave_tests.py -v undo   # only cases matching "undo", with diffs
+```
+
+- **Equivalence cases.** A script is played once in a single session, then
+  again killed and relaunched after chosen commands. The output must match
+  command for command. There are no goldens.
+  - The walks cover every engine era: 4.00, 3.90, 3.80 and 3.7x. Other cases
+    cover a relaunch after every command, undo history, the 3.9 turn counter,
+    in-game save/restore, and restart.
+  - The rest cover what the saved game itself does not hold, which the
+    container's session section (`run_session_state()` in `scrunner.cpp`)
+    carries: the line `again` repeats, the command history past its 64-entry
+    ring, pronouns (also in the undo buffer), an open 4.0 "Which tree?  ...?"
+    question together with the list it offered (what decides "That is still
+    ambiguous!" on the next tie), the question prefix ("Wear what?",
+    "...with?", the battle's "Who do you want to attack?"), brief/verbose and
+    score notification, and the typed player name. An `expect` string proves
+    the one-session run reached that state.
+  - A walk whose route depends on the RNG (Les Feux's fights, Great Escape's
+    car chase) sets the case's `env`:
+    the headless goldens are recorded under `SCR_RNG=xoshiro` with the row's
+    `SCR_SEED`, and the Spatterlight build reads both variables. Its default
+    generator is a different one (`erkyrath_random`), so a seed alone does not
+    replay a headless route. That generator's words are stashed with the
+    library state (`rng_runner*` in `scarier-autosave.h`), so the stream
+    continues across the relaunch.
+  - `AUTOSAVE_TEST_STRIP_SESSION=1` cuts the session section out of every
+    autosave between sessions, as an older build would have written it. Those
+    cases must then fail, which shows they depend on it.
+- **ADRIFT 5 (`a5-*`).** The same equivalence checks against `gsc_a5_main`
+  and the `SCARAUTO5` container. Most cases play the committed probes in
+  `../adrift5/probes/` (events, NPC walks, randomness, variables, ambiguity,
+  undo after the end), so they run without the corpus. Corpus walks (4rooms,
+  Alien Diver, Wumpus, Beginners Cave) SKIP when the game is absent. Other
+  cases cover a relaunch after every command, the undo stack across
+  relaunches, pronouns, in-game save/restore, restart, and a corrupt or
+  truncated container.
+  - ADRIFT 5 has no session section. Its pronouns are in the save XML.
+  - An open "Which key?" or a remembered bare verb ("Get what?") is not in
+    the save XML, so the container ends with a pending chunk
+    (`a5run_pending_save`). The `a5-which-open*` and `a5-bare-verb-open`
+    cases relaunch between the question and its answer; the answer must
+    still be taken as one. An older container without the chunk resumes at
+    a fresh prompt.
+- **Checks on every relaunch.** It must open or close no windows before its
+  first input (a RESTART played later may reopen the graphics window), print
+  nothing before its first input, and have autosaved at the prompt it closed
+  on.
+- **Startup prompts.** A game closed at its ADRIFT 4 name or gender prompt,
+  before the first room, comes back at that question (`startup-name-prompt`,
+  `startup-gender-prompt`, and the name prompt a RESTART asks in `restart`).
+  An ADRIFT 5 `%PopUpInput%` or `%PopUpChoice%` question is asked partway
+  through a turn, so its autosave is of where the turn began plus the command
+  and the answers given so far, and the relaunch runs the turn again up to
+  the question (`a5-popup-open`; `a5-popup-opening` for one the opening asks).
+- **Media after a relaunch.** A Blorb's pictures and sounds are read through
+  a Glk stream, and the library restore replaces every stream, so
+  `gsc_a5_rebind_resources` registers the resource map again. The
+  `a5-sound-after-restore` and `a5-image-after-restore` cases compare the
+  resource loads the app is sent (number, offset, length, file) with those of
+  one unbroken session, across two relaunches.
+- **Other cases.** A corrupt container is discarded; a container without its
+  undo tail still restores.
+- **`xfail` cases.** These record state the autosave does not carry yet. An
+  XPASS fails the run, so the list stays current. There are none at present.
+- **Environment.** Autosaves are keyed by `SPATTERLIGHT_AUTOSAVE_SIGNATURE`.
+  They still land in the real `~/Library/Application Support/Spatterlight`
+  (the directory lookup ignores `$HOME`), and the script removes them itself.
+  The default terp is refused if it is older than the engine sources.
+
+## Elsewhere
+
+The reverse-engineering inputs behind the battle port are not in the repo — the
+DotFix VB Decompiler output of `run400.exe` (`Battles.bas` is the combat engine
+the port was derived from), the original ADRIFT 4 Runner/Generator and manual,
+and the jAsea jar — and live under `~/adrift-battle/`. The one-off C probes that
+sat beside them were written against the pre-rename C `terps/scare` and no
+longer build; their durable content survives as `terps/scarier/test/adrift4/harness/battle_test.cpp`
+and `harness/scproj_test.cpp`.

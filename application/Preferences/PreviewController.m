@@ -9,6 +9,7 @@
 #import "GlkStyle.h"
 
 #import "PreviewController.h"
+#import "Preferences.h"
 
 @interface PreviewTextView : NSTextView
 
@@ -28,6 +29,9 @@
 
 @interface PreviewController ()
 
+@property (strong) IBOutlet PreviewTextView *sampleTextView;
+@property (strong) IBOutlet NSLayoutConstraint *previewHeightConstraint;
+
 @end
 
 @implementation PreviewController
@@ -35,7 +39,7 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.view.wantsLayer = YES;
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(notePreferencesChanged:) name:@"PreferencesChanged" object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(notePreferencesChanged:) name:kPreferencesChangedNotification object:nil];
 }
 
 - (void)fixScrollBar {
@@ -45,7 +49,7 @@
     scrollview.backgroundColor = _sampleTextView.backgroundColor;
     scrollview.hasHorizontalScroller = NO;
     scrollview.hasVerticalScroller = YES;
-    scrollview.verticalScroller.alphaValue = 100;
+    scrollview.verticalScroller.alphaValue = 1;
     scrollview.autohidesScrollers = YES;
 }
 
@@ -54,27 +58,35 @@
 
 - (void)notePreferencesChanged:(NSNotification *)notify {
     // Change the theme of the sample text field
-    _theme = (Theme *)notify.object;
+    if ([notify.object isKindOfClass:[Theme class]])
+        _theme = (Theme *)notify.object;
     [self updatePreviewText];
     _textHeight.constant = MIN(NSHeight(self.view.frame), NSHeight(_sampleTextView.frame));
 }
 
++ (NSAttributedString *)attributedPreviewForTheme:(Theme *)theme {
+    NSMutableAttributedString *attrStr = [NSMutableAttributedString new];
+    NSMutableDictionary *attributes = theme.bufSubH.attributeDict.mutableCopy;
+
+    NSParagraphStyle *para = theme.bufferNormal.attributeDict[NSParagraphStyleAttributeName];
+    attributes[NSParagraphStyleAttributeName] = para;
+
+    [attrStr appendAttributedString:[[NSAttributedString alloc] initWithString:NSLocalizedString(@"Palace Gate", nil) attributes:attributes]];
+    [attrStr appendAttributedString:[[NSAttributedString alloc] initWithString:NSLocalizedString(@" A tide of perambulators surges north along the crowded Broad Walk. ", nil) attributes:theme.bufferNormal.attributeDict]];
+    [attrStr appendAttributedString:[[NSAttributedString alloc] initWithString:NSLocalizedString(@"(Trinity, Brian Moriarty, Infocom 1986)", nil) attributes:theme.bufEmph.attributeDict]];
+    return attrStr;
+}
+
 - (void)updatePreviewText {
+    // The theme is weak: if it was deleted, show the current one instead of a blank preview
+    if (_theme == nil || _theme.isDeleted || _theme.managedObjectContext == nil)
+        _theme = Preferences.currentTheme;
     if (NSWidth(_sampleTextView.frame) != NSWidth(_sampleTextView.enclosingScrollView.frame)) {
         NSRect frame = _sampleTextView.frame;
         frame.size.width = NSWidth(_sampleTextView.enclosingScrollView.frame);
         _sampleTextView.frame = frame;
     }
-    NSMutableAttributedString *attrStr = [NSMutableAttributedString new];
-    NSMutableDictionary *attributes = _theme.bufSubH.attributeDict.mutableCopy;
-
-    NSParagraphStyle *para = _theme.bufferNormal.attributeDict[NSParagraphStyleAttributeName];
-    attributes[NSParagraphStyleAttributeName] = para;
-    
-    [attrStr appendAttributedString:[[NSAttributedString alloc] initWithString:NSLocalizedString(@"Palace Gate", nil) attributes:attributes]];
-    [attrStr appendAttributedString:[[NSAttributedString alloc] initWithString:NSLocalizedString(@" A tide of perambulators surges north along the crowded Broad Walk. ", nil) attributes:_theme.bufferNormal.attributeDict]];
-    [attrStr appendAttributedString:[[NSAttributedString alloc] initWithString:NSLocalizedString(@"(Trinity, Brian Moriarty, Infocom 1986)", nil) attributes:_theme.bufEmph.attributeDict]];
-    [_sampleTextView.textStorage setAttributedString:attrStr];
+    [_sampleTextView.textStorage setAttributedString:[PreviewController attributedPreviewForTheme:_theme]];
     [_sampleTextView.layoutManager ensureLayoutForTextContainer:_sampleTextView.textContainer];
     _textHeight.constant = NSHeight(_sampleTextView.frame);
     _sampleTextView.backgroundColor = _theme.bufferBackground;
@@ -86,7 +98,7 @@
     NSTextStorage *textStorage = [[NSTextStorage alloc] initWithAttributedString:[_sampleTextView.textStorage copy]];
     CGFloat textWidth = _sampleTextView.frame.size.width;
     NSTextContainer *textContainer = [[NSTextContainer alloc]
-                                      initWithContainerSize:NSMakeSize(textWidth, FLT_MAX)];
+                                      initWithContainerSize:NSMakeSize(textWidth, CGFLOAT_MAX)];
 
     NSLayoutManager *layoutManager = [[NSLayoutManager alloc] init];
     [layoutManager addTextContainer:textContainer];

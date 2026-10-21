@@ -1,4 +1,4 @@
-// Copyright 2010-2021 Chris Spiegel.
+// Copyright 2010-2024 Chris Spiegel.
 //
 // SPDX-License-Identifier: MIT
 
@@ -13,6 +13,7 @@
 #include <locale>
 #include <memory>
 #include <new>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -35,11 +36,20 @@
 #include "util.h"
 #include "zterp.h"
 
+#ifdef ZTERP_GLK
+#include "glkautosave.h"
+#endif
+
 #ifdef SPATTERLIGHT
 #include "journey.hpp"
 #endif
 
 using namespace std::literals;
+
+class SaveError : public std::runtime_error {
+public:
+    using std::runtime_error::runtime_error;
+};
 
 enum class StoreWhere {
     Variable,
@@ -53,6 +63,8 @@ struct CallFrame {
     uint8_t nlocals;
     uint8_t nargs;
     uint16_t where;
+    bool internal;
+
     std::array<uint16_t, 15> locals;
 };
 
@@ -82,7 +94,7 @@ static uint16_t pop_stack()
     return *--sp;
 }
 
-struct SaveState {
+class SaveState {
 public:
     SaveType savetype;
     std::vector<uint8_t> quetzal;
@@ -98,7 +110,7 @@ public:
 private:
     static std::string format_time() {
         auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-        auto lt = std::localtime(&now);
+        auto *lt = std::localtime(&now);
 
         if (lt == nullptr) {
             return "<no time information>";
@@ -156,7 +168,7 @@ static std::unordered_map<SaveStackType, SaveStack> save_stacks;
 
 bool seen_save_undo = false;
 
-static void add_frame(uint32_t pc_, uint16_t *sp_, uint8_t nlocals, uint8_t nargs, uint16_t where)
+static void add_frame(uint32_t pc_, uint16_t *sp_, uint8_t nlocals, uint8_t nargs, uint16_t where, bool internal = false)
 {
     ZASSERT(fp != TOP_OF_FRAMES, "call stack too deep: %ld", NFRAMES + 1);
 
@@ -165,8 +177,16 @@ static void add_frame(uint32_t pc_, uint16_t *sp_, uint8_t nlocals, uint8_t narg
     fp->nlocals = nlocals;
     fp->nargs = nargs;
     fp->where = where;
+    fp->internal = internal;
 
     fp++;
+}
+
+// The number of locals of the routine currently executing: variable() and
+// store_variable() abort on anything above it.
+uint8_t current_frame_nlocals()
+{
+    return CURRENT_FRAME->nlocals;
 }
 
 uint16_t variable(uint16_t var)
@@ -204,11 +224,11 @@ void store_variable(uint16_t var, uint16_t n)
     }
 }
 
-uint16_t *stack_top_element()
+static uint16_t &stack_top_element()
 {
     ZASSERT(sp > CURRENT_FRAME->sp, "stack underflow");
 
-    return sp - 1;
+    return sp[-1];
 }
 
 void zpush()
@@ -225,7 +245,7 @@ void zpull()
 
         // The z-spec 1.1 requires indirect variable references to the stack not to push/pop
         if (zargs[0] == 0) {
-            *stack_top_element() = v;
+            stack_top_element() = v;
         } else {
             store_variable(zargs[0], v);
         }
@@ -234,6 +254,9 @@ void zpull()
             v = pop_stack();
         } else {
             uint16_t slots = user_word(zargs[0]) + 1;
+
+            ZASSERT(slots != 0, "user stack counter overflow");
+            ZASSERT(zargs[0] + (2UL * slots) <= header.static_end - 2, "user stack access out of bounds");
 
             v = user_word(zargs[0] + (2 * slots));
 
@@ -248,7 +271,7 @@ void zload()
 {
     // The z-spec 1.1 requires indirect variable references to the stack not to push/pop
     if (zargs[0] == 0) {
-        store(*stack_top_element());
+        store(stack_top_element());
     } else {
         store(variable(zargs[0]));
     }
@@ -258,17 +281,22 @@ void zstore()
 {
     // The z-spec 1.1 requires indirect variable references to the stack not to push/pop
     if (zargs[0] == 0) {
-        *stack_top_element() = zargs[1];
+        stack_top_element() = zargs[1];
     } else {
         store_variable(zargs[0], zargs[1]);
     }
 }
 
-static void call(StoreWhere store_where)
+// “internal_var” is a somewhat special case: it needs to be paired with
+// StoreWhere::Push, and indicates which variable the opcode calling
+// this function will store to (so it is not meaningful for non-store
+// opcodes). Moreover, this is only necessary if the internal call might
+// call @save, as its sole purpose is to ensure the call frame has a
+// valid variable to store to on restore.
+static void call(StoreWhere store_where, std::optional<uint8_t> internal_var = std::nullopt)
 {
-    uint32_t jmp_to;
-    uint8_t nlocals;
     uint16_t where;
+    bool internal = false;
 
     if (zargs[0] == 0) {
         // call(StoreWhere::Push) should never happen if zargs[0] is 0.
@@ -278,24 +306,29 @@ static void call(StoreWhere store_where)
         return;
     }
 
-    jmp_to = unpack_routine(zargs[0]);
-    ZASSERT(jmp_to < memory_size - 1, "call to invalid address 0x%lx", static_cast<unsigned long>(jmp_to));
+    uint32_t jmp_to = unpack_routine(zargs[0]);
+    ZASSERT(jmp_to < memory_size, "call to invalid address 0x%lx", static_cast<unsigned long>(jmp_to));
 
-    nlocals = byte(jmp_to++);
+    uint8_t nlocals = byte(jmp_to++);
     ZASSERT(nlocals <= 15, "too many (%d) locals at 0x%lx", nlocals, static_cast<unsigned long>(jmp_to) - 1);
 
     if (zversion <= 4) {
-        ZASSERT(jmp_to + (nlocals * 2) < memory_size, "call to invalid address 0x%lx", static_cast<unsigned long>(jmp_to));
+        ZASSERT(jmp_to + (nlocals * 2) <= memory_size, "call to invalid address 0x%lx", static_cast<unsigned long>(jmp_to));
     }
 
     switch (store_where) {
     case StoreWhere::Variable: where = byte(pc++); break; // Where to store return value
     case StoreWhere::None:     where = 0xff + 1;   break; // Or a tag meaning no return value
-    case StoreWhere::Push:     where = 0xff + 2;   break; // Or a tag meaning push the return value
+    case StoreWhere::Push:
+        // A real variable if one was provided, otherwise a tag meaning
+        // push the return value.
+        where = internal_var.value_or(0xff + 2);
+        internal = true;
+        break;
     default:                   die("internal error: invalid store_where value (%d)", static_cast<int>(store_where));
     }
 
-    add_frame(pc, sp, nlocals, znargs - 1, where);
+    add_frame(pc, sp, nlocals, znargs - 1, where, internal);
 
     for (int i = 0; i < nlocals; i++) {
         if (i < znargs - 1) {
@@ -322,64 +355,34 @@ void start_v6()
     call(StoreWhere::None);
 }
 
-#ifdef ZTERP_GLK
-uint16_t internal_call(uint16_t routine)
+uint16_t internal_call(uint16_t routine, std::vector<uint16_t> args, std::optional<uint8_t> store_var)
 {
-    std::vector<uint16_t> saved_args(zargs.begin(), zargs.begin() + znargs);
+    auto saved_zargs = zargs;
+    auto saved_znargs = znargs;
 
-    znargs = 1;
+    ZASSERT(args.size() < 8, "internal error: too many arguments");
+
+    if (routine == 0) {
+        return 0;
+    }
+
+    znargs = 1 + args.size();
     zargs[0] = routine;
-    call(StoreWhere::Push);
+    std::copy(args.begin(), args.end(), &zargs[1]);
+    call(StoreWhere::Push, store_var);
 
     process_instructions();
 
-    std::copy(saved_args.begin(), saved_args.end(), zargs.begin());
-    znargs = saved_args.size();
+    zargs = saved_zargs;
+    znargs = saved_znargs;
 
     return pop_stack();
 }
 
 #ifdef SPATTERLIGHT
-uint16_t internal_call_with_args(uint16_t routine, uint16_t number_of_args, uint16_t *args)
-{
-    if (number_of_args > 4)
-        return 0;
-
-    std::vector<uint16_t> saved_args(zargs.begin(), zargs.begin() + znargs);
-
-    znargs = number_of_args + 1;
-    zargs[0] = routine;
-    for (int i = 1; i <= number_of_args; i++) {
-        zargs[i] = args[i - 1];
-    }
-
-    call(StoreWhere::Push);
-
-    process_instructions();
-
-    std::copy(saved_args.begin(), saved_args.end(), zargs.begin());
-    znargs = (int)saved_args.size();
-
-    return pop_stack();
-}
-
-uint16_t internal_call_with_arg(uint16_t routine, uint16_t arg)
-{
-    uint16_t args[1] = { arg };
-    return internal_call_with_args(routine, 1, args);
-}
-
-uint16_t internal_call_with_2_args(uint16_t routine, uint16_t arg1, uint16_t arg2)
-{
-    uint16_t args[2] = { arg1 , arg2 };
-    return internal_call_with_args(routine, 2, args);
-}
-
 uint16_t internal_arg_count(void) {
     return CURRENT_FRAME->nargs;
 }
-#endif
-
 #endif
 
 void zcall_store()
@@ -393,20 +396,21 @@ void zcall_nostore()
 
 void do_return(uint16_t retval)
 {
-    uint16_t where;
-
-    ZASSERT(NFRAMES > 1, "return attempted outside of a function");
+    ZASSERT(NFRAMES > 1, zversion == 6 ? "illegal return from main function" : "return attempted outside of a function");
 
     pc = CURRENT_FRAME->pc;
     sp = CURRENT_FRAME->sp;
-    where = CURRENT_FRAME->where;
+    uint16_t where = CURRENT_FRAME->where;
+    bool internal = CURRENT_FRAME->internal;
     fp--;
+
+    if (internal) {
+        push_stack(retval);
+        throw Operation::ReturnFromInternal();
+    }
 
     if (where <= 0xff) {
         store_variable(where, retval);
-    } else if (where == 0xff + 2) {
-        push_stack(retval);
-        throw Operation::Return();
     }
 }
 
@@ -464,6 +468,7 @@ void zcheck_arg_count()
     branch_if(zargs[0] <= CURRENT_FRAME->nargs);
 }
 
+#ifndef ZTERP_NO_V6
 void zpop_stack()
 {
     if (znargs == 1) {
@@ -484,11 +489,14 @@ void zpush_stack()
         return;
     }
 
+    ZASSERT(zargs[1] + (2UL * slots) <= header.static_end - 2, "user stack access out of bounds");
+
     user_store_word(zargs[1] + (2 * slots), zargs[0]);
     user_store_word(zargs[1], slots - 1);
 
     branch_if(true);
 }
+#endif
 
 // Compress dynamic memory according to Quetzal. On failure,
 // std::bad_alloc is thrown.
@@ -538,7 +546,7 @@ static bool uncompress_memory(const uint8_t *compressed, uint32_t size)
 {
     uint32_t memory_index = 0;
 
-    std::memcpy(memory, dynamic_memory, header.static_start);
+    std::copy(dynamic_memory.begin(), dynamic_memory.begin() + header.static_start, memory.begin());
 
     for (uint32_t i = 0; i < size; i++) {
         if (compressed[i] != 0) {
@@ -591,7 +599,7 @@ static IFF::TypeID write_mem(IO &savefile)
 {
     std::vector<uint8_t> compressed;
     uint32_t memsize = header.static_start;
-    const uint8_t *mem = memory;
+    const uint8_t *mem = memory.data();
     IFF::TypeID type = IFF::TypeID("UMem");
 
     try {
@@ -618,13 +626,11 @@ static IFF::TypeID write_stks(IO &savefile)
     // calculate the evaluation stack used by the current routine.
     fp->sp = sp;
     for (CallFrame *p = BASE_OF_FRAMES; p != fp; p++) {
-        uint8_t flags;
-
         savefile.write8((p->pc >> 16) & 0xff);
         savefile.write8((p->pc >>  8) & 0xff);
         savefile.write8((p->pc >>  0) & 0xff);
 
-        flags = p->nlocals;
+        uint8_t flags = p->nlocals;
         if (p->where > 0xff) {
             flags |= 0x10;
         }
@@ -637,6 +643,12 @@ static IFF::TypeID write_stks(IO &savefile)
         }
 
         savefile.write8((1U << p->nargs) - 1);
+
+        // Quetzal stores this in 16 bits, so a perverse story that uses
+        // >64K of stack space isn’t compatible with Quetzal.
+        if ((p + 1)->sp - p->sp > 65535) {
+            throw SaveError(fstring("evaluation stack too large (frame #%td)", p - BASE_OF_FRAMES));
+        }
 
         // number of words of evaluation stack used
         savefile.write16((p + 1)->sp - p->sp);
@@ -715,25 +727,18 @@ static IFF::TypeID write_msav(IO &savefile)
 template<typename... Types>
 static void write_chunk(IO &io, IFF::TypeID (*writefunc)(IO &savefile, Types... args), Types... args)
 {
-    long chunk_pos, end_pos, size;
-    IFF::TypeID type;
-
-    chunk_pos = io.tell();
-    // Type and size, to be filled in below.
-    io.write32(0);
-    io.write32(0);
-    type = writefunc(io, args...);
+    IO chunk({}, IO::Mode::WriteOnly);
+    auto type = writefunc(chunk, args...);
     if (type.empty()) {
-        io.seek(chunk_pos, IO::SeekFrom::Start);
         return;
     }
-    end_pos = io.tell();
-    size = end_pos - chunk_pos - 8;
-    io.seek(chunk_pos, IO::SeekFrom::Start);
+
+    const auto &mem = chunk.get_memory();
+
     io.write32(type.val());
-    io.write32(size);
-    io.seek(end_pos, IO::SeekFrom::Start);
-    if ((size & 1) == 1) {
+    io.write32(mem.size());
+    io.write_exact(mem.data(), mem.size());
+    if ((mem.size() & 1) == 1) {
         io.write8(0); // padding
     }
 }
@@ -744,11 +749,12 @@ static void write_chunk(IO &io, IFF::TypeID (*writefunc)(IO &savefile, Types... 
 // BFZS instead of IFZS to prevent the files from being used by a normal
 // @restore (as they are not compatible). See Quetzal.md for a
 // description of how BFZS differs from IFZS.
-static bool save_quetzal(IO &savefile, SaveType savetype, SaveOpcode saveopcode, bool on_save_stack)
+//
+// On failure, SaveError is thrown.
+static void save_quetzal(IO &savefile, SaveType savetype, SaveOpcode saveopcode, bool on_save_stack)
 {
     try {
-        long file_size;
-        bool is_bfzs = savetype == SaveType::Meta || savetype == SaveType::Autosave;
+        bool is_bfzs = savetype == SaveType::Meta || savetype == SaveType::Autosave || savetype == SaveType::AutosaveLib;
 
         savefile.write_exact("FORM", 4);
         savefile.write32(0); // to be filled in
@@ -786,19 +792,18 @@ static bool save_quetzal(IO &savefile, SaveType savetype, SaveOpcode saveopcode,
             write_chunk(savefile, screen_write_scrn);
         }
 
-        if (savetype == SaveType::Autosave) {
+        if (savetype == SaveType::Autosave || savetype == SaveType::AutosaveLib) {
             write_chunk(savefile, write_undo);
             write_chunk(savefile, write_msav);
             write_chunk(savefile, random_write_rand);
         }
 
-        file_size = savefile.tell();
+        long file_size = savefile.tell();
         savefile.seek(4, IO::SeekFrom::Start);
         savefile.write32(file_size - 8); // entire file size minus 8 (FORM + size)
 
-        return true;
     } catch (const IO::IOError &) {
-        return false;
+        throw SaveError("unable to write to the save file");
     }
 }
 
@@ -835,8 +840,8 @@ static void read_mem(IFF &iff)
             throw RestoreError("memory size mismatch");
         }
         try {
-            iff.io()->read_exact(memory, header.static_start);
-        } catch (const IO::OpenError &) {
+            iff.io()->read_exact(memory.data(), header.static_start);
+        } catch (const IO::IOError &) {
             throw RestoreError("unexpected eof reading memory");
         }
     } else {
@@ -860,10 +865,7 @@ static void read_stks(IFF &iff)
 
     while (n < size) {
         uint8_t frame[8];
-        uint8_t nlocals;
-        uint16_t nstack;
         uint8_t nargs = 0;
-        uint32_t frame_pc;
 
         try {
             iff.io()->read_exact(frame, sizeof frame);
@@ -872,16 +874,20 @@ static void read_stks(IFF &iff)
         }
         n += sizeof frame;
 
-        nlocals = frame[3] & 0xf;
-        nstack = (frame[6] << 8) | frame[7];
+        uint8_t nlocals = frame[3] & 0xf;
+        uint16_t nstack = (frame[6] << 8) | frame[7];
         frame[5]++;
         while ((frame[5] >>= 1) != 0) {
             nargs++;
         }
 
-        frame_pc = (static_cast<uint32_t>(frame[0]) << 16) | (static_cast<uint32_t>(frame[1]) << 8) | static_cast<uint32_t>(frame[2]);
+        uint32_t frame_pc = (static_cast<uint32_t>(frame[0]) << 16) | (static_cast<uint32_t>(frame[1]) << 8) | static_cast<uint32_t>(frame[2]);
         if (frame_pc >= memory_size) {
             throw RestoreError(fstring("frame #%lu pc out of range (0x%lx)", static_cast<unsigned long>(frameno), static_cast<unsigned long>(frame_pc)));
+        }
+
+        if (fp == TOP_OF_FRAMES) {
+            throw RestoreError("call stack too deep in save file");
         }
 
         add_frame(frame_pc, sp, nlocals, nargs, ((frame[3] & 0x10) == 0x10) ? 0xff + 1 : frame[4]);
@@ -906,6 +912,10 @@ static void read_stks(IFF &iff)
                 s = iff.io()->read16();
             } catch (const IO::IOError &) {
                 throw RestoreError("unexpected eof reading stack entry");
+            }
+
+            if (sp == TOP_OF_STACK) {
+                throw RestoreError("eval stack too deep in save file");
             }
             push_stack(s);
 
@@ -941,17 +951,25 @@ static void read_args(IFF &iff, SaveOpcode &saveopcode)
 
     // @read takes between 1 and 4 operands, @read_char takes
     // between 1 and 3.
+    // @save and @restore take none. (Args are possible in z5,
+    // but I haven’t implemented that yet.)
     switch (saveopcode) {
     case SaveOpcode::Read:
         if (size != 2 && size != 4 && size != 6 && size != 8) {
-            throw RestoreError(fstring("invalid Args size: %lu", static_cast<unsigned long>(size)));
+            throw RestoreError(fstring("invalid Args size for %d: %lu", static_cast<int>(saveopcode), static_cast<unsigned long>(size)));
         }
         break;
     case SaveOpcode::ReadChar:
         if (size != 2 && size != 4 && size != 6) {
 #ifndef SPATTERLIGHT
-            throw RestoreError(fstring("invalid Args size: %lu", static_cast<unsigned long>(size)));
+            throw RestoreError(fstring("invalid Args size for %d: %lu", static_cast<int>(saveopcode), static_cast<unsigned long>(size)));
 #endif
+        }
+        break;
+    case SaveOpcode::Save:
+    case SaveOpcode::Restore:
+        if (size != 0) {
+            throw RestoreError(fstring("invalid Args size for %d: %lu", static_cast<int>(saveopcode), static_cast<unsigned long>(size)));
         }
         break;
     default:
@@ -975,7 +993,9 @@ static void read_bfzs_specific(IFF &iff, SaveType savetype, SaveOpcode &saveopco
 
     read_args(iff, saveopcode);
 
-    if (savetype == SaveType::Autosave && iff.find(IFF::TypeID("Rand"), size)) {
+    if ((savetype == SaveType::Autosave || savetype == SaveType::AutosaveLib) &&
+        iff.find(IFF::TypeID("Rand"), size))
+    {
         random_read_rand(*iff.io());
     }
 
@@ -1005,15 +1025,27 @@ static void read_undo_msav(IO &savefile, uint32_t size, SaveStackType type)
 
     try {
         uint32_t version = savefile.read32();
-        uint32_t count;
         SaveStack &save_stack = save_stacks[type];
         size_t actual_size = 0;
         if (version != 0) {
             return;
         }
-        count = savefile.read32();
+        uint32_t count = savefile.read32();
 
         actual_size += 4 + 4;
+
+        if (size < actual_size) {
+            return;
+        }
+
+        // Lengths below are read straight from the save file, and are
+        // used to size allocations. Nothing can be longer than what’s
+        // left of the chunk containing it, so check that before
+        // allocating: otherwise a corrupted autosave asking for 4GB is
+        // honored, and the failure only comes later, at end of file.
+        auto too_long = [&actual_size, size](uint32_t len) {
+            return actual_size > size || len > size - actual_size;
+        };
 
         SaveStack temp = SaveStack();
         temp.max = save_stack.max;
@@ -1022,13 +1054,11 @@ static void read_undo_msav(IO &savefile, uint32_t size, SaveStackType type)
         for (uint32_t i = 0; i < count; i++) {
             uint8_t savetype = static_cast<uint8_t>(SaveType::Meta);
             std::string desc;
-            uint32_t quetzal_size;
             std::vector<uint8_t> quetzal;
 
             if (type == SaveStackType::Game) {
                 savetype = savefile.read8();
                 if (static_cast<SaveType>(savetype) != SaveType::Normal && static_cast<SaveType>(savetype) != SaveType::Meta) {
-
                     return;
                 }
 
@@ -1038,22 +1068,35 @@ static void read_undo_msav(IO &savefile, uint32_t size, SaveStackType type)
 
                 actual_size += 1;
             } else if (type == SaveStackType::User) {
-                desc.resize(savefile.read32());
-                savefile.read_exact(&desc[0], desc.size());
+                uint32_t desc_size = savefile.read32();
 
-                actual_size += 4 + desc.size();
+                actual_size += 4;
+                if (too_long(desc_size)) {
+                    return;
+                }
+
+                desc.resize(desc_size);
+                savefile.read_exact(desc.data(), desc_size);
+
+                actual_size += desc_size;
             }
 
-            quetzal_size = savefile.read32();
+            uint32_t quetzal_size = savefile.read32();
+
+            actual_size += 4;
+            if (too_long(quetzal_size)) {
+                return;
+            }
+
             quetzal.resize(quetzal_size);
             savefile.read_exact(quetzal.data(), quetzal_size);
 
             if (count - i <= save_stack.max) {
-                SaveState newstate(static_cast<SaveType>(savetype), desc.c_str(), quetzal);
+                SaveState newstate(static_cast<SaveType>(savetype), desc.c_str(), std::move(quetzal));
                 temp.push(std::move(newstate));
             }
 
-            actual_size += 4 + quetzal_size;
+            actual_size += quetzal_size;
         }
 
         if (actual_size != size) {
@@ -1090,7 +1133,14 @@ static void read_msav(IO &savefile, uint32_t size)
 // restore will fail, but otherwise, it will proceed.
 static bool instruction_has_stack_argument(uint32_t addr)
 {
-    uint32_t types = user_byte(addr++);
+    // This function can’t assert (it’s not a hard failure if this
+    // address is out of bounds, as it comes from a save file); perform
+    // the out-of-bounds check manually.
+    if (addr >= memory_size) {
+        return false;
+    }
+
+    uint32_t types = byte(addr++);
 
     for (int i = 6; i >= 0; i -= 2) {
         switch ((types >> i) & 0x03) {
@@ -1101,7 +1151,11 @@ static bool instruction_has_stack_argument(uint32_t addr)
             addr++;
             break;
         case 2:
-            if (user_byte(addr++) == 0) {
+            if (addr >= memory_size) {
+                return false;
+            }
+
+            if (byte(addr++) == 0) {
                 return true;
             }
             break;
@@ -1115,11 +1169,11 @@ static bool instruction_has_stack_argument(uint32_t addr)
 
 static bool restore_quetzal(const std::shared_ptr<IO> &savefile, SaveType savetype, SaveOpcode &saveopcode, bool close_window)
 {
-    std::unique_ptr<IFF> iff;
+    std::optional<IFF> iff;
     uint32_t size;
     uint8_t ifhd[13];
     uint32_t newpc;
-    bool is_bfzs = savetype == SaveType::Meta || savetype == SaveType::Autosave;
+    bool is_bfzs = savetype == SaveType::Meta || savetype == SaveType::Autosave || savetype == SaveType::AutosaveLib;
     bool is_bfms = false;
     Stash stash;
     uint16_t flags2 = word(0x10);
@@ -1128,23 +1182,23 @@ static bool restore_quetzal(const std::shared_ptr<IO> &savefile, SaveType savety
 
     if (is_bfzs) {
         try {
-            iff = std::make_unique<IFF>(savefile, IFF::TypeID("BFZS"));
+            iff.emplace(savefile, IFF::TypeID("BFZS"));
         } catch (const IFF::InvalidFile &) {
             try {
-                iff = std::make_unique<IFF>(savefile, IFF::TypeID("BFMS"));
+                iff.emplace(savefile, IFF::TypeID("BFMS"));
                 is_bfms = true;
             } catch (const IFF::InvalidFile &) {
             }
         }
     } else {
         try {
-            iff = std::make_unique<IFF>(savefile, IFF::TypeID("IFZS"));
+            iff.emplace(savefile, IFF::TypeID("IFZS"));
         } catch (const IFF::InvalidFile &) {
         }
     }
 
     try {
-        if (iff == nullptr ||
+        if (!iff.has_value() ||
             !iff->find(IFF::TypeID("IFhd"), size) ||
             size != 13) {
 
@@ -1173,7 +1227,7 @@ static bool restore_quetzal(const std::shared_ptr<IO> &savefile, SaveType savety
             throw RestoreError("detected incompatible meta save: please file a bug report at https://bocfel.org/issues");
         }
 
-        if (is_bfzs && savetype == SaveType::Autosave) {
+        if (is_bfzs && (savetype == SaveType::Autosave || savetype == SaveType::AutosaveLib)) {
             if (iff->find(IFF::TypeID("Undo"), size)) {
                 read_undo(*iff->io(), size);
             }
@@ -1193,11 +1247,15 @@ static bool restore_quetzal(const std::shared_ptr<IO> &savefile, SaveType savety
         }
 
         if (iff->find(IFF::TypeID("Bfhs"), size)) {
+            // In the regular restore case, we display the history (from
+            // the save file) unless this is disabled by the -H option.
+            // We always redisplay after an autosave, unless we’re doing
+            // a library-state autosave, in which case we don’t need to.
             if (savetype == SaveType::Autosave || !options.disable_history_playback) {
                 try {
                     long start = iff->io()->tell();
 
-                    screen_read_bfhs(*iff->io(), savetype == SaveType::Autosave);
+                    screen_read_bfhs(*iff->io(), savetype);
 
                     if (iff->io()->tell() - start != size) {
                         throw RestoreError("history size mismatch");
@@ -1236,7 +1294,7 @@ static bool restore_quetzal(const std::shared_ptr<IO> &savefile, SaveType savety
         // before anything happens, it is guaranteed that the stacks were
         // empty before the restore process started. This is faster and
         // simpler than stashing.
-        if (is_bfzs && savetype == SaveType::Autosave) {
+        if (is_bfzs && (savetype == SaveType::Autosave || savetype == SaveType::AutosaveLib)) {
             save_stacks[SaveStackType::Game].clear();
             save_stacks[SaveStackType::User].clear();
         }
@@ -1247,7 +1305,8 @@ static bool restore_quetzal(const std::shared_ptr<IO> &savefile, SaveType savety
     pc = newpc;
 
     // §8.6.1.3
-    if (close_window && zversion == 3) {
+    // Except that for AutosaveLib, we’ll restore the upper window.
+    if (close_window && zversion == 3 && savetype != SaveType::AutosaveLib) {
         close_upper_window();
     }
 
@@ -1256,9 +1315,18 @@ static bool restore_quetzal(const std::shared_ptr<IO> &savefile, SaveType savety
     // Flags 2 to indicate a redraw is requested. The Z-Machine
     // Standards Document says this bit is for V6 only, but Infocom’s
     // documentation says V4+, and A Mind Forever Voyaging (which is V4)
-    // checks it.
-    if (zversion >= 4 && (savetype == SaveType::Autosave || savetype == SaveType::Meta)) {
-        flags2 |= FLAGS2_STATUS;
+    // checks it. For all other games which support this flag, setting
+    // it does more harm than good (see window_change() in screen.cpp).
+    if (is_game(Game::AMFV) && (savetype == SaveType::Autosave || savetype == SaveType::Meta)) {
+        flags2 |= FLAGS2_REDRAW;
+    }
+
+    if (savetype == SaveType::AutosaveLib) {
+        // Use the save file’s FLAGS2_TRANSCRIPT.
+        if (word(0x10) & FLAGS2_TRANSCRIPT)
+            flags2 |= FLAGS2_TRANSCRIPT;
+        else
+            flags2 &= ~FLAGS2_TRANSCRIPT;
     }
 
     // §6.1.2.2: The save might be from a different interpreter with
@@ -1281,19 +1349,19 @@ static bool restore_quetzal(const std::shared_ptr<IO> &savefile, SaveType savety
 
 static std::shared_ptr<IO> open_savefile(SaveType savetype, IO::Mode mode)
 {
-    std::unique_ptr<std::string> filename;
+    std::optional<std::string> filename;
 
-    if (savetype == SaveType::Autosave) {
+    if (savetype == SaveType::Autosave || savetype == SaveType::AutosaveLib) {
         filename = zterp_os_autosave_name();
-        if (filename == nullptr) {
+        if (!filename.has_value()) {
             return nullptr;
         }
     }
 
     try {
-        return std::make_shared<IO>(filename.get(), mode, IO::Purpose::Save);
+        return std::make_shared<IO>(filename, mode, IO::Purpose::Save);
     } catch (const IO::OpenError &) {
-        if (savetype != SaveType::Autosave) {
+        if (!(savetype == SaveType::Autosave || savetype == SaveType::AutosaveLib)) {
             warning("unable to open save file");
         }
 
@@ -1310,10 +1378,22 @@ bool do_save(SaveType savetype, SaveOpcode saveopcode)
         return false;
     }
 
-    if (!save_quetzal(*savefile, savetype, saveopcode, false)) {
-        warning("error while writing save file");
+    try {
+        save_quetzal(*savefile, savetype, saveopcode, false);
+    } catch (const SaveError &e) {
+        if (savetype != SaveType::Autosave && savetype != SaveType::AutosaveLib) {
+            show_message("Error saving: %s", e.what());
+        }
         return false;
     }
+
+#ifdef ZTERP_GLK
+    if (savetype == SaveType::AutosaveLib) {
+        if (!glkautosave_library_autosave()) {
+            return false;
+        }
+    }
+#endif
 
     return true;
 }
@@ -1323,10 +1403,7 @@ bool do_save(SaveType savetype, SaveOpcode saveopcode)
 // The “prompt” argument added by standard 1.1 is thus also ignored.
 void zsave()
 {
-    if (in_interrupt()) {
-        store(0);
-        return;
-    }
+    bool success = false;
 
 #ifdef SPATTERLIGHT
     if (is_spatterlight_journey) {
@@ -1334,7 +1411,23 @@ void zsave()
     }
 #endif
 
-    bool success = do_save(SaveType::Normal, SaveOpcode::None);
+    if (!in_interrupt()) {
+        // Autosave before blocking on the fileref prompt. (Which will
+        // certainly happen down in the guts of do_save(), because there
+        // is no suggested filename.)
+        //
+        // Yes, it’s goofy to call do_save() before do_save(), but that’s
+        // what happens if you want to autosave every time the Z-machine
+        // waits for input.
+        //
+        // (Note that we might have arrived here from zsave5().)
+        //
+        if (options.autosave && options.autosave_librarystate) {
+            do_save(SaveType::AutosaveLib, SaveOpcode::Save);
+        }
+
+        success = do_save(SaveType::Normal, SaveOpcode::None);
+    }
 
 #ifdef SPATTERLIGHT
     if (is_spatterlight_journey) {
@@ -1355,6 +1448,14 @@ void zsave()
 // this is.
 bool do_restore(SaveType savetype, SaveOpcode &saveopcode)
 {
+#ifdef ZTERP_GLK
+    if (savetype == SaveType::AutosaveLib) {
+        if (!glkautosave_library_autorestore()) {
+            return false;
+        }
+    }
+#endif
+
     auto savefile = open_savefile(savetype, IO::Mode::ReadOnly);
     if (savefile == nullptr) {
         return false;
@@ -1365,6 +1466,16 @@ bool do_restore(SaveType savetype, SaveOpcode &saveopcode)
 
 void zrestore()
 {
+    // Autosave before blocking on the fileref prompt. (Which will
+    // certainly happen down in the guts of do_restore(), because there
+    // is no suggested filename.)
+    //
+    // (Note that we might have arrived here from restore5().)
+    //
+    if (!in_interrupt() && options.autosave && options.autosave_librarystate) {
+        do_save(SaveType::AutosaveLib, SaveOpcode::Restore);
+    }
+
     SaveOpcode saveopcode;
     bool success = do_restore(SaveType::Normal, saveopcode);
 
@@ -1394,15 +1505,14 @@ SaveResult push_save(SaveStackType type, SaveType savetype, SaveOpcode saveopcod
     try {
         IO savefile(std::vector<uint8_t>(), IO::Mode::WriteOnly);
 
-        if (!save_quetzal(savefile, savetype, saveopcode, true)) {
-            return SaveResult::Failure;
-        }
+        save_quetzal(savefile, savetype, saveopcode, true);
 
         SaveState newstate(savetype, desc, savefile.get_memory());
         s.push(std::move(newstate));
 
         return SaveResult::Success;
-    } catch (const IO::OpenError &) {
+    } catch (const IO::Error &) {
+    } catch (const SaveError &) {
     } catch (const std::bad_alloc &) {
     }
 
@@ -1453,7 +1563,7 @@ bool drop_save(SaveStackType type, size_t i)
 
 void list_saves(SaveStackType type)
 {
-    SaveStack &s = save_stacks[type];
+    const SaveStack &s = save_stacks[type];
     auto nsaves = s.states.size();
 
     if (nsaves == 0) {
@@ -1557,18 +1667,18 @@ class MemoryStasher : public Stasher {
 public:
     void backup() override {
         try {
-            m_memory = std::make_unique<std::vector<uint8_t>>(memory, memory + header.static_start);
-        } catch (std::bad_alloc &) {
+            m_memory.emplace(memory.begin(), memory.begin() + header.static_start);
+        } catch (const std::bad_alloc &) {
             m_memory.reset();
         }
     }
 
     bool restore() override {
-        if (m_memory == nullptr) {
+        if (!m_memory.has_value()) {
             return false;
         }
 
-        std::copy(m_memory->begin(), m_memory->end(), memory);
+        std::copy(m_memory->begin(), m_memory->end(), memory.begin());
 
         return true;
     }
@@ -1578,21 +1688,21 @@ public:
     }
 
 private:
-    std::unique_ptr<std::vector<uint8_t>> m_memory;
+    std::optional<std::vector<uint8_t>> m_memory;
 };
 
 class StackStasher : public Stasher {
 public:
     void backup() override {
         try {
-            m_stack = std::make_unique<std::vector<uint16_t>>(stack, sp);
+            m_stack.emplace(stack, sp);
         } catch (const std::bad_alloc &) {
             m_stack.reset();
         }
     }
 
     bool restore() override {
-        if (m_stack == nullptr) {
+        if (!m_stack.has_value()) {
             return false;
         }
 
@@ -1607,21 +1717,21 @@ public:
     }
 
 private:
-    std::unique_ptr<std::vector<uint16_t>> m_stack;
+    std::optional<std::vector<uint16_t>> m_stack;
 };
 
 class FrameStasher : public Stasher {
 public:
     void backup() override {
         try {
-            m_frames = std::make_unique<std::vector<CallFrame>>(frames, fp);
+            m_frames.emplace(frames, fp);
         } catch (const std::bad_alloc &) {
             m_frames.reset();
         }
     }
 
     bool restore() override {
-        if (m_frames == nullptr) {
+        if (!m_frames.has_value()) {
             return false;
         }
 
@@ -1636,14 +1746,8 @@ public:
     }
 
 private:
-    std::unique_ptr<std::vector<CallFrame>> m_frames;
+    std::optional<std::vector<CallFrame>> m_frames;
 };
-
-// Replace with std::clamp when switching to C++17.
-template <typename T>
-const T &clamp(const T &value, const T &min, const T &max) {
-    return value < min ? min : value > max ? max : value;
-}
 
 void init_stack(bool first_run)
 {
@@ -1654,20 +1758,20 @@ void init_stack(bool first_run)
     // Also, the call stack can be no larger than 0xffff so that the
     // result of a @catch will fit into a 16-bit integer.
     if (first_run) {
-        options.eval_stack_size = clamp<size_t>(options.eval_stack_size, 1, SIZE_MAX / sizeof *stack);
+        options.eval_stack_size = std::clamp<size_t>(options.eval_stack_size, 1, SIZE_MAX / sizeof *stack);
         try {
             stack = new uint16_t[options.eval_stack_size];
-        } catch (std::bad_alloc &) {
+        } catch (const std::bad_alloc &) {
             die("unable to allocate %lu bytes for the evaluation stack", options.eval_stack_size * static_cast<unsigned long>(sizeof *stack));
         }
         TOP_OF_STACK = &stack[options.eval_stack_size];
 
-        options.call_stack_size = clamp<size_t>(options.call_stack_size, 1, std::min<size_t>(0xffff, (SIZE_MAX / sizeof *frames) - sizeof *frames));
+        options.call_stack_size = std::clamp<size_t>(options.call_stack_size, 1, std::min<size_t>(0xffff, (SIZE_MAX / sizeof *frames) - 1));
         try {
-            // One extra to help with saving (thus the subtraction of
-            // sizeof *frames above).
+            // One extra to help with saving (thus the subtraction of 1
+            // above).
             frames = new CallFrame[options.call_stack_size + 1];
-        } catch (std::bad_alloc &) {
+        } catch (const std::bad_alloc &) {
             die("unable to allocate %lu bytes for the call stack", (options.call_stack_size + 1) * static_cast<unsigned long>(sizeof *frames));
         }
         TOP_OF_FRAMES = &frames[options.call_stack_size];

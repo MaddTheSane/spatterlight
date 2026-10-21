@@ -1,0 +1,29 @@
+# ADRIFT 5 game files (copyrighted; not redistributable in the repo).
+# The a5run / groundtruth harnesses look here by default (A5_GAMES_DIR).
+/games/
+
+# Downloaded third-party walkthrough documents (source material for the
+# derived goldens/); not ours to commit.
+/downloaded/
+
+# Cached FrankenDrift ground-truth transcripts (a5_groundtruth.sh FD_CACHE).
+/harness/.fd_cache/
+
+# Symphonica 64 route-derivation scratch (see notes/Symphonica64_walkthrough.md).
+/harness/symph_work/
+
+# TASP, Dinner Plans, AFP2 and The Drunken Harlot: explicit text, deliberately not
+# committed.  (The Harlot pair was committed once, in a998af91, before this
+# rule covered it.)
+/goldens/TASP_expected.txt
+/goldens/TASP_walkthrough.txt
+/goldens/DinnerPlans_expected.txt
+/goldens/DinnerPlans_walkthrough.txt
+/goldens/AFP2_expected.txt
+/goldens/AFP2_walkthrough.txt
+/goldens/ECCI_expected.txt
+/goldens/ECCI_walkthrough.txt
+/goldens/TheDrunkenHarlot_expected.txt
+/goldens/TheDrunkenHarlot_walkthrough.txt
+/goldens/TheDrunkenHarlotSrc_expected.txt
+/goldens/TheDrunkenHarlotSrc_walkthrough.txt

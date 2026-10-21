@@ -38,27 +38,34 @@ namespace SFB {
 
 		private:
 
+			// Optional AudioFileTypeID hint passed to AudioFileOpenWithCallbacks.
+			// Useful when the input source is a CFData buffer whose format would
+			// otherwise need to be sniffed and may fail (e.g. ID3-prefixed MP3).
+			virtual void _SetFileTypeHint(uint32_t typeHint) override { mFileTypeHint = (AudioFileTypeID)typeHint; }
+
+
 			// Audio access
-			virtual bool _Open(CFErrorRef *error);
-			virtual bool _Close(CFErrorRef *error);
+			virtual bool _Open(CFErrorRef *error) override;
+			virtual bool _Close(CFErrorRef *error) override;
 
 			// The native format of the source audio
-			virtual SFB::CFString _GetSourceFormatDescription() const;
+			virtual SFB::CFString _GetSourceFormatDescription() const override;
 
 			// Attempt to read frameCount frames of audio, returning the actual number of frames read
-			virtual UInt32 _ReadAudio(AudioBufferList *bufferList, UInt32 frameCount);
+			virtual UInt32 _ReadAudio(AudioBufferList *bufferList, UInt32 frameCount) override;
 
 			// Source audio information
-			virtual SInt64 _GetTotalFrames() const;
-			virtual SInt64 _GetCurrentFrame() const;
+			virtual SInt64 _GetTotalFrames() const override;
+			virtual SInt64 _GetCurrentFrame() const override;
 
 			// Seeking support
-			inline virtual bool _SupportsSeeking() const			{ return mInputSource->SupportsSeeking(); }
-			virtual SInt64 _SeekToFrame(SInt64 frame);
+			inline virtual bool _SupportsSeeking() const override	{ return mInputSource->SupportsSeeking(); }
+			virtual SInt64 _SeekToFrame(SInt64 frame) override;
 
 			// Data members
 			AudioFileID			mAudioFile;
 			ExtAudioFileRef		mExtAudioFile;
+			AudioFileTypeID		mFileTypeHint = 0;
 		};
 
 	}

@@ -1,0 +1,20 @@
+
+BlockCase
+
+You are in Study.
+There is brass key and ghost here.
+You can go north.
+
+> x brass key
+A small brass key.
+
+> rub key
+It gleams.
+
+> probe
+It sparkles.
+
+> north
+You are in Hall.
+A bare hall.
+[runner] turns=4 leftover=0 running=true

@@ -1,0 +1,1901 @@
+=== Spatterlight Interpreter Log ===
+Game: Hamper.taf
+Interpreter: scarier
+
+[MSG] cmd=HELLO a1=0 a2=0 a3=0 len=0
+[REPLY] cmd=1 a1=1 a2=1 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=NEWWIN a1=3 a2=0 a3=0 len=0
+[REPLY] cmd=1 a1=0 a2=0 a3=0 len=0
+[MSG] cmd=SIZWIN a1=0 a2=0 a3=0 len=24
+[MSG] cmd=CLRWIN a1=0 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=32
+[TEXT] Loading game...
+
+[MSG] cmd=TIMER a1=100 a2=0 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=TIMER a1=0 a2=0 a3=0 len=0
+[MSG] cmd=STYLEMEASURE a1=0 a2=0 a3=8 len=0
+[REPLY] cmd=1 a1=1 a2=16777215 a3=0 len=0
+[MSG] cmd=DELWIN a1=0 a2=0 a3=0 len=0
+[MSG] cmd=SETTITLE a1=0 a2=0 a3=0 len=19
+[MSG] cmd=STYLEHINT a1=3 a2=9 a3=2 len=0
+[MSG] cmd=STYLEHINT a1=3 a2=10 a3=2 len=0
+[MSG] cmd=STYLEHINT a1=3 a2=10 a3=4 len=0
+[MSG] cmd=STYLEHINT a1=3 a2=6 a3=2 len=0
+[MSG] cmd=STYLEHINT a1=3 a2=3 a3=2 len=0
+[MSG] cmd=STYLEHINT a1=3 a2=4 a3=2 len=0
+[MSG] cmd=STYLEHINT a1=4 a2=9 a3=9 len=0
+[MSG] cmd=NEWWIN a1=3 a2=0 a3=0 len=0
+[REPLY] cmd=1 a1=0 a2=0 a3=0 len=0
+[MSG] cmd=SIZWIN a1=0 a2=0 a3=0 len=24
+[MSG] cmd=CLRWIN a1=0 a2=0 a3=0 len=0
+[MSG] cmd=NEWWIN a1=4 a2=1 a3=0 len=0
+[REPLY] cmd=1 a1=1 a2=0 a3=0 len=0
+[MSG] cmd=SIZWIN a1=1 a2=0 a3=0 len=24
+[MSG] cmd=SIZWIN a1=0 a2=0 a3=0 len=24
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=66
+[TEXT] To Hell in a Hamper | J. J. Guest
+[MSG] cmd=FINDIMAGE a1=1552921103 a2=0 a3=0 len=0
+[REPLY] cmd=1 a1=0 a2=0 a3=0 len=0
+[MSG] cmd=LOADIMAGE a1=1552921103 a2=35373 a3=44795 len=207
+[MSG] cmd=FINDIMAGE a1=1552921103 a2=0 a3=0 len=0
+[REPLY] cmd=1 a1=1 a2=0 a3=0 len=0
+[MSG] cmd=SIZEIMAGE a1=0 a2=0 a3=0 len=0
+[REPLY] cmd=1 a1=425 a2=253 a3=0 len=0
+[MSG] cmd=NEWWIN a1=5 a2=2 a3=0 len=0
+[REPLY] cmd=1 a1=2 a2=0 a3=0 len=0
+[MSG] cmd=SIZWIN a1=2 a2=0 a3=0 len=24
+[MSG] cmd=SIZWIN a1=1 a2=0 a3=0 len=24
+[MSG] cmd=SIZWIN a1=0 a2=0 a3=0 len=24
+[MSG] cmd=FINDIMAGE a1=1552921103 a2=0 a3=0 len=0
+[REPLY] cmd=1 a1=1 a2=0 a3=0 len=0
+[MSG] cmd=SIZEIMAGE a1=0 a2=0 a3=0 len=0
+[REPLY] cmd=1 a1=425 a2=253 a3=0 len=0
+[MSG] cmd=FILLRECT a1=2 a2=1 a3=0 len=12
+[MSG] cmd=FINDIMAGE a1=1552921103 a2=0 a3=0 len=0
+[REPLY] cmd=1 a1=1 a2=0 a3=0 len=0
+[MSG] cmd=DRAWIMAGE a1=2 a2=0 a3=0 len=28
+[MSG] cmd=FINDIMAGE a1=1552921103 a2=0 a3=0 len=0
+[REPLY] cmd=1 a1=1 a2=0 a3=0 len=0
+[MSG] cmd=SIZEIMAGE a1=0 a2=0 a3=0 len=0
+[REPLY] cmd=1 a1=425 a2=253 a3=0 len=0
+[MSG] cmd=DELWIN a1=2 a2=0 a3=0 len=0
+[MSG] cmd=SIZWIN a1=1 a2=0 a3=0 len=24
+[MSG] cmd=SIZWIN a1=0 a2=0 a3=0 len=24
+[MSG] cmd=FINDIMAGE a1=1552921103 a2=0 a3=0 len=0
+[REPLY] cmd=1 a1=1 a2=0 a3=0 len=0
+[MSG] cmd=DRAWIMAGE a1=0 a2=0 a3=0 len=28
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] 
+
+[MSG] cmd=CLRWIN a1=0 a2=0 a3=0 len=0
+[MSG] cmd=FINDIMAGE a1=1552921103 a2=0 a3=0 len=0
+[REPLY] cmd=1 a1=1 a2=0 a3=0 len=0
+[MSG] cmd=DRAWIMAGE a1=0 a2=0 a3=0 len=28
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] 
+
+[MSG] cmd=PRINT a1=0 a2=3 a3=0 len=2
+[TEXT] 
+
+[MSG] cmd=PRINT a1=0 a2=9 a3=0 len=414
+[TEXT] To Hell in a Hamper
+By J. J. Guest
+With thanks to my beta-testers, Amby, Liz and Woodfish
+and to my brother Dan for his many suggestions.
+
+From the log of Professor Pettibone, eminent Victorian Balloonist:
+
+
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] 
+
+[MSG] cmd=PRINT a1=0 a2=1 a3=0 len=106
+[TEXT] Twenty-fourth of February, 1876. The English Channel.
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=1726
+[TEXT] 
+
+Our Journey begins! A large crowd gathered this morning in Berkeley Square as we made our final preparations for what is to be one of the most daring expeditions ever undertaken; a journey around the world by balloon. Our vessel, which I have christened Titania, consists of a strong wicker basket borne aloft by a sealed balloon containing 30,000 cubic feet of hydrogen, an amount which, according to my calculations, should be quite sufficient to carry myself, Mr. Booby and all of our supplies and equipment. Mr. Booby is travelling with me as a last-minute replacement for Doctor Cox, who was suddenly taken ill with a serious case of the dreaded badly-bruised knees just days before the launch. At eleven o'clock, amid cries of 'Huzzah!' I cut the ropes binding the balloon to the earth and we soared aloft on the first leg of our journey...
+
+Press any key
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=66
+[TEXT] To Hell in a Hamper | J. J. Guest
+[MSG] cmd=NEWWIN a1=5 a2=2 a3=0 len=0
+[REPLY] cmd=1 a1=2 a2=0 a3=0 len=0
+[MSG] cmd=SIZWIN a1=1 a2=0 a3=0 len=24
+[MSG] cmd=SIZWIN a1=0 a2=0 a3=0 len=24
+[MSG] cmd=SIZWIN a1=2 a2=0 a3=0 len=24
+[MSG] cmd=STYLEMEASURE a1=0 a2=0 a3=7 len=0
+[REPLY] cmd=1 a1=1 a2=0 a3=0 len=0
+[MSG] cmd=STYLEMEASURE a1=0 a2=0 a3=8 len=0
+[REPLY] cmd=1 a1=1 a2=16777215 a3=0 len=0
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=FILLRECT a1=2 a2=281 a3=0 len=3372
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=INITCHAR a1=0 a2=0 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=CLRWIN a1=0 a2=0 a3=0 len=0
+[MSG] cmd=FINDIMAGE a1=1552921103 a2=0 a3=0 len=0
+[REPLY] cmd=1 a1=1 a2=0 a3=0 len=0
+[MSG] cmd=DRAWIMAGE a1=0 a2=0 a3=0 len=28
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] 
+
+[MSG] cmd=PRINT a1=0 a2=1 a3=0 len=108
+[TEXT] Fourteenth of September, 1876. Fujian province, China.
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=1926
+[TEXT] 
+
+I began to have my doubts about Mr. Booby almost as soon as the balloon had made its ascent from berkeley Square. The instant we left the earth, Mr. Booby got into such convulsions of nausea that I began to doubt his credentials as a balloonist, and as a suitable replacement for poor Dr. Cox, who was suddenly taken ill just days before our take-off.
+
+Though I have expressed to him many times the importance of keeping the weight of the balloon down to a minimum, I am beginning to suspect that Mr. Booby has, against my wishes, been smuggling souvenirs of our journey into the balloon under that great coat of his. Only this morning I caught sight of him in a marketplace, haggling over the price of a particularly ugly vase. He was not exactly a small man even before our journey began, and he seems to grow progressively larger as our journey goes on. There is something about that strange, mis-shapen coat of his that arouses my suspicions.
+
+Press any key
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=66
+[TEXT] To Hell in a Hamper | J. J. Guest
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=INITCHAR a1=0 a2=0 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=CLRWIN a1=0 a2=0 a3=0 len=0
+[MSG] cmd=FINDIMAGE a1=1552921103 a2=0 a3=0 len=0
+[REPLY] cmd=1 a1=1 a2=0 a3=0 len=0
+[MSG] cmd=DRAWIMAGE a1=0 a2=0 a3=0 len=28
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] 
+
+[MSG] cmd=PRINT a1=0 a2=1 a3=0 len=98
+[TEXT] Twenty-sixth of June, 1877. The Ecuadorian Andes.
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=1494
+[TEXT] 
+
+Our situation is desperate. A strong wind blows us ever closer to the mouth of an erupting volcano. Our altitude is twelve thousand feet, and in in spite of all my efforts, I am unable to raise the balloon any higher. I have been forced to throw out all four sandbags, our food and water supplies, our first-aid kit, our compass, variometer and theodolite, and yet still we are too low to safely clear the volcano! In a moment I shall be forced to throw out this very log-book, along with the pencil I am writing with, and all my outer garments, in a last ditch effort to gain the necessary altitude of twenty thousand feet.
+
+Mr. Booby assures me that he has disposed of all unnecessary weight, and yet somehow I doubt his veracity. If there is 
+[MSG] cmd=PRINT a1=0 a2=1 a3=0 len=32
+[TEXT] anything at all 
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=18
+[TEXT] concealed
+[MSG] cmd=PRINT a1=0 a2=1 a3=0 len=2
+[TEXT]  
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=352
+[TEXT] beneath that voluminous coat of his, I must find it now and dispose of it over the side of the basket, or we are both doomed!
+
+- Professor Pettibone, balloonist.
+
+Press any key
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=66
+[TEXT] To Hell in a Hamper | J. J. Guest
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=INITCHAR a1=0 a2=0 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=CLRWIN a1=0 a2=0 a3=0 len=0
+[MSG] cmd=FINDIMAGE a1=1552921103 a2=0 a3=0 len=0
+[REPLY] cmd=1 a1=1 a2=0 a3=0 len=0
+[MSG] cmd=DRAWIMAGE a1=0 a2=0 a3=0 len=28
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=8
+[TEXT] 
+
+
+
+
+[MSG] cmd=PRINT a1=0 a2=4 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=1030
+[TEXT] 
+I am in the basket of the balloon, high, though not high enough above the foothills of the Andes. Directly ahead of us is a glow in the sky; the heavens themselves seem to be ablaze as the wind carries us ever nearer to an erupting volcano! Attached to the ropes that hold the balloon aloft is a brass altimeter, the one and only piece of aeronautical equipment that has not been sacrificed.  The basket is otherwise completely empty.  Hubert Booby stands in the corner of the basket, peering at me suspiciously.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 12,000 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=26
+[TEXT] EXAMINE BOOBY
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=408
+[TEXT] 
+Hubert is a man of prodigious girth, pasty and unhealthy looking with slicked down hair and beady little eyes that follow you about.  Hubert is wearing a large, bulky overcoat and a shapeless felt hat.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 12,000 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=32
+[TEXT] EXAMINE OVERCOAT
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=790
+[TEXT] 
+Hubert habitually wears this huge black overcoat. It seems to have been designed with only a small breast pocket, but a larger side pocket has been crudely stitched to the side.  The overcoat is bursting at the seams; it is buttoned up but the buttons threaten to pop off under the strain. The occasional slight movement from within the bulk suggest something untoward is going on in there...
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 12,000 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=38
+[TEXT] EXAMINE SIDE POCKET
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=440
+[TEXT] 
+A large pocket that seems not to have been part of the coat's original design.  Despite Hubert's protestations, I am able to take a quick peek at its contents, which appear to consist of a tin box and a rubber mallet.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 12,000 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=20
+[TEXT] GET MALLET
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=192
+[TEXT] 
+Before Hubert has time to react, I snatch the rubber mallet from the side pocket of his coat.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 12,000 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=16
+[TEXT] OPEN BOX
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=190
+[TEXT] 
+I open the sewing kit, finding inside a pair of sharp scissors, a ball of yarn and a needle.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 12,000 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=24
+[TEXT] GET SCISSORS
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=114
+[TEXT] 
+I take the pair of sharp scissors from the sewing kit.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 12,000 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=20
+[TEXT] GET NEEDLE
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=82
+[TEXT] 
+I take the needle from the sewing kit.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 12,000 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=16
+[TEXT] GET YARN
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=94
+[TEXT] 
+I take the ball of yarn from the sewing kit.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 12,000 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=42
+[TEXT] EXAMINE BREAST POCKET
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=254
+[TEXT] 
+A small pocket on the front of the overcoat.  The corner of a handkerchief can be seen poking out of Hubert's breast pocket.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 12,000 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=32
+[TEXT] GET HANDKERCHIEF
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=754
+[TEXT] 
+I take hold of the corner of the handkerchief and tug, whereupon, like some infernal conjouring trick, the one handkerchief is attached to another, and another, until I am holding a huge bundle of coloured handkerchiefs all tied together at the corners. 'Leave those alone!' protests Hubert, 'my Aunt Gertie will be very annoyed when she finds out you've stolen my hankies!'
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 12,000 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=22
+[TEXT] CUT BUTTONS
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=1370
+[TEXT] 
+As soon as Hubert sees me approaching with the scissors he understandably backs away, but in the confines of the balloon I soon have him cornered. His vigourous attempts to fend me off are quite inneffectual.
+
+With a deft movement of the wrist I succeed in cutting through the tough thread that binds each button to the coat. As I do so each button flies off like a speeding bullet, and finally, with a great rending sound the coat bursts open, spilling a multitude of diverse objects onto the floor of the basket! These items consist of a large framed painting, an enormous carpetbag, a bundle of twigs, a boomerang, an ear-trumpet, a toy donkey and a sleeping Saint Bernard dog...
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 12,000 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=26
+[TEXT] GET BOOMERANG
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=48
+[TEXT] 
+I take the boomerang.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 12,000 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=44
+[TEXT] THROW BOOMERANG AT HAT
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=508
+[TEXT] 
+I hurl the boomerang at Hubert's hat, in the time honoured tradition of the Australian Aboriginal hunters. Unfortunately Hubert ducks, and the boomerang whistles off into the distance. 'You're going to have to try harder than that, old man!' he jeers.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 12,300 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=8
+[TEXT] WAIT
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=932
+[TEXT] 
+Time passes...
+
+
+There is a strange whistling noise, and a second later a loud crack as the boomerang returns, hitting Hubert on the back of the head. Hubert yelps with pain and the felt hat topples to the floor with a heavy thump. As it hits the floor a large cuckoo clock, which Hubert had been concealing under it, drops out and lands by my feet. The clock immediately begins to chime...
+
+
+The clock chimes five times. 'CUCKOO! CUCKOO! CUCKOO! CUCKOO! CUCKOO!'
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 12,000 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=18
+[TEXT] GET CLOCK
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=138
+[TEXT] 
+I pick up the cuckoo clock. 'Put that down at once!' cries Hubert.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 12,000 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=22
+[TEXT] THROW CLOCK
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=1404
+[TEXT] 
+I hurl the cuckoo clock over the side of the basket. It continues to chime long after it has disappeared into the wreath of thin cloud that hovers below us.
+
+'You maniac!' screams Hubert, shuddering like a Quaker. 'That clock was to have adorned the kitchen wall of my dear Aunt Gertie. Its hourly chiming would have reminded her when it was time to make my tea, run my bath and a thousand other duties incumbent upon her as my legal guardian!'
+
+
+The balance between the weight of the balloon and the lift provided by the gas is so delicate that jettisoning even a very light object causes an immediate vertical displacement. In this instance, the balloon gains around five hundred feet in altitude.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 12,500 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=14
+[TEXT] GET HAT
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=204
+[TEXT] 
+I pick up the shapeless felt hat. 'If you damage that,' says Hubert, 'I shall tell my Aunt Gertie!'
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 12,500 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=18
+[TEXT] THROW HAT
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=978
+[TEXT] 
+I drop the ratty old hat over the side of the basket. As it tumbles away into the clouds, Hubert screams 'You imbecile! My great uncle Percy wore that hat during the Charge of the Light Brigade! It was his dying wish that I should wear it every day of my life!'
+
+
+The equilibrium of a balloon in the air is so sensitive that the loss of an almost  insignificant weight can produce a very appreciable displacement. In this instance, the balloon gains around one hundred feet in altitude.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 12,600 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=20
+[TEXT] GET DONKEY
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=124
+[TEXT] 
+I pick up the toy donkey. 'Leave that alone!' cries Hubert.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 12,600 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=24
+[TEXT] THROW DONKEY
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=766
+[TEXT] 
+I fling the toy donkey over the side of the balloon and watch as it spirals to Earth. 'You maniac!' screams Hubert, wringing his hands and quivering all over like an oversized lemon jelly. 'The shopkeeper assured me that donkey was one-of-a-kind!'
+
+
+Unburdening the balloon of this quite large and heavy object causes a sudden and immediate gain in altitude of seven hundred feet.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 13,300 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=24
+[TEXT] GET PAINTING
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=78
+[TEXT] 
+I pick up the large framed painting.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 13,300 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=28
+[TEXT] THROW PAINTING
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=918
+[TEXT] 
+Without hesitation I fling the painting over the side, thereby consigning that artistic abberration to oblivion. It seems the kindest thing to do.
+
+'You imbecile!' cries Hubert, tearing out great clumps of his own hair, 'I bought that painting to adorn the walls of my dear Aunt Gertie's drawing room. You'll pay for this!'
+
+
+Unburdening the balloon of this quite large and heavy object causes a sudden and immediate gain in altitude of seven hundred feet.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 14,000 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=22
+[TEXT] GET TRUMPET
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=52
+[TEXT] 
+I take the ear-trumpet.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 14,000 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=32
+[TEXT] EXAMINE OVERCOAT
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=728
+[TEXT] 
+Hubert habitually wears this huge black overcoat. It seems to have been designed with only a small breast pocket, but a larger side pocket has been crudely stitched to the side.  The overcoat is flapping open, the buttons having long since flown the coop. There is a peculiar bulge in the tartan lining, and I can now see that the overcoat has an inside pocket.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 14,000 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=42
+[TEXT] EXAMINE INSIDE POCKET
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=230
+[TEXT] 
+A small pocket in the lining of Hubert's overcoat. The inside pocket contains a cigarette lighter and a hatchet.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 14,000 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=22
+[TEXT] GET LIGHTER
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=336
+[TEXT] 
+I reach inside Hubert's overcoat and retrieve the lighter. 'Stop! Thief!' yells Hubert, presumably in the hope of attracting the attention of the local constabulary.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 14,000 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=22
+[TEXT] GET HATCHET
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=244
+[TEXT] 
+I reach inside Hubert's overcoat and retrieve the hatchet from his inside pocket, immediately recognising it as my own!
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 14,000 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=28
+[TEXT] EXAMINE LINING
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=238
+[TEXT] 
+Hubert's overcoat is lined with coarse tartan material.  There is a conspicuous bulge in the lining of the overcoat.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 14,000 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=20
+[TEXT] CUT LINING
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=482
+[TEXT] 
+I lunge with the scissors, slashing a large rent in the tartan fabric. A colourful vase drops out onto the floor of the basket. 'You lunatic!' shrieks Hubert, throwing up his hands in horror, 'My Auntie Gertie will have to mend that now!'
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 14,000 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=16
+[TEXT] GET VASE
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=138
+[TEXT] 
+I pick up the Ting dynasty vase. 'Leave that alone!' cries Hubert.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 14,000 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=44
+[TEXT] SMASH VASE WITH MALLET
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=438
+[TEXT] 
+I hit the vase with the mallet. It shatters most obligingly, revealing a tiny key among the wreckage!
+
+'You maniac!' cries Hubert, 'that vase was a present for my Aunt Gertie! I'll never be able to find another one!'
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 14,000 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=14
+[TEXT] GET KEY
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=58
+[TEXT] 
+I take the tiny metal key.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 14,000 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=24
+[TEXT] THROW MALLET
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=942
+[TEXT] 
+I fling the mallet over the side of the basket. 'You lunatic!' yells Hubert, stamping his feet in distraction. 'That was an extremely useful mallet - I used it every day at breakfast to crack open my boiled eggs!'
+
+
+The balance between the weight of the balloon and the lift provided by the gas is so delicate that jettisoning even a very light object causes an immediate vertical displacement. In this instance, the balloon gains around five hundred feet in altitude.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 14,500 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=34
+[TEXT] EXAMINE CARPETBAG
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=308
+[TEXT] 
+This is by far the largest example of a carpetbag I have ever seen! It must contain enough carpet to carpet the Taj Mahal!  The carpetbag is padlocked.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 14,500 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=32
+[TEXT] UNLOCK CARPETBAG
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=416
+[TEXT] 
+I unlock the carpetbag with the tiny metal key, tossing the padlock over the side of the basket. The bag falls open to reveal, to my astonishment, a pair of underpants, a trombone, and what appears to be an 
+[MSG] cmd=PRINT a1=0 a2=1 a3=0 len=30
+[TEXT] Egyptian mummy 
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=68
+[TEXT] still in its original wrappings!
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 14,500 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=28
+[TEXT] GET UNDERPANTS
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=126
+[TEXT] 
+I gingerly remove the pair of underpants from the carpetbag.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 14,500 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=32
+[TEXT] THROW UNDERPANTS
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=1078
+[TEXT] 
+I toss the underpants over the side of the balloon. A warm air current sends them floating off into the distance. 'You idiot!' cries Hubert, his eyes wide as coal-holes, 'My Aunt Gertie was very insistent that I always have clean underwear - I've been wearing my other pair ever since this infernal trip began!'
+
+
+The equilibrium of a balloon in the air is so sensitive that the loss of an almost  insignificant weight can produce a very appreciable displacement. In this instance, the balloon gains around one hundred feet in altitude.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 14,600 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=24
+[TEXT] GET TROMBONE
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=84
+[TEXT] 
+I take the trombone from the carpetbag.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 14,600 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=26
+[TEXT] DROP TROMBONE
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=46
+[TEXT] 
+I drop the trombone.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 14,600 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=24
+[TEXT] DROP HATCHET
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=44
+[TEXT] 
+I drop the hatchet.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 14,600 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=18
+[TEXT] GET MUMMY
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=308
+[TEXT] 
+I carefully lift the Egyptian mummy from the carpetbag and heave it over my shoulder. 'I wouldn't touch that if I were you,' says Hubert 'it's cursed!'
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 14,600 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=26
+[TEXT] GET CARPETBAG
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=48
+[TEXT] 
+I take the carpetbag.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 14,600 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=30
+[TEXT] THROW CARPETBAG
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=636
+[TEXT] 
+I hurl the empty bag over the side of the basket. Hubert merely glares at me for a moment.
+
+
+The equilibrium of a balloon in the air is so sensitive that the loss of an almost  insignificant weight can produce a very appreciable displacement. In this instance, the balloon gains around one hundred feet in altitude.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 14,700 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=22
+[TEXT] THROW MUMMY
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=1092
+[TEXT] 
+I heave the mummy over the side of the balloon and watch as it plummets earthwards.
+
+
+Unburdening the balloon of this large, heavy object causes a sudden and immediate gain in altitude of one thousand feet.  As the mummy disappears from sight the sky seems to darken; the light alpine cloud coalesces into forbidding thunder clouds. The ominous silence is broken by a piercing shriek like that of an exotic bird...
+
+'Now you've done it!' cries Hubert, shaking like a leaf and paler than ever, 'We're both doomed now. Did I not tell you about...
+
+[MSG] cmd=PRINT a1=0 a2=3 a3=0 len=62
+[TEXT] ...THE CURSE OF THE BLUE IBIS?'
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=6
+[TEXT] 
+
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 15,700 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=26
+[TEXT] GET BOOMERANG
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=48
+[TEXT] 
+I take the boomerang.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 15,700 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=46
+[TEXT] THROW BOOMERANG AT IBIS
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=990
+[TEXT] 
+I hurl the boomerang at the Blue Ibis, in the time honoured tradition of the Australian Aboriginal hunters. But the Blue Ibis is no ordinary bird, and instead of striking the creature dead, the boomerang explodes in a mass of splinters!
+
+
+The balance between the weight of the balloon and the lift provided by the gas is so delicate that jettisoning even a very light object causes an immediate vertical displacement. In this instance, the balloon gains around three hundred feet in altitude.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 16,000 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=32
+[TEXT] GET SMUDGE STICK
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=54
+[TEXT] 
+I take the smudge stick.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 16,000 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=36
+[TEXT] LIGHT SMUDGE STICK
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=640
+[TEXT] 
+I light the smudge stick with the cigarette lighter, then blow it out, allowing the scented smoke to  waft around the balloon. It could be my imagination, but from somewhere I hear the distant sound of drums and a Shoshone medicine man chanting. From above there is a raucous shriek, and I look up to see the Blue Ibis 
+[MSG] cmd=PRINT a1=0 a2=1 a3=0 len=12
+[TEXT] vanish
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=222
+[TEXT]  into the sweet smelling smoke like something out of a dream...
+
+
+Red hot embers fly from the smudge stick...
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 16,000 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=36
+[TEXT] THROW SMUDGE STICK
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=578
+[TEXT] 
+I toss the burning smudge stick over the side of the balloon.
+
+
+The equilibrium of a balloon in the air is so sensitive that the loss of an almost  insignificant weight can produce a very appreciable displacement. In this instance, the balloon gains around one hundred feet in altitude.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 16,100 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=24
+[TEXT] GET TROMBONE
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=46
+[TEXT] 
+I take the trombone.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 16,100 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=48
+[TEXT] PUT TRUMPET IN DOG'S EAR
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=104
+[TEXT] 
+I put the ear-trumpet in the Saint Bernard's ear.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 16,100 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=26
+[TEXT] PLAY TROMBONE
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=188
+[TEXT] 
+The trombone emits an almost inaudible squeak. I fear there may be something wrong with it.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 16,100 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=48
+[TEXT] HIT HUBERT WITH TROMBONE
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=120
+[TEXT] 
+I bash Hubert over the head with the trombone, whereupon a 
+[MSG] cmd=PRINT a1=0 a2=1 a3=0 len=26
+[TEXT] cricket ball 
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=50
+[TEXT] pops out of the funnel.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 16,100 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=16
+[TEXT] GET BALL
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=54
+[TEXT] 
+I take the cricket ball.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 16,100 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=26
+[TEXT] PLAY TROMBONE
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=438
+[TEXT] 
+I place the trombone to my lips and blow. It emits a few strangulated notes. The St. Bernard, upon hearing this leaps four feet into the air, sending the ear-trumpet flying into space. He seems to be fully alert now!
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 16,300 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=20
+[TEXT] THROW BALL
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=966
+[TEXT] 
+I throw the cricket ball (overarm, naturally) over the side of the basket, giving it plenty of topspin. It whistles off into the clouds, closely followed by the St. Bernard, which, like any dog, cannot resist chasing a thrown ball. Through a gap in the clouds I see the hapless hound land safely in a snow-drift. At least he will be able to dig himself out.
+
+
+Unburdening the balloon of this large, heavy object causes a sudden and immediate gain in altitude of one thousand feet.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 17,300 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=28
+[TEXT] THROW TROMBONE
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=744
+[TEXT] 
+Having no further use for it, I cast the trombone out of the basket. Hubert merely sighs and rolls his eyes at me.
+
+
+The balance between the weight of the balloon and the lift provided by the gas is so delicate that jettisoning even a very light object causes an immediate vertical displacement. In this instance, the balloon gains around five hundred feet in altitude.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 17,800 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=28
+[TEXT] MAKE PARACHUTE
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=446
+[TEXT] 
+Fortunately I was taught to sew by the overbearing nuns who educated me in that convent school. Stitching the handkerchiefs together  I soon construct a parachute strong enough to support a reasonably lightweight person.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 17,800 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=22
+[TEXT] GET HATCHET
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=44
+[TEXT] 
+I take the hatchet.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 17,800 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=56
+[TEXT] CUT ANCHOR ROPE WITH HATCHET
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=1858
+[TEXT] 
+I hack through the anchor rope with the hatchet and watch as the anchor tumbles to earth.
+
+
+Unburdening the balloon of this quite large and heavy object causes a sudden and immediate gain in altitude of seven hundred feet.
+
+'THAT DOES IT!' shrieks Hubert, shaking his tiny fists at me in exasperation. 'That's the last straw. You've really done it this time. I'm going to tell my Aunt Gertie on you!'
+
+'Oh, and I suppose you have your Aunt Gertie secreted away in that incredible overcoat of yours as well...' I say, mockingly.
+
+'Yes,' says Hubert, 'as a matter of fact I have. You didn't think I'd leave her at home all on her own, do you?' After much squirming and wriggling, a tiny little old lady emerges from the overcoat.
+
+'What is it, Hubert dear?' she asks...  ''Tain't right,' mutters Aunt Gertie distractedly, 'it oughtn't to be allowed!' She gives me a crack across the shins with her cane, just for the hell of it.
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 18,500 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=46
+[TEXT] TIE PARACHUTE TO GERTIE
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=172
+[TEXT] 
+I wait 'til her back is turned, and swiftly tie the parachute to her apron strings!
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 18,500 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=22
+[TEXT] PUSH GERTIE
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=1790
+[TEXT] 
+With a hearty shove, I push the old crone over the edge of the basket. The parachute on her back opens instantly, slowing her rate of descent so that she drifts to earth as gently as a dandelion seed.
+
+
+My command of the English language is, alas, inadequate to describe the look on Hubert's face as he watches his beloved aunt disappear into the void. Lost for words, he struggles to come up with one final snipe:
+
+'You... you... you... LOONY!' before leaping after her. The great black overcoat billows out around him like his very own parachute.
+
+Unburdened of Hubert's enormous weight, the balloon begins to ascend with breathtaking rapidity. Within seconds we have passed 20,000 feet, then 25,000, then 30,000, at which point I am seized with asphyxia, I lose power to my legs and arms and I begin to lose consciousness...
+
+I have just one chance. Unless I speedily descend, ALL IS LOST!
+
+
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 37,000 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=2
+[TEXT] >
+[MSG] cmd=SETECHO a1=0 a2=0 a3=0 len=0
+[MSG] cmd=INITLINE a1=0 a2=255 a3=0 len=0
+[MSG] cmd=NEXTEVENT a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=0 a2=8 a3=0 len=38
+[TEXT] PULL GAS VALVE ROPE
+[MSG] cmd=PRINT a1=0 a2=0 a3=0 len=318
+[TEXT] 
+The last thing I remember before passing out is falling upon the gas valve rope and pulling down on it with all the strength remaining to me...
+
+Press any key
+[MSG] cmd=CLRWIN a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=160
+[TEXT]                                                                                 
+[MSG] cmd=MOVETO a1=1 a2=0 a3=0 len=0
+[MSG] cmd=MOVETO a1=1 a2=1 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=52
+[TEXT] In the basket of a balloon
+[MSG] cmd=MOVETO a1=1 a2=57 a3=0 len=0
+[MSG] cmd=PRINT a1=1 a2=9 a3=0 len=44
+[TEXT] ALTITUDE - 37,000 FEET
+[MSG] cmd=SETBGND a1=2 a2=16777215 a3=0 len=0
+[MSG] cmd=INITMOUSE a1=2 a2=0 a3=0 len=0
+[MSG] cmd=INITCHAR a1=0 a2=0 a3=0 len=0
+
+=== Session ended ===

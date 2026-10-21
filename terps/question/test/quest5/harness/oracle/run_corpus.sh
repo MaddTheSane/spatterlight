@@ -1,0 +1,91 @@
+#!/bin/bash
+# Run the qvh oracle over every corpus game listed in corpus.tsv, using the
+# extractor mode recorded there. Emits transcripts + extracted scripts to out/
+# and prints a coverage table. `hints` rows are reported as skipped (no linear
+# command script exists for them).
+export PATH="/opt/homebrew/bin:$PATH"
+set -u
+HERE="$(cd "$(dirname "$0")" && pwd)"
+# Both corpora are third-party material and so are kept out of the repo. Prefer
+# a local quest5/games (quest5/downloaded) if one has been set up, the way
+# quest4/games works, and fall back to the ~/Downloads layout otherwise.
+if [ -z "${GAMES:-}" ] && [ -d "$HERE/../../games" ]; then GAMES="$HERE/../../games"; fi
+if [ -z "${WALKS:-}" ] && [ -d "$HERE/../../downloaded" ]; then WALKS="$HERE/../../downloaded"; fi
+GAMES="${GAMES:-$HOME/Downloads/Quest 5 games}"
+WALKS="${WALKS:-$HOME/Downloads/Quest 5 walkthroughs}"
+OUT="$HERE/out"
+mkdir -p "$OUT"
+DLL="$HERE/bin/Release/net10.0/qvh.dll"
+# `#!tail=N` in a script keeps only the last N transcript lines (see corpus_lib.sh).
+tail_filter() {
+  local n; n="$(sed -n 's/^#!tail=\([0-9][0-9]*\).*/\1/p' "$1" | head -1)"
+  if [ -n "$n" ]; then tail -n "$n"; else cat; fi
+}
+
+printf "%-52s %-6s %6s %6s %4s %-9s\n" "GAME" "ASL" "STEPS" "EMITS" "ERR" "STATE"
+# `bad` counts corpus rows that could not be driven at all (missing game file,
+# missing override for a wt=- row, missing walkthrough, empty command script).
+# Such a row produces no out/*.txt, so check_golden.sh never diffs it and stays
+# green while the row is silently not being tested — which is exactly how the
+# Defeating The Monster override went missing for a whole release. Any such row
+# is a hard failure: this script exits non-zero.
+fin=0; run=0; wedge=0; skip=0; bad=0
+while IFS=$'\t' read -r game wt mode preamble; do
+  case "$game" in ''|\#*) continue;; esac
+  if [ "$mode" = "hints" ]; then
+    printf "%-52s %-6s %6s %6s %-9s\n" "$game" "-" "-" "-" "hints"
+    skip=$((skip+1)); continue
+  fi
+  q="$GAMES/$game.quest"
+  if [ ! -f "$q" ] && [ -f "$GAMES/$game.aslx" ]; then q="$GAMES/$game.aslx"; fi
+  src="$WALKS/$wt"
+  if [ ! -f "$q" ];   then printf "%-52s  (game file missing)\n" "$game"; bad=$((bad+1)); continue; fi
+  # wt="-" marks an override-only row: no source walkthrough exists anywhere
+  # (the overrides/ script was derived from the game source), so there is no
+  # file to existence-check — the override itself is required instead.
+  if [ "$wt" = "-" ]; then
+    if [ ! -f "$HERE/overrides/$game.cmd" ]; then printf "%-52s  (override missing for wt=- row)\n" "$game"; bad=$((bad+1)); continue; fi
+  elif [ ! -f "$src" ]; then printf "%-52s  (walkthrough missing: %s)\n" "$game" "$wt"; bad=$((bad+1)); continue; fi
+  cmd="$OUT/$game.cmd"
+  # A curated override wins outright: overrides/<game>.cmd is a hand-authored
+  # winning script (verbatim, incl. any title-screen preamble baked in) for a game
+  # whose raw walkthrough does NOT reach the ending as-is — a walkthrough typo, a
+  # branch that must be chosen, a nav error vs the release map, or an RNG-/timer-
+  # specific solve. Each override carries a "#"-comment header documenting exactly
+  # how it deviates from the raw walkthrough. When present it REPLACES both the
+  # preamble and the extractor. See overrides/README.md.
+  if [ -f "$HERE/overrides/$game.cmd" ]; then
+    cp "$HERE/overrides/$game.cmd" "$cmd"
+  else
+  # Optional 4th column: ";"-separated commands prepended before the walkthrough
+  # (e.g. "new game" to click past a title-screen menu the walkthrough assumes
+  # you already dismissed — without it every later command hits the menu and
+  # fails). Kept out of extract_walkthrough.py because it is game-, not
+  # format-specific.
+  : > "$cmd"
+  if [ -n "${preamble:-}" ]; then
+    printf '%s\n' "$preamble" | tr ';' '\n' | sed 's/^ *//; s/ *$//' >> "$cmd"
+  fi
+  python3 "$HERE/extract_walkthrough.py" --mode "$mode" "$src" >> "$cmd"
+  fi
+  [ -s "$cmd" ] || { printf "%-52s  (no commands extracted)\n" "$game"; bad=$((bad+1)); continue; }
+  dotnet "$DLL" "$q" "$cmd" 2> "$OUT/$game.err" | tail_filter "$cmd" > "$OUT/$game.txt"
+  diag="$(grep '^\[diag\] end:' "$OUT/$game.err")"
+  ver="$(grep -o 'version=[^ ]*' "$OUT/$game.err" | head -1 | cut -d= -f2)"
+  steps="$(echo "$diag" | grep -o 'steps=[0-9]*' | cut -d= -f2)"
+  emits="$(echo "$diag" | grep -o 'emits=[0-9]*' | cut -d= -f2)"
+  errs="$(echo "$diag" | grep -o 'errors=[0-9]*' | cut -d= -f2)"
+  state="$(echo "$diag" | grep -o 'state=[A-Za-z]*' | cut -d= -f2)"
+  printf "%-52s %-6s %6s %6s %4s %-9s\n" "$game" "${ver:-?}" "${steps:-?}" "${emits:-?}" "${errs:-?}" "${state:-?}"
+  case "$state" in
+    Finished) fin=$((fin+1));;
+    Wedged)   wedge=$((wedge+1));;
+    *)        run=$((run+1));;
+  esac
+done < "$HERE/corpus.tsv"
+echo "---"
+echo "driven: $((fin+run+wedge))  (Finished: $fin, Running: $run, Wedged: $wedge)   hints-only skipped: $skip"
+if [ "$bad" -ne 0 ]; then
+  echo "ERROR: $bad corpus row(s) could not be driven (see the annotations above)" >&2
+  exit 1
+fi

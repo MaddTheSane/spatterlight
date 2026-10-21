@@ -1,0 +1,31 @@
+Delrt Probe
+DELRT PROBE
+1[ab]
+2[a]
+3[a]
+4[a]
+5[a
+]
+6 credits shape:
+Websites:
+https://one.example
+ http://two.example
+END OF INTRO
+
+Delete Lab7ROOMDESC starts with del.
+
+> eight
+8[a]END8
+
+> nine
+9[x
+  ]END9
+
+> ten
+10[a
+  ]END10
+
+> eleven
+11[a
+]END11
+

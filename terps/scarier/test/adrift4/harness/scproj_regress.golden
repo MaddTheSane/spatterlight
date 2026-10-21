@@ -1,0 +1,216 @@
+==== deaths.taf ====
+player: Str=0 Acc=0 Def=0 Agi=0  playerStamina=30
+weapon: 'pistle' method=shoot HitValue=30 Accuracy=0
+enemy : 'Debbie' Stamina=10 Str=0 Def=0 Acc=0 Agi=0
+default_weapon after wield = 17 (weapon obj = 17)
+--- fight (player attacks; stamina kept up so we can watch enemy fall) ---
+round  1: enemy stamina   10 ->  -30  (dmg 40)  [ENEMY DEAD/REMOVED]
+    | You shoot Debbie with fire pistle.
+RESULT: enemy stamina=-30 location=0 after 1 rounds
+
+==== Colony.taf ====
+player: Str=0 Acc=0 Def=0 Agi=0  playerStamina=100
+weapon: 'colt 45' method=shoot HitValue=200 Accuracy=0
+enemy : 'An alien' Stamina=50 Str=0 Def=0 Acc=0 Agi=0
+default_weapon after wield = 6 (weapon obj = 6)
+--- fight (player attacks; stamina kept up so we can watch enemy fall) ---
+round  1: enemy stamina   50 -> -175  (dmg 225)  [ENEMY DEAD/REMOVED]
+    | You shoot an  avarage sized alien with the colt 45.
+RESULT: enemy stamina=-175 location=0 after 1 rounds
+
+==== light_up_4summer_comp.taf ====
+player: Str=30 Acc=30 Def=35 Agi=30  playerStamina=44
+weapon: 'lighter' method=throw HitValue=40 Accuracy=40
+enemy : 'Chip' Stamina=60 Str=35 Def=20 Acc=35 Agi=20
+default_weapon after wield = 64 (weapon obj = 64)
+--- fight (player attacks; stamina kept up so we can watch enemy fall) ---
+round  1: enemy stamina   60 ->   50  (dmg 10)
+    | I throw the lighter at Chip.
+round  2: enemy stamina   50 ->   40  (dmg 10)
+    | I throw the lighter at Chip.
+round  3: enemy stamina   40 ->   30  (dmg 10)
+    | I throw the lighter at Chip.
+round  4: enemy stamina   30 ->   20  (dmg 10)
+    | I throw the lighter at Chip.
+round  5: enemy stamina   20 ->   10  (dmg 10)
+    | I throw the lighter at Chip.
+round  6: enemy stamina   10 ->    0  (dmg 10)  [ENEMY DEAD/REMOVED]
+    | I throw the lighter at Chip.
+RESULT: enemy stamina=0 location=0 after 6 rounds
+
+==== Space Boy's First Adventure.taf ====
+player: Str=58 Acc=64 Def=72 Agi=31  playerStamina=93
+weapon: 'Ice Gloves' method=shoot HitValue=50 Accuracy=100
+enemy : 'Evil Man' Stamina=84 Str=88 Def=55 Acc=58 Agi=65
+default_weapon after wield = 3 (weapon obj = 3)
+--- fight (player attacks; stamina kept up so we can watch enemy fall) ---
+round  1: enemy stamina   84 ->   84  (dmg 0)
+    | You shoot Evil Man with the set of Ice Gloves, but it doesn't seem to do any damage.
+round  2: enemy stamina   84 ->   84  (dmg 0)
+    | You shoot Evil Man with the set of Ice Gloves, but it doesn't seem to do any damage.
+round  3: enemy stamina   84 ->   83  (dmg 1)
+    | You shoot Evil Man with the set of Ice Gloves.
+round  4: enemy stamina   83 ->   82  (dmg 1)
+    | You shoot Evil Man with the set of Ice Gloves.
+round  5: enemy stamina   82 ->   82  (dmg 0)
+    | You shoot Evil Man with the set of Ice Gloves, but it doesn't seem to do any damage.
+round  6: enemy stamina   82 ->   82  (dmg 0)
+    | You shoot Evil Man with the set of Ice Gloves, but it doesn't seem to do any damage.
+round  7: enemy stamina   82 ->   82  (dmg 0)
+    | You shoot Evil Man with the set of Ice Gloves, but it doesn't seem to do any damage.
+round  8: enemy stamina   82 ->   80  (dmg 2)
+    | You shoot Evil Man with the set of Ice Gloves.
+round  9: enemy stamina   80 ->   79  (dmg 1)
+    | You shoot Evil Man with the set of Ice Gloves.
+round 10: enemy stamina   79 ->   79  (dmg 0)
+    | You shoot Evil Man with the set of Ice Gloves, but it doesn't seem to do any damage.
+round 11: enemy stamina   79 ->   79  (dmg 0)
+    | You shoot Evil Man with the set of Ice Gloves, but it doesn't seem to do any damage.
+round 12: enemy stamina   79 ->   79  (dmg 0)
+    | You shoot Evil Man with the set of Ice Gloves, but it doesn't seem to do any damage.
+round 13: enemy stamina   79 ->   79  (dmg 0)
+    | You shoot Evil Man with the set of Ice Gloves, but it doesn't seem to do any damage.
+round 14: enemy stamina   79 ->   76  (dmg 3)
+    | You shoot Evil Man with the set of Ice Gloves.
+round 15: enemy stamina   76 ->   76  (dmg 0)
+    | You shoot Evil Man with the set of Ice Gloves, but it doesn't seem to do any damage.
+round 16: enemy stamina   76 ->   76  (dmg 0)
+    | You shoot Evil Man with the set of Ice Gloves, but it doesn't seem to do any damage.
+round 17: enemy stamina   76 ->   76  (dmg 0)
+    | You shoot Evil Man with the set of Ice Gloves, but it doesn't seem to do any damage.
+round 18: enemy stamina   76 ->   75  (dmg 1)
+    | You shoot Evil Man with the set of Ice Gloves.
+round 19: enemy stamina   75 ->   75  (dmg 0)
+    | You shoot Evil Man with the set of Ice Gloves, but it doesn't seem to do any damage.
+round 20: enemy stamina   75 ->   75  (dmg 0)
+    | You shoot Evil Man with the set of Ice Gloves, but it doesn't seem to do any damage.
+round 21: enemy stamina   75 ->   72  (dmg 3)
+    | You shoot Evil Man with the set of Ice Gloves.
+round 22: enemy stamina   72 ->   72  (dmg 0)
+    | You shoot Evil Man with the set of Ice Gloves, but it doesn't seem to do any damage.
+round 23: enemy stamina   72 ->   72  (dmg 0)
+    | You shoot Evil Man with the set of Ice Gloves, but it doesn't seem to do any damage.
+round 24: enemy stamina   72 ->   70  (dmg 2)
+    | You shoot Evil Man with the set of Ice Gloves.
+round 25: enemy stamina   70 ->   69  (dmg 1)
+    | You shoot Evil Man with the set of Ice Gloves.
+round 26: enemy stamina   69 ->   68  (dmg 1)
+    | You shoot Evil Man with the set of Ice Gloves.
+round 27: enemy stamina   68 ->   67  (dmg 1)
+    | You shoot Evil Man with the set of Ice Gloves.
+round 28: enemy stamina   67 ->   66  (dmg 1)
+    | You shoot Evil Man with the set of Ice Gloves.
+round 29: enemy stamina   66 ->   64  (dmg 2)
+    | You shoot Evil Man with the set of Ice Gloves.
+round 30: enemy stamina   64 ->   64  (dmg 0)
+    | You shoot Evil Man with the set of Ice Gloves, but it doesn't seem to do any damage.
+round 31: enemy stamina   64 ->   64  (dmg 0)
+    | You shoot Evil Man with the set of Ice Gloves, but it doesn't seem to do any damage.
+round 32: enemy stamina   64 ->   64  (dmg 0)
+    | You shoot Evil Man with the set of Ice Gloves, but it doesn't seem to do any damage.
+round 33: enemy stamina   64 ->   64  (dmg 0)
+    | You shoot Evil Man with the set of Ice Gloves, but it doesn't seem to do any damage.
+round 34: enemy stamina   64 ->   61  (dmg 3)
+    | You shoot Evil Man with the set of Ice Gloves.
+round 35: enemy stamina   61 ->   58  (dmg 3)
+    | You shoot Evil Man with the set of Ice Gloves.
+round 36: enemy stamina   58 ->   58  (dmg 0)
+    | You shoot Evil Man with the set of Ice Gloves, but it doesn't seem to do any damage.
+round 37: enemy stamina   58 ->   56  (dmg 2)
+    | You shoot Evil Man with the set of Ice Gloves.
+round 38: enemy stamina   56 ->   54  (dmg 2)
+    | You shoot Evil Man with the set of Ice Gloves.
+round 39: enemy stamina   54 ->   54  (dmg 0)
+    | You shoot Evil Man with the set of Ice Gloves, but it doesn't seem to do any damage.
+round 40: enemy stamina   54 ->   54  (dmg 0)
+    | You shoot Evil Man with the set of Ice Gloves, but it doesn't seem to do any damage.
+RESULT: enemy stamina=54 location=1 after 40 rounds
+
+==== cyber2.taf ====
+player: Str=900 Acc=0 Def=800 Agi=0  playerStamina=50
+weapon: 'Cannon' method=shoot HitValue=90 Accuracy=0
+enemy : 'Ninja Chef' Stamina=50 Str=40 Def=50 Acc=0 Agi=0
+default_weapon after wield = 3 (weapon obj = 3)
+--- fight (player attacks; stamina kept up so we can watch enemy fall) ---
+round  1: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round  2: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round  3: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round  4: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round  5: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round  6: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round  7: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round  8: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round  9: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round 10: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round 11: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round 12: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round 13: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round 14: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round 15: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round 16: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round 17: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round 18: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round 19: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round 20: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round 21: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round 22: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round 23: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round 24: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round 25: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round 26: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round 27: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round 28: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round 29: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round 30: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round 31: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round 32: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round 33: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round 34: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round 35: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round 36: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round 37: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round 38: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round 39: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+round 40: enemy stamina   50 ->   50  (dmg 0)
+    | The Ninja Chef manages to avoid your attack with Wave Motion Cannon.
+RESULT: enemy stamina=50 location=1 after 40 rounds
+

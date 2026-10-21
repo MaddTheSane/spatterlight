@@ -6,18 +6,40 @@
 //
 //
 
-#import "NSString+Categories.h"
 #import "Game.h"
 #import "Metadata.h"
+#import "FileSignature.h"
+
+#import "NSString+Categories.h"
+#import "DebugLog.h"
+
 
 @implementation NSString (Categories)
 
-
-// Computes the game signature, which is a 64-character string unique to the
-// game. (In fact it is just the first 64 bytes of the game file, encoded as
-// hexadecimal digits.)
+#pragma mark File signatures
 
 - (NSString *)signatureFromFile {
+    NSError *error = nil;
+    NSData *theData =
+    [NSData dataWithContentsOfURL:[NSURL fileURLWithPath:self isDirectory:NO]
+                          options:NSDataReadingMappedAlways error:&error];
+    if (theData == nil) {
+        if (error != nil)
+            NSLog(@"signatureFromFile: %@", error);
+        return nil;
+    }
+    return [FileSignature signatureFromData:theData];
+}
+
+// Only used for backward compatibility.
+// A 64-character string unique to the game. (In fact it is just the first
+// 64 bytes of the game file, encoded as hexadecimal digits.)
+// This idea was stolen from Lectrote.
+// It repeats the Blorb chunk walk in FileSignature, but don't merge the two:
+// this must keep giving the old answer, because GameImporter.m and
+// GlkController+Autorestore.m match existing library entries against it.
+
+- (NSString *)oldSignatureFromFile {
     NSMutableString *hexString = [NSMutableString string];
     NSError * error = nil;
     NSData *theData =
@@ -38,10 +60,10 @@
                 NSLog(@"signatureFromFile: Missing RIdx index header in Blorb!");
 
             int chunkLength = bytes64[16] << 24 | (bytes64[17] & 0xff) << 16 |
-                              (bytes64[18] & 0xff) << 8 | (bytes64[19] & 0xff);
+            (bytes64[18] & 0xff) << 8 | (bytes64[19] & 0xff);
 
             int numRes = bytes64[20] << 24 | (bytes64[21] & 0xff) << 16 |
-                         (bytes64[22] & 0xff) << 8 | (bytes64[23] & 0xff);
+            (bytes64[22] & 0xff) << 8 | (bytes64[23] & 0xff);
 
             if (chunkLength != 4 + numRes * 12)
                 NSLog(@"signatureFromFile: Chunk length wrong! Should be 4 + "
@@ -55,8 +77,8 @@
                 [theData getBytes:bytes12 range:NSMakeRange(i, 12)];
                 if (bytes12[0] == 'E' && bytes12[1] == 'x' && bytes12[2] == 'e' && bytes12[3] == 'c') {
                     execStart = bytes12[8] << 24 | (bytes12[9] & 0xff) << 16 |
-                                (bytes12[10] & 0xff) << 8 |
-                                (bytes12[11] & 0xff);
+                    (bytes12[10] & 0xff) << 8 |
+                    (bytes12[11] & 0xff);
                     // Found Exec index at offset i.
                     // Executable chunk starts at execStart.
                     break;
@@ -94,6 +116,8 @@
     return [NSString stringWithString:hexString];
 }
 
+#pragma mark Text cleanup
+
 // Scrubs an NSString for non-parseable characters, mainly
 // curly quotes and em dashes, and converts them to their
 // "standard" equivalents, i.e. inch and minus symbols.
@@ -101,45 +125,20 @@
 // https://stackoverflow.com/questions/39729525/replacing-smart-quote-in-nsstring-replace-doesnt-catch-it
 
 - (NSString *)scrubInvalidCharacters {
+    // None of the replacements contains a character that is itself replaced,
+    // so the order does not matter.
+    static NSString * const replacements[][2] = {
+        { @"\u2010", @"-" },   { @"\u2011", @"-" },  { @"\u2012", @"-" },
+        { @"\u2013", @"-" },   { @"\u2014", @"-" },  { @"\u2015", @"-" },
+        { @"\u2017", @"_" },   { @"\u2018", @"'" },  { @"\u2019", @"'" },
+        { @"\u201a", @"," },   { @"\u201b", @"'" },  { @"\u201c", @"\"" },
+        { @"\u201d", @"\"" },  { @"\u201e", @"\"" }, { @"\u2026", @"..." },
+        { @"\u2032", @"'" },   { @"\u2033", @"\"" },
+    };
     NSString *result = self;
-    result = [result stringByReplacingOccurrencesOfString:@"\u2010"
-                                               withString:@"-"];
-    result = [result stringByReplacingOccurrencesOfString:@"\u2011"
-                                               withString:@"-"];
-    result = [result stringByReplacingOccurrencesOfString:@"\u2012"
-                                               withString:@"-"];
-    result = [result stringByReplacingOccurrencesOfString:@"\u2013"
-                                               withString:@"-"];
-    result = [result stringByReplacingOccurrencesOfString:@"\u2014"
-                                               withString:@"-"];
-    result = [result stringByReplacingOccurrencesOfString:@"\u2015"
-                                               withString:@"-"];
-    result = [result stringByReplacingOccurrencesOfString:@"\u2017"
-                                               withString:@"_"];
-    result = [result stringByReplacingOccurrencesOfString:@"\u2018"
-                                               withString:@"\'"];
-    result = [result stringByReplacingOccurrencesOfString:@"\u2019"
-                                               withString:@"\'"];
-    result = [result stringByReplacingOccurrencesOfString:@"\u201a"
-                                               withString:@","];
-    result = [result stringByReplacingOccurrencesOfString:@"\u201b"
-                                               withString:@"\'"];
-    result = [result stringByReplacingOccurrencesOfString:@"\u201c"
-                                               withString:@"\""];
-    result = [result stringByReplacingOccurrencesOfString:@"\u201d"
-                                               withString:@"\""];
-    result = [result stringByReplacingOccurrencesOfString:@"\u201e"
-                                               withString:@"\""];
-    result = [result stringByReplacingOccurrencesOfString:@"\u2026"
-                                               withString:@"..."];
-    result = [result stringByReplacingOccurrencesOfString:@"\u2032"
-                                               withString:@"\'"];
-    result = [result stringByReplacingOccurrencesOfString:@"\u2033"
-                                               withString:@"\""];
-    result = [result stringByReplacingOccurrencesOfString:@"“"
-                                               withString:@"\""];
-    result = [result stringByReplacingOccurrencesOfString:@"”"
-                                               withString:@"\""];
+    for (size_t i = 0; i < sizeof(replacements) / sizeof(replacements[0]); i++)
+        result = [result stringByReplacingOccurrencesOfString:replacements[i][0]
+                                                   withString:replacements[i][1]];
     return result;
 }
 
@@ -160,17 +159,52 @@
     return CFBridgingRelease(outStr);
 }
 
+// Turns literal "<br>" tags into real line breaks. Some games (any ADRIFT 5
+// game, for example) escape the line breaks of their description as "&lt;br&gt;"
+// rather than write them as XML elements, so after entity decoding we are left
+// with the tags spelled out in the text. A single newline per tag is how ADRIFT
+// itself renders <br>, and it also keeps the common "<br><br>" paragraph break
+// looking like a paragraph break.
+
+- (NSString *)stringByReplacingBreakTagsWithNewlines {
+    // Short-circuit if there are no tags at all.
+    if ([self rangeOfString:@"<" options:NSLiteralSearch].location == NSNotFound) {
+        return self;
+    }
+
+    static NSRegularExpression *breakTag;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        breakTag = [NSRegularExpression regularExpressionWithPattern:@"<br\\s*/?>"
+                                                            options:NSRegularExpressionCaseInsensitive
+                                                              error:nil];
+    });
+
+    return [breakTag stringByReplacingMatchesInString:self
+                                              options:0
+                                                range:NSMakeRange(0, self.length)
+                                         withTemplate:@"\n"];
+}
+
+// Titles longer than 40 characters are cut to 39 plus an ellipsis
+#pragma mark Display
+
+static NSString *SPTruncatedTitle(NSString *title) {
+    if (title.length <= 40)
+        return title;
+    // Cut at index 39, or before it if that would split a composed character
+    NSRange keep = NSMakeRange(0, [title rangeOfComposedCharacterSequenceAtIndex:39].location);
+    return [[title substringWithRange:keep] stringByAppendingString:@"…"];
+}
+
 + (NSString *)stringWithSummaryOfGames:(NSArray<Game*> *)games {
 
     if (!games || games.count == 0)
         return nil;
-
-    NSString *gameString = games[0].metadata.title;
-    if (gameString.length > 40) {
-        gameString = [gameString substringToIndex:39];
-        gameString = [NSString stringWithFormat:@"%@…", gameString];
-    }
-    gameString = [NSString stringWithFormat:@"\"%@\"", gameString];
+    Metadata *metadata = games.firstObject.metadata;
+    if (metadata == nil)
+        return nil;
+    NSString *gameString = [NSString stringWithFormat:@"\"%@\"", SPTruncatedTitle(metadata.title)];
 
     NSUInteger number = games.count - 1;
 
@@ -178,11 +212,7 @@
         return gameString;
 
     if (number == 1) {
-        NSString *gameString2 = games[1].metadata.title;
-        if (gameString2.length > 40) {
-            gameString2 = [gameString2 substringToIndex:39];
-            gameString2 = [NSString stringWithFormat:@"%@…", gameString2];
-        }
+        NSString *gameString2 = SPTruncatedTitle(games[1].metadata.title);
         return [NSString stringWithFormat:@"%@ and \"%@\"", gameString, gameString2];
     }
 
@@ -203,6 +233,8 @@
 }
 
 // Returns an NSArray of range values, including leading and trailing spaces (but strips leading and trailing blank lines)
+#pragma mark Line ranges
+
 - (NSArray *)lineRanges {
     return [self lineRangesKeepEmptyLines:NO];
 }
@@ -265,5 +297,17 @@
     return string;
 }
 
+#pragma mark Construction
+
++ (NSString *)stringWithLatin1Bytes:(const char *)bytes length:(NSUInteger)length {
+    if (bytes == NULL || length == 0)
+        return @"";
+    NSString *string = [[NSString alloc] initWithBytes:bytes length:length encoding:NSISOLatin1StringEncoding];
+    return string ?: @"";
+}
+
++ (NSString *)spacesOfLength:(NSUInteger)length {
+    return [@"" stringByPaddingToLength:length withString:@" " startingAtIndex:0];
+}
 
 @end

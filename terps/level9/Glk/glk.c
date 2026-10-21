@@ -44,15 +44,19 @@
 #include <string.h>
 #include <limits.h>
 #include <stddef.h>
+#include <unistd.h>
 
 #include "level9.h"
 
 #include "glk.h"
+#include "randomness.h"
 
 #ifdef SPATTERLIGHT
 L9UINT16 random_array[100];
-
+extern int gli_slowdraw;
 extern glui32 gli_determinism;
+#else
+static int gli_slowdraw = 0;
 #endif
 
 /*
@@ -150,6 +154,39 @@ static void gln_standout_string (const char *message);
 
 static int gln_confirm (const char *prompt);
 
+/*---------------------------------------------------------------------*/
+/*  Slow line drawing stuff                                            */
+/*---------------------------------------------------------------------*/
+
+typedef struct {
+  int x;
+  int y;
+  uint8_t colour;
+} pixel_to_draw;
+
+static pixel_to_draw *pixels_to_draw = NULL;
+
+static size_t draw_ops_capacity = 100;
+
+static int total_draw_instructions = 0;
+static int current_draw_instruction = 0;
+int vector_image_shown = -1;
+
+/* Pixels emitted per slow-draw tick. Pairs with the graphics timeout
+ * interval — change in step with it. */
+#define GLN_VECTOR_PIXELS_PER_TICK 40
+
+/* TRUE once the background fill has been issued for the current image. Reset
+ * in FreePixels() when the instruction buffer is torn down. */
+static int vector_background_painted = FALSE;
+
+typedef enum {
+  NO_VECTOR_IMAGE,
+  DRAWING_VECTOR_IMAGE,
+  SHOWING_VECTOR_IMAGE
+} VectorStateType;
+
+VectorStateType VectorState = NO_VECTOR_IMAGE;
 
 /*---------------------------------------------------------------------*/
 /*  Glk port utility functions                                         */
@@ -484,8 +521,6 @@ static gln_game_table_t GLN_GAME_TABLE[] = {
   {0x6e60, 0x83, 0x18e0, "Adventure Quest /JoD (Amiga/PC)"},
   {0x6e5c, 0xf6, 0xd356, "Adventure Quest /JoD (ST)"},
   {0x6f0c, 0x95, 0x1f64, "Dungeon Adventure /JoD (Amiga/PC/ST)"},
-
-  {0x6f70, 0x40, 0xbd91, "Colossal Adventure /JoD (MSX)"},
 
   {0x6f6e, 0x78, 0x28cd, "Colossal Adventure /JoD (Spectrum 128)"},
   {0x6970, 0xd6, 0xa820, "Adventure Quest /JoD (Spectrum 128)"},
@@ -1496,7 +1531,7 @@ static const int GLN_REPAINT_LIMIT = 256;
  * this, and can give us higher timer resolution; we'll set 50ms here, and
  * hope that no other Glk library is worse.
  */
-static const glui32 GLN_GRAPHICS_TIMEOUT = 50;
+static glui32 GLN_GRAPHICS_TIMEOUT = 10;
 
 /*
  * Count of timeouts to wait on.  Waiting after a repaint smooths the
@@ -1507,8 +1542,13 @@ static const glui32 GLN_GRAPHICS_TIMEOUT = 50;
 static const int GLN_GRAPHICS_REPAINT_WAIT = 10;
 
 #ifdef SPATTERLIGHT
-/* Pixel size multiplier for image size scaling. */
-static const int GLN_GRAPHICS_PIXEL = 2;
+/* Pixel size multiplier for image size scaling. Recomputed per picture in
+ * gln_graphics_position_picture() to the largest integer scale that still
+ * fits the image horizontally in the current graphics window. */
+static int GLN_GRAPHICS_PIXEL = 2;
+
+/* Margin between picture and text */
+static const int GLN_VERTICAL_PADDING = 10;
 
 /* Proportion of the display to use for graphics. */
 static const glui32 GLN_GRAPHICS_PROPORTION = 60;
@@ -1522,11 +1562,23 @@ static const glui32 GLN_GRAPHICS_PROPORTION = 30;
 #endif
 
 /*
- * Special title picture number, requiring its own handling, and count of
- * timeouts to wait on after fully rendering the title picture (~2 seconds).
+ * Special picture numbers that get their own handling: the title (0) and the
+ * first in-game picture (1), both of which are otherwise instantly overwritten
+ * by the next picture before they can be seen.
  */
 static const int GLN_GRAPHICS_TITLE_PICTURE = 0,
-                 GLN_GRAPHICS_TITLE_WAIT = 40;
+                 GLN_GRAPHICS_FIRST_PICTURE = 1;
+
+/*
+ * How long to hold such a picture on screen once it has fully rendered, in
+ * milliseconds (~4 seconds).  This is a wall-clock duration, measured against
+ * the Glk real-time clock, rather than a count of background timeouts: the
+ * timer period differs a lot between line graphics (fast) and bitmap graphics
+ * (slow), and a requested period is in any case floored to the configured
+ * minimum, so counting timeouts gives wildly different pauses.  Measuring real
+ * time keeps the pause about the same in both kinds of game.
+ */
+static const glui32 GLN_GRAPHICS_TITLE_WAIT_MS = 4000;
 
 /*
  * Border and shading control.  For cases where we can't detect the back-
@@ -1560,12 +1612,33 @@ static Colour gln_graphics_palette[GLN_PALETTE_SIZE]; /* = { 0, ... }; */
 static int gln_graphics_picture = -1;
 
 /*
+ * The x,y offset and "colorize" (gli_z6_colorize) preference that the current
+ * picture was decoded with, kept so it can be re-decoded with identical
+ * parameters when only the colour preference has changed (see
+ * gln_graphics_recolor).  -1 colorize means "no picture decoded yet".
+ */
+static int gln_graphics_picture_x = 0,
+           gln_graphics_picture_y = 0,
+           gln_graphics_colorize = -1;
+
+/*
  * Flags set on new picture, and on resize or arrange events, and a flag
  * to indicate whether background repaint is stopped or active.
  */
 static int gln_graphics_new_picture = FALSE,
            gln_graphics_repaint = FALSE,
            gln_graphics_active = FALSE;
+
+/*
+ * Picture hold: while active, a newly-arrived picture's paint is postponed to
+ * keep the picture currently on screen visible for a moment first (used to
+ * hold the first in-game picture before the one that would otherwise instantly
+ * overwrite it).  The hold lasts GLN_GRAPHICS_TITLE_WAIT_MS of real time from
+ * gln_graphics_hold_start, is released in gln_graphics_timeout() without
+ * blocking the interpreter, and is cleared early by player input.
+ */
+static int gln_graphics_hold_active = FALSE;
+static glui32 gln_graphics_hold_start = 0;
 
 /*
  * State to monitor the state of interpreter graphics.  The values of the
@@ -1648,6 +1721,11 @@ gln_graphics_start (void)
       /* If not running, start the updating "thread". */
       if (!gln_graphics_active)
         {
+          if (gli_slowdraw && gln_graphics_interpreter_state == GLN_GRAPHICS_LINE_MODE) {
+            GLN_GRAPHICS_TIMEOUT = 1;
+          } else {
+            GLN_GRAPHICS_TIMEOUT = 50;
+          }
           glk_request_timer_events (GLN_GRAPHICS_TIMEOUT);
           gln_graphics_active = TRUE;
         }
@@ -1952,14 +2030,42 @@ gln_graphics_position_picture (winid_t glk_window, int pixel_size,
   glk_window_get_size (glk_window, &window_width, &window_height);
 
 #ifdef SPATTERLIGHT
-    if (window_height < height * pixel_size + GLN_GRAPHICS_BORDER * 2 + GLN_GRAPHICS_SHADING)
+    /* Pick the largest integer scale that still fits the image horizontally —
+     * same idea as OptimalPictureSize() in scott_display.c, but width-only
+     * since the height is what we're resizing the window to match. */
+    int optimal_pixel = window_width / width;
+    if (optimal_pixel < 1)
+        optimal_pixel = 1;
+    GLN_GRAPHICS_PIXEL = optimal_pixel;
+    pixel_size = optimal_pixel;
+
+  glui32 target_height = height * pixel_size + GLN_GRAPHICS_BORDER * 2 + GLN_GRAPHICS_SHADING + GLN_VERTICAL_PADDING;
+    if (window_height != target_height)
     {
-        glk_window_close(gln_graphics_window, NULL);
-        gln_graphics_window = glk_window_open (gln_main_window,
-                                           winmethod_Above
-                                           | winmethod_Fixed,
-                                           height * pixel_size + GLN_GRAPHICS_BORDER * 2 + GLN_GRAPHICS_SHADING + 20,
-                                           wintype_Graphics, 0);
+        winid_t parent = glk_window_get_parent (gln_graphics_window);
+
+        /* Resize, then verify the text buffer kept at least 4 rows. Glk has no
+         * "pixels per line" query, so if the text buffer came out too short we
+         * shrink the graphics target and retry. Bounded so a degenerate window
+         * can't loop forever. */
+        for (int attempt = 0; attempt < 10; attempt++)
+        {
+            glk_window_set_arrangement (parent,
+                                        winmethod_Above | winmethod_Fixed,
+                                        target_height,
+                                        gln_graphics_window);
+            if (!gln_main_window)
+                break;
+            glui32 main_cols, main_rows;
+            glk_window_get_size (gln_main_window, &main_cols, &main_rows);
+            if (main_rows >= 4 || target_height == 0)
+                break;
+            /* Shrink proportionally to how many rows short we are. */
+            glui32 shrink = target_height / (4 - main_rows + 1);
+            if (shrink == 0)
+                shrink = 1;
+            target_height = (target_height > shrink) ? target_height - shrink : 0;
+        }
         glk_window_get_size (gln_graphics_window, &window_width, &window_height);
     }
 #endif
@@ -1969,7 +2075,7 @@ gln_graphics_position_picture (winid_t glk_window, int pixel_size,
    * the image centers inside the graphical window.
    */
   *x_offset = ((int) window_width - width * pixel_size) / 2;
-  *y_offset = ((int) window_height - height * pixel_size) / 2;
+  *y_offset = ((int) window_height - height * pixel_size - GLN_VERTICAL_PADDING) / 2;
 }
 
 
@@ -2306,6 +2412,284 @@ gln_graphics_paint_everything (winid_t glk_window,
 	}
 }
 
+static void
+glk_plot_pixel(winid_t glk_window, glsi32 x, glsi32 y, gln_byte pixel, int x_offset, int y_offset, glui32 palette[]) {
+  glk_window_fill_rect (glk_window,
+                        palette[ pixel ],
+                        x * GLN_GRAPHICS_PIXEL + x_offset,
+                        y * GLN_GRAPHICS_PIXEL + y_offset,
+                        GLN_GRAPHICS_PIXEL, GLN_GRAPHICS_PIXEL);
+}
+
+static void FreePixels(void)
+{
+  vector_background_painted = FALSE;
+  if (pixels_to_draw == NULL)
+    return;
+  free(pixels_to_draw);
+  pixels_to_draw = NULL;
+  total_draw_instructions = 0;
+  draw_ops_capacity = 100;
+}
+
+static void ensure_capacity(void) {
+  // Ensure pixels_to_draw has room for all draw instructions.
+  // This could theoretically be more than the total amount of
+  // pixels in the bitmap, as lines may be overlapping.
+
+  if (pixels_to_draw == NULL) {
+    pixels_to_draw = gln_malloc(draw_ops_capacity * sizeof(pixel_to_draw));
+  }
+
+  if (total_draw_instructions >= draw_ops_capacity) {
+    draw_ops_capacity *= 2;  // Double the capacity
+    pixel_to_draw *new_pixels = gln_realloc(pixels_to_draw, draw_ops_capacity * sizeof(pixel_to_draw));
+    pixels_to_draw = new_pixels;
+  }
+}
+
+static void shrink_capacity(void) {
+  // When the image has finished drawing all its instructions,
+  // we might have allocated a lot more memory than we need,
+  // so free any excess space.
+  if (pixels_to_draw != NULL && draw_ops_capacity > total_draw_instructions) {
+    if (total_draw_instructions == 0) {
+      FreePixels();
+      return;
+    }
+    draw_ops_capacity = total_draw_instructions;
+    // Our wrapper of realloc() will exit() on failure,
+    // so no need to check the result here.
+    pixel_to_draw *new_pixels = gln_realloc(pixels_to_draw, draw_ops_capacity * sizeof(pixel_to_draw));
+    pixels_to_draw = new_pixels;
+  }
+}
+
+static glui32 gln_graphics_get_millisecs (void);
+
+/*
+ * TRUE while the most recently drawn picture has not yet had a chance to
+ * be flushed to the player via a real input wait.  Set at the end of
+ * os_cleargraphics; cleared in gln_event_wait_2 when a real LineInput or
+ * CharInput arrives.  When os_cleargraphics is called again with this flag
+ * still TRUE, it means two pictures are arriving back-to-back with no input
+ * between them (e.g. The Secret Diary of Adrian Mole's intro), so the
+ * deferred / synchronous slow-draw path is taken instead of fast-paint to
+ * keep the previous picture visible.  In the common case (Adventure Quest
+ * gameplay, one picture per location) the flag is cleared by the player's
+ * intervening command, so no artificial delay is incurred.
+ */
+static int gln_picture_dwell_pending = FALSE;
+
+/*
+ * Deferred-commit state for vector graphics.  When os_cleargraphics is
+ * called while gln_graphics_hold_active is still TRUE from a previous
+ * picture, the next picture's commit is parked here instead of painted
+ * immediately.  This keeps the held picture on screen without blocking
+ * the interpreter, mirroring the bitmap-graphics async hold pattern.
+ *
+ * gln_graphics_timeout fires the deferred paint once the hold expires:
+ * the entire snapshot for gli_slowdraw=FALSE, or in chunks of GLN_VECTOR_
+ * PIXELS_PER_TICK for gli_slowdraw=TRUE so the player sees the same
+ * gradual reveal as the rest of the intro.  Ownership of the pixels_to_draw
+ * buffer is transferred here (the live pixels_to_draw is then reset to
+ * NULL so absrunsub(0) for the next picture starts with a fresh buffer).
+ */
+static pixel_to_draw *gln_pending_paint_list = NULL;
+static int gln_pending_paint_count = 0;
+static int gln_pending_paint_index = 0;
+static gln_uint16 gln_pending_paint_width = 0;
+static gln_uint16 gln_pending_paint_height = 0;
+static Colour gln_pending_paint_palette[GLN_PALETTE_SIZE];
+static int gln_pending_paint_x_offset = 0;
+static int gln_pending_paint_y_offset = 0;
+static int gln_pending_paint_background_done = FALSE;
+static int gln_pending_paint_pending = FALSE;
+
+#pragma mark DrawSomeL9VectorPixels
+
+/*
+ * Renders the recorded vector image into glk_window, resuming from wherever
+ * the previous call left off. Called repeatedly from the graphics timeout so
+ * that drawing can be interleaved with game play instead of blocking on a
+ * single large paint.
+ *
+ * When gli_slowdraw is set, only 50 pixels are emitted per call so the user
+ * sees the picture build up gradually (mimicking the original Level 9
+ * line-mode look). Otherwise every remaining instruction is flushed in one go.
+ */
+void DrawSomeL9VectorPixels(glui32 bg_col, winid_t glk_window, int x_offset, int y_offset, glui32 palette[])
+{
+  VectorState = DRAWING_VECTOR_IMAGE;
+  int i = current_draw_instruction;
+
+  /* Paint the background once per image, before any pixels are plotted. */
+  if (!vector_background_painted) {
+    glk_window_fill_rect (glk_window,
+                          bg_col,
+                          x_offset,
+                          y_offset,
+                          gln_graphics_width * GLN_GRAPHICS_PIXEL,
+                          gln_graphics_height * GLN_GRAPHICS_PIXEL);
+    vector_background_painted = TRUE;
+  }
+
+  /* Emit pixels until we run out or, in slow-draw mode, hit the chunk limit
+   * that yields back to the timeout loop. */
+  int chunk_end = i + GLN_VECTOR_PIXELS_PER_TICK;
+  for (; i < total_draw_instructions && (!gli_slowdraw || i < chunk_end); i++) {
+    const pixel_to_draw *todraw = &pixels_to_draw[i];
+    glk_plot_pixel(glk_window, todraw->x, todraw->y, todraw->colour, x_offset, y_offset, palette);
+  }
+  current_draw_instruction = i;
+
+  /* All instructions consumed: transition to the static "showing" state,
+   * release the instruction buffer, and shut down the graphics timer. */
+  if (current_draw_instruction >= total_draw_instructions) {
+    VectorState = SHOWING_VECTOR_IMAGE;
+    FreePixels();
+    current_draw_instruction = 0;
+    gln_graphics_stop ();
+  }
+}
+
+
+#ifndef GARGLK
+
+/* Per-pass state for the upstream layer-scan renderer. Lives here rather than
+ * as locals in gln_graphics_timeout so the loop body can be a standalone
+ * helper. Reset via gln_graphics_paint_pass_reset on every new picture or
+ * deferred repaint. */
+static int saved_layer_state, saved_x_state, saved_y_state;
+static int yield_counter_state;
+
+static void
+gln_graphics_paint_pass_reset(void)
+{
+  saved_layer_state = 0;
+  saved_x_state = 0;
+  saved_y_state = 0;
+  yield_counter_state = 0;
+}
+
+/*
+ * Make a portion of an image pass, from lower to higher image layers,
+ * scanning for invalidated pixels in the current layer. Each invalidated
+ * pixel triggers one paint region. On hitting GLN_REPAINT_LIMIT regions we
+ * save scan position and yield by returning; the next call resumes.
+ */
+static void
+gln_graphics_paint_pass(glui32 palette[], int layers[], long layer_usage[],
+                        gln_byte *on_screen, gln_byte *off_screen,
+                        int x_offset, int y_offset,
+                        long picture_size)
+{
+  int regions = 0;
+
+  for (int layer = saved_layer_state;
+       layer < GLN_PALETTE_SIZE && layer_usage[layer] > 0; layer++)
+    {
+      /* Track the row's starting index incrementally to avoid the per-pixel
+       * multiplication. */
+      long index_row = saved_y_state * gln_graphics_width;
+      for (int y = saved_y_state; y < gln_graphics_height; y++)
+        {
+          for (int x = saved_x_state; x < gln_graphics_width; x++)
+            {
+              long index = index_row + x;
+              assert (index < picture_size);
+
+              if (layers[off_screen[index]] == layer
+                  && on_screen[index] != off_screen[index])
+                {
+                  gln_graphics_paint_region (gln_graphics_window,
+                                             palette, layers,
+                                             off_screen, on_screen,
+                                             x, y, x_offset, y_offset,
+                                             GLN_GRAPHICS_PIXEL,
+                                             gln_graphics_width,
+                                             gln_graphics_height);
+
+                  if (++regions >= GLN_REPAINT_LIMIT)
+                    {
+                      yield_counter_state++;
+                      saved_layer_state = layer;
+                      saved_x_state = x;
+                      saved_y_state = y;
+                      return;
+                    }
+                }
+            }
+          saved_x_state = 0;
+          index_row += gln_graphics_width;
+        }
+      saved_y_state = 0;
+    }
+
+  assert (regions < GLN_REPAINT_LIMIT);
+}
+
+#else /* GARGLK */
+
+/* Slow-draw vector rendering is in progress (or just about to start) and the
+ * user has slow-draw enabled — the timeout should keep feeding vector pixels
+ * to the window instead of paint_everything-ing the whole bitmap.
+ *
+ * Gate this on there being pixels left to emit (total_draw_instructions > 0).
+ * Once an image is complete, FreePixels() has set total_draw_instructions to
+ * 0, so a later timeout — in particular one triggered by an arrange/redraw
+ * (resize) event — falls through to gln_graphics_paint_everything(), which
+ * repaints the whole image from off_screen.  Without this gate a resize after
+ * the final image would run DrawSomeL9VectorPixels() over an empty buffer and
+ * paint only the background, erasing the picture. */
+static int
+gln_should_continue_slow_vector_draw(void)
+{
+  return gln_graphics_interpreter_state == GLN_GRAPHICS_LINE_MODE
+      && gli_slowdraw == 1
+      && total_draw_instructions > 0;
+}
+
+static void
+gln_graphics_paint_garglk(glui32 palette[],
+                                gln_byte *off_screen,
+                                int x_offset, int y_offset)
+{
+  if (gln_should_continue_slow_vector_draw()) {
+    DrawSomeL9VectorPixels(palette[0], gln_graphics_window, x_offset, y_offset, palette);
+  } else {
+    gln_graphics_paint_everything(gln_graphics_window,
+                                  palette, off_screen,
+                                  x_offset, y_offset,
+                                  gln_graphics_width,
+                                  gln_graphics_height);
+    /* Nothing more to do until something restarts us. */
+    gln_graphics_stop();
+  }
+}
+
+#endif /* GARGLK */
+
+
+/*
+ * gln_graphics_get_millisecs()
+ *
+ * Return a millisecond timestamp from the Glk real-time clock, used to hold
+ * title and first pictures for a fixed wall-clock duration rather than a fixed
+ * number of background timeouts (whose real period varies with the timer rate
+ * and the configured minimum).  Only differences between returned values are
+ * used, so the unsigned wrap of the seconds-times-1000 term is harmless.
+ */
+static glui32
+gln_graphics_get_millisecs (void)
+{
+  glktimeval_t now;
+
+  glk_current_time (&now);
+  return (glui32) now.low_sec * 1000 + (glui32) now.microsec / 1000;
+}
+
+
 /*
  * gln_graphics_timeout()
  *
@@ -2334,18 +2718,10 @@ gln_graphics_timeout (void)
   static int ignore_counter;                 /* Count of calls ignored */
 
   static int x_offset, y_offset;             /* Point plot offsets */
-  static int yield_counter;                  /* Yields in rendering */
-  static int saved_layer;                    /* Saved current layer */
-  static int saved_x, saved_y;               /* Saved x,y coord */
-
-  static int total_regions;                  /* Debug statistic */
 
   gln_byte *on_screen;                       /* On-screen image buffer */
   gln_byte *off_screen;                      /* Off-screen image buffer */
   long picture_size;                         /* Picture size in pixels */
-  int layer;                                 /* Image layer iterator */
-  int x, y;                                  /* Image iterators */
-  int regions;                               /* Count of regions painted */
 
   /* Ignore the call if the current graphics state is inactive. */
   if (!gln_graphics_active)
@@ -2364,6 +2740,100 @@ gln_graphics_timeout (void)
       deferred_repaint = TRUE;
       gln_graphics_repaint = FALSE;
       ignore_counter = GLN_GRAPHICS_REPAINT_WAIT - 1;
+      return;
+    }
+
+  /*
+   * If a picture hold is in effect, keep the image currently on screen and
+   * postpone painting any newly-arrived picture.  This counts down on each
+   * background timeout, so it delays the next picture without blocking the
+   * interpreter, which carries on running meanwhile.
+   */
+  if (gln_graphics_hold_active)
+    {
+      if (gln_graphics_get_millisecs () - gln_graphics_hold_start
+          < GLN_GRAPHICS_TITLE_WAIT_MS)
+        return;
+      gln_graphics_hold_active = FALSE;
+    }
+
+  /*
+   * Vector graphics deferred-commit: os_cleargraphics may have parked an
+   * intro picture's pixels here while the previous picture's hold was still
+   * in effect.  Now that the hold has expired, paint the parked snapshot —
+   * all at once for fast-paint (gli_slowdraw=FALSE), or in GLN_VECTOR_PIXELS
+   * _PER_TICK chunks for gli_slowdraw=TRUE so the player sees the gradual
+   * reveal.  When the snapshot is fully painted, arm a fresh hold for it
+   * (so the next picture's commit defers in turn) and free the buffer.
+   *
+   * Painted directly via glk_window_fill_rect; we don't go through the
+   * normal new_picture / paint_garglk path because those would clear the
+   * window (using the live gln_graphics_* state, which already reflects the
+   * picture AFTER this one) and then paint pixels_to_draw (which has the
+   * next picture's border instead of this snapshot's pixels).
+   */
+  if (gln_pending_paint_pending)
+    {
+      glui32 pending_palette[GLN_PALETTE_SIZE];
+      gln_graphics_convert_palette (gln_pending_paint_palette,
+                                    pending_palette);
+
+      if (!gln_pending_paint_background_done)
+        {
+          /* Draw the shaded border around the picture area before the first
+           * chunk, matching what gln_graphics_clear_and_border does for the
+           * regular new_picture setup path.  Without this the deferred
+           * pictures appear without their frame. */
+          gln_graphics_clear_and_border (gln_graphics_window,
+                                         gln_pending_paint_x_offset,
+                                         gln_pending_paint_y_offset,
+                                         GLN_GRAPHICS_PIXEL,
+                                         gln_pending_paint_width,
+                                         gln_pending_paint_height);
+          glk_window_fill_rect (gln_graphics_window, pending_palette[0],
+                                gln_pending_paint_x_offset,
+                                gln_pending_paint_y_offset,
+                                gln_pending_paint_width * GLN_GRAPHICS_PIXEL,
+                                gln_pending_paint_height * GLN_GRAPHICS_PIXEL);
+          gln_pending_paint_background_done = TRUE;
+        }
+
+      int chunk_end = gli_slowdraw
+        ? gln_pending_paint_index + GLN_VECTOR_PIXELS_PER_TICK
+        : gln_pending_paint_count;
+      if (chunk_end > gln_pending_paint_count)
+        chunk_end = gln_pending_paint_count;
+
+      for (int i = gln_pending_paint_index; i < chunk_end; i++)
+        {
+          const pixel_to_draw *p = &gln_pending_paint_list[i];
+          glk_window_fill_rect (gln_graphics_window,
+                                pending_palette[p->colour],
+                                p->x * GLN_GRAPHICS_PIXEL
+                                  + gln_pending_paint_x_offset,
+                                p->y * GLN_GRAPHICS_PIXEL
+                                  + gln_pending_paint_y_offset,
+                                GLN_GRAPHICS_PIXEL,
+                                GLN_GRAPHICS_PIXEL);
+        }
+      gln_pending_paint_index = chunk_end;
+
+      if (gln_pending_paint_index >= gln_pending_paint_count)
+        {
+          free (gln_pending_paint_list);
+          gln_pending_paint_list = NULL;
+          gln_pending_paint_count = 0;
+          gln_pending_paint_index = 0;
+          gln_pending_paint_pending = FALSE;
+          gln_pending_paint_background_done = FALSE;
+
+          /* Arm fresh hold for the just-committed snapshot.  The next
+           * picture (either deferred-painted here on next expiry, or
+           * slow-drawn during input wait via the regular paint path) will
+           * wait this out. */
+          gln_graphics_hold_active = TRUE;
+          gln_graphics_hold_start = gln_graphics_get_millisecs ();
+        }
       return;
     }
 
@@ -2466,12 +2936,28 @@ gln_graphics_timeout (void)
                                      GLN_GRAPHICS_PIXEL,
                                      gln_graphics_width, gln_graphics_height);
 
-      /* Start a fresh picture rendering pass. */
-      yield_counter = 0;
-      saved_layer = 0;
-      saved_x = 0;
-      saved_y = 0;
-      total_regions = 0;
+#ifndef GARGLK
+      gln_graphics_paint_pass_reset();
+#endif
+
+#ifdef GARGLK
+      /*
+       * If a vector image is still being slow-drawn when this runs (i.e. a
+       * resize arrived mid-draw), the window clear above has just discarded
+       * the pixels plotted so far, while current_draw_instruction still points
+       * partway through the buffer.  Restart the vector draw from the top so
+       * the whole accumulated image is re-emitted at the new size - every
+       * pixel is still held in pixels_to_draw, as FreePixels() only runs once
+       * the image is complete.  (For a brand-new picture these are already 0 /
+       * FALSE, so this is a no-op there.)
+       */
+      if (gln_graphics_interpreter_state == GLN_GRAPHICS_LINE_MODE
+          && total_draw_instructions > 0)
+        {
+          current_draw_instruction = 0;
+          vector_background_painted = FALSE;
+        }
+#endif
 
       /* Clear the new picture and deferred repaint flags. */
       gln_graphics_new_picture = FALSE;
@@ -2479,112 +2965,149 @@ gln_graphics_timeout (void)
     }
 
 #ifndef GARGLK
-  /*
-   * Make a portion of an image pass, from lower to higher image layers,
-   * scanning for invalidated pixels that are in the current image layer we
-   * are painting.  Each invalidated pixel gives rise to a region paint,
-   * which equates to one Glk rectangle fill.
-   *
-   * When the limit on regions is reached, save the current image pass layer
-   * and coordinates, and yield control to the main game playing code by
-   * returning.  On the next call, pick up where we left off.
-   *
-   * As an optimization, we can leave the loop on the first empty layer we
-   * encounter.  Since layers are ordered by complexity and color usage, all
-   * layers higher than the first unused one will also be empty, so we don't
-   * need to scan them.
-   */
-  regions = 0;
-  for (layer = saved_layer;
-       layer < GLN_PALETTE_SIZE && layer_usage[layer] > 0; layer++)
+  gln_graphics_paint_pass(palette, layers, layer_usage,
+                          on_screen, off_screen,
+                          x_offset, y_offset,
+                          picture_size);
+#else
+  gln_graphics_paint_garglk(palette, off_screen, x_offset, y_offset);
+#endif
+}
+
+
+/*
+ * Reading picture files out of Amstrad CPC / Spectrum +3 disk images
+ * ------------------------------------------------------------------
+ * The CPC and +3 releases keep their picture files (title.pic, 1.pic and
+ * allpics.pic) inside an EXTENDED-CPC / +3DOS .dsk disk image rather than as
+ * loose files.  When no loose picture files are found beside the game, we
+ * parse any .dsk images in the same folder and drop their *.PIC files into a
+ * temporary directory that the normal bitmap loader can then read.  The .dsk /
+ * CP/M parsing is shared with the core loader via DiskCatalogue() in level9.c;
+ * here we only handle the temporary directory and writing the files out.
+ */
+
+/* Context for gln_write_pic_file(): the (lazily created) temp directory. */
+typedef struct { char *dir; } gln_pic_extract;
+
+/* DiskCatalogue() callback: write one *.PIC file out as "<name>.pic". */
+static void
+gln_write_pic_file (const char *name8, L9BYTE *data, L9UINT32 len, void *vctx)
+{
+  gln_pic_extract *ctx = (gln_pic_extract *) vctx;
+  char outname[16], outpath[4096];
+  FILE *f;
+  int k, w;
+
+  if (len == 0)
+    return;
+
+  /* Create the temporary directory on the first file actually extracted. */
+  if (!ctx->dir)
     {
-      long index_row;
+      const char *base = getenv ("TMPDIR");
+      char tmpl[4096];
+      size_t bl;
+      char *made;
 
-      /*
-       * As an optimization to avoid multiplications in the loop, maintain a
-       * separate index row.
-       */
-      index_row = saved_y * gln_graphics_width;
-      for (y = saved_y; y < gln_graphics_height; y++)
-        {
-          for (x = saved_x; x < gln_graphics_width; x++)
-            {
-              long index;
-
-              /* Get the index for this pixel. */
-              index = index_row + x;
-              assert (index < picture_size * sizeof (*off_screen));
-
-              /*
-               * Ignore pixels not in the current layer, and pixels not
-               * currently invalid (that is, ones whose on-screen represen-
-               * tation matches the off-screen buffer).
-               */
-              if (layers[off_screen[index]] == layer
-                  && on_screen[index] != off_screen[index])
-                {
-                  /*
-                   * Rather than painting just one pixel, here we try to
-                   * paint the maximal region we can for the layer of the
-                   * given pixel.
-                   */
-                  gln_graphics_paint_region (gln_graphics_window,
-                                             palette, layers,
-                                             off_screen, on_screen,
-                                             x, y, x_offset, y_offset,
-                                             GLN_GRAPHICS_PIXEL,
-                                             gln_graphics_width,
-                                             gln_graphics_height);
-
-                  /*
-                   * Increment count of regions handled, and yield, by
-                   * returning, if the limit on paint regions is reached.
-                   * Before returning, save the current layer and scan
-                   * coordinates, so we can pick up here on the next call.
-                   */
-                  regions++;
-                  if (regions >= GLN_REPAINT_LIMIT)
-                    {
-                      yield_counter++;
-                      saved_layer = layer;
-                      saved_x = x;
-                      saved_y = y;
-                      total_regions += regions;
-                      return;
-                    }
-                }
-            }
-
-          /* Reset the saved x coordinate on y increment. */
-          saved_x = 0;
-
-          /* Update the index row on change of y. */
-          index_row += gln_graphics_width;
-        }
-
-      /* Reset the saved y coordinate on layer change. */
-      saved_y = 0;
+      if (!base || !base[0])
+        base = "/tmp";
+      bl = strlen (base);
+      snprintf (tmpl, sizeof tmpl, "%s%sglnpicsXXXXXX",
+                base, (bl && base[bl-1] == GLN_FILE_DELIM) ? "" : "/");
+      made = mkdtemp (tmpl);
+      if (!made)
+        return;
+      ctx->dir = gln_malloc (strlen (made) + 2);
+      strlcpy (ctx->dir, made, strlen (made) + 2);
+      bl = strlen (ctx->dir);
+      ctx->dir[bl] = GLN_FILE_DELIM;
+      ctx->dir[bl + 1] = '\0';
     }
 
-  /*
-   * If we reach this point, then we didn't get to the limit on regions
-   * painted on this pass.  In that case, we've finished rendering the
-   * image.
-   */
-  assert (regions < GLN_REPAINT_LIMIT);
-  total_regions += regions;
+  w = 0;                               /* build "<name>.pic", lower case */
+  for (k = 0; k < 8 && name8[k] != ' '; k++)
+    outname[w++] = tolower ((unsigned char) name8[k]);
+  outname[w++] = '.'; outname[w++] = 'p'; outname[w++] = 'i'; outname[w++] = 'c';
+  outname[w] = '\0';
 
-#else
-  gln_graphics_paint_everything
-      (gln_graphics_window,
-       palette, off_screen,
-       x_offset, y_offset,
-       gln_graphics_width,
-       gln_graphics_height);
-#endif
+  snprintf (outpath, sizeof outpath, "%s%s", ctx->dir, outname);
+  f = fopen (outpath, "rb");           /* keep the first disk's copy on a clash */
+  if (f)
+    { fclose (f); return; }
+  f = fopen (outpath, "wb");
+  if (f)
+    { fwrite (data, 1, len, f); fclose (f); }
+}
 
-  /* Stop graphics; there's no more to be done until something restarts us. */
-  gln_graphics_stop ();
+/* Pull the *.PIC files out of one .dsk image into ctx (no-op if `path` is not
+ * a CPC/+3 disk image, or cannot be read). */
+static void
+gln_extract_one_disk (const char *path, gln_pic_extract *ctx)
+{
+  FILE *f;
+  L9BYTE *raw;
+  long rawlen;
+
+  f = fopen (path, "rb");
+  if (!f)
+    return;
+  fseek (f, 0, SEEK_END);
+  rawlen = ftell (f);
+  fseek (f, 0, SEEK_SET);
+  if (rawlen > 0 && (raw = malloc (rawlen)) != NULL)
+    {
+      if (fread (raw, 1, rawlen, f) == (size_t) rawlen)
+        DiskCatalogue (raw, (L9UINT32) rawlen, "PIC", gln_write_pic_file, ctx);
+      free (raw);
+    }
+  fclose (f);
+}
+
+/* Advance a game filename to its next physical part (Side/Tape stepping);
+ * defined further down and shared with os_get_game_file(). */
+static int gln_advance_tape_file (char *name, int size);
+
+/*
+ * gln_extract_disk_pictures()
+ *
+ * Extract the *.PIC files from the disk image(s) belonging to this game into a
+ * fresh temporary directory.  Rather than trawling the whole folder, we look
+ * only at the game file itself and its sibling parts, located with the same
+ * Side/Tape stepping os_get_game_file() uses (e.g. "... - Side A.dsk" ->
+ * "... - Side B.dsk"), so an unrelated game's disks in the same folder are
+ * never touched.  Returns the temp directory path (gln_malloc'd, with a
+ * trailing GLN_FILE_DELIM) or NULL if nothing was extracted.
+ */
+static char *
+gln_extract_disk_pictures (const char *gamefile)
+{
+  gln_pic_extract ctx;
+  char name[MAX_PATH], *base, *hash;
+
+  ctx.dir = NULL;
+  if (!gamefile || strlen (gamefile) + 1 > sizeof name)
+    return NULL;
+  strncpy (name, gamefile, sizeof name - 1);
+  name[sizeof name - 1] = '\0';
+
+  /* Drop any "#N" multi-part selector so we have a real filename. */
+  base = strrchr (name, GLN_FILE_DELIM);
+  base = base ? base + 1 : name;
+  hash = strchr (base, '#');
+  if (hash)
+    *hash = '\0';
+
+  /* Walk the game file and each subsequent part; DiskCatalogue() silently
+   * ignores anything that is not a CPC/+3 disk image. */
+  for (;;)
+    {
+      gln_extract_one_disk (name, &ctx);
+      if (!gln_advance_tape_file (name, sizeof name))
+        break;
+    }
+
+  return ctx.dir;
 }
 
 
@@ -2618,6 +3141,26 @@ gln_graphics_locate_bitmaps (const char *gamefile)
   bitmap_type = DetectBitmaps (dirname);
   if (bitmap_type == NO_BITMAPS)
     {
+      /*
+       * No loose picture files.  The Amstrad CPC and Spectrum +3 releases
+       * keep title.pic / 1.pic / allpics.pic inside a .dsk disk image, so try
+       * extracting the *.PIC files from this game's own disk image(s) and
+       * detect again in that temporary directory.
+       */
+      char *extracted = gln_extract_disk_pictures (gamefile);
+      if (extracted)
+        {
+          BitmapType extracted_type = DetectBitmaps (extracted);
+          if (extracted_type != NO_BITMAPS)
+            {
+              free (dirname);
+              gln_graphics_bitmap_directory = extracted;
+              gln_graphics_bitmap_type = extracted_type;
+              return;
+            }
+          free (extracted);
+        }
+
       free (dirname);
       gln_graphics_bitmap_directory = NULL;
       gln_graphics_bitmap_type = NO_BITMAPS;
@@ -2631,20 +3174,25 @@ gln_graphics_locate_bitmaps (const char *gamefile)
 
 
 /*
- * gln_graphics_handle_title_picture()
+ * gln_graphics_hold_picture()
  *
- * Picture 0 is special, normally the title picture.  Unless we handle it
- * specially, the next picture comes along and instantly overwrites it.
- * Here, then, we try to delay until the picture has rendered, allowing the
- * delay to be broken with a keypress.
+ * Some pictures are otherwise instantly overwritten by the next one before
+ * they can be seen: picture 0 (the title) and picture 1 (the first in-game
+ * picture, which several games replace immediately).  Both are first pumped to
+ * completion so they actually reach the screen.  The title then announces
+ * itself with a prompt and waits (blocking) for a couple of seconds or a
+ * keypress.  Other pictures are held WITHOUT blocking: a hold is armed so the
+ * background timeout postpones the next picture's paint while the interpreter
+ * keeps running, and player input ends the hold early.
  */
 static void
-gln_graphics_handle_title_picture (void)
+gln_graphics_hold_picture (int picture)
 {
   event_t event;
-  int count;
+  glui32 start_millisecs;
 
-  gln_standout_string ("\n[ Press any key to skip the title picture... ]\n\n");
+  if (picture == GLN_GRAPHICS_TITLE_PICTURE)
+    gln_standout_string ("\n[ Press any key to skip the title picture... ]\n\n");
 
   /* Wait until a keypress or graphics rendering is complete. */
   glk_request_char_event (gln_main_window);
@@ -2665,13 +3213,32 @@ gln_graphics_handle_title_picture (void)
   while (gln_graphics_active);
 
   /*
-   * Now wait another couple of seconds, or until a keypress.  We'll do this
-   * in graphics timeout chunks, so that if graphics restarts while we're
-   * delaying, and it requests timer events and overwrites ours, we wind up
-   * with the identical timer event period to the one we're expecting anyway.
+   * For pictures other than the title, don't block: the image is on screen
+   * now, so arm a non-blocking hold (released by gln_graphics_timeout once the
+   * wait duration elapses, cleared by input) that postpones the next picture's
+   * paint, then return so the game keeps running.
+   */
+  if (picture != GLN_GRAPHICS_TITLE_PICTURE)
+    {
+      gln_graphics_hold_active = TRUE;
+      gln_graphics_hold_start = gln_graphics_get_millisecs ();
+      glk_cancel_char_event (gln_main_window);
+      gln_watchdog_tick ();
+      return;
+    }
+
+  /*
+   * Now wait the title pause, or until a keypress.  We do this in graphics
+   * timeout chunks, so that if graphics restarts while we're delaying, and it
+   * requests timer events and overwrites ours, we wind up with the identical
+   * timer event period to the one we're expecting anyway.  The number of
+   * chunks isn't fixed: we stop once GLN_GRAPHICS_TITLE_WAIT_MS of real time
+   * has passed, so the pause is the same length whatever the timer period.
    */
   glk_request_timer_events (GLN_GRAPHICS_TIMEOUT);
-  for (count = 0; count < GLN_GRAPHICS_TITLE_WAIT; count++)
+  start_millisecs = gln_graphics_get_millisecs ();
+  while (gln_graphics_get_millisecs () - start_millisecs
+         < GLN_GRAPHICS_TITLE_WAIT_MS)
     {
       gln_event_wait_2 (evtype_CharInput, evtype_Timer, &event);
 
@@ -2724,6 +3291,18 @@ os_show_bitmap (int picture, int x, int y)
     return;
 
   /*
+   * The Amstrad CPC and Spectrum +3 releases share C64-format picture files.
+   * Reuse the "Colorize 1-bit graphics" theme preference (gli_z6_colorize) to
+   * pick between the full-colour C64/CPC decode (preference on) and the
+   * authentic monochrome +3 rendering (preference off).  Harmless for the
+   * other bitmap types, which ignore this setting.
+   */
+  {
+    extern int gli_z6_colorize;
+    bitmap_zx_set_colour (gli_z6_colorize ? TRUE : FALSE);
+  }
+
+  /*
    * Get the core interpreter's bitmap for the requested picture.  If this
    * returns NULL, the picture doesn't exist, so ignore the call silently.
    */
@@ -2734,9 +3313,17 @@ os_show_bitmap (int picture, int x, int y)
 
   /*
    * Note the last thing passed to os_show_bitmap, to avoid possible repaints
-   * of the current picture.
+   * of the current picture.  Also remember the decode parameters (offset and
+   * the colour preference in force) so the picture can be re-decoded later if
+   * the colour preference changes (see gln_graphics_recolor).
    */
   gln_graphics_picture = picture;
+  gln_graphics_picture_x = x;
+  gln_graphics_picture_y = y;
+  {
+    extern int gli_z6_colorize;
+    gln_graphics_colorize = gli_z6_colorize ? 1 : 0;
+  }
 
   /* Calculate the picture size in bytes. */
   picture_bytes = bitmap->width * bitmap->height * sizeof (*bitmap->bitmap);
@@ -2767,18 +3354,80 @@ os_show_bitmap (int picture, int x, int y)
     {
       /*
        * Ensure graphics on, then set the new picture flag and start the
-       * updating "thread".  If this is the title picture, start special
-       * handling.
+       * updating "thread".  The title picture and the first in-game picture
+       * are otherwise instantly overwritten, so hold them on screen briefly.
        */
       if (gln_graphics_open ())
         {
           gln_graphics_new_picture = TRUE;
           gln_graphics_start ();
 
-          if (picture == GLN_GRAPHICS_TITLE_PICTURE)
-            gln_graphics_handle_title_picture ();
+          if (picture == GLN_GRAPHICS_TITLE_PICTURE
+              || picture == GLN_GRAPHICS_FIRST_PICTURE)
+            gln_graphics_hold_picture (picture);
         }
     }
+}
+
+
+/*
+ * gln_graphics_recolor()
+ *
+ * Re-decode and repaint the current picture when the "Colorize 1-bit graphics"
+ * preference (gli_z6_colorize) has changed since it was last decoded, so a
+ * CPC/+3 picture switches between full colour and monochrome on the fly.
+ * Called on arrange/redraw events, which Glk delivers when the preference is
+ * toggled.  Returns TRUE if it re-decoded the picture (so the caller can skip
+ * the normal repaint), or FALSE when there is nothing to recolor — preference
+ * unchanged, no current picture, or graphics not displayed — in which case the
+ * caller's gln_graphics_paint() handles the event as usual.
+ */
+static int
+gln_graphics_recolor (void)
+{
+  extern int gli_z6_colorize;
+  Bitmap *bitmap;
+  long picture_bytes;
+  int colorize = gli_z6_colorize ? 1 : 0;
+
+  if (!gln_graphics_enabled || !gln_graphics_are_displayed ()
+      || gln_graphics_interpreter_state != GLN_GRAPHICS_BITMAP_MODE)
+    return FALSE;
+  if (gln_graphics_picture < 0 || colorize == gln_graphics_colorize)
+    return FALSE;
+
+  /* Re-decode the same picture, at the same offset, with the new preference. */
+  bitmap_zx_set_colour (colorize ? TRUE : FALSE);
+  bitmap = DecodeBitmap (gln_graphics_bitmap_directory,
+                         gln_graphics_bitmap_type, gln_graphics_picture,
+                         gln_graphics_picture_x, gln_graphics_picture_y);
+  if (!bitmap)
+    return FALSE;
+  gln_graphics_colorize = colorize;
+
+  /* Replace the cached bitmap, dimensions, and palette, exactly as
+   * os_show_bitmap() does for a freshly delivered picture. */
+  picture_bytes = bitmap->width * bitmap->height * sizeof (*bitmap->bitmap);
+  free (gln_graphics_bitmap);
+  gln_graphics_bitmap = gln_malloc (picture_bytes);
+  memcpy (gln_graphics_bitmap, bitmap->bitmap, picture_bytes);
+  gln_graphics_width = bitmap->width;
+  gln_graphics_height = bitmap->height;
+  memset (gln_graphics_palette, 0, sizeof (gln_graphics_palette));
+  memcpy (gln_graphics_palette, bitmap->palette,
+          bitmap->npalette * sizeof (bitmap->palette[0]));
+
+  /*
+   * Cancel any in-progress picture hold (the long pause that keeps the title
+   * or first in-game picture on screen) so the new colour appears at once
+   * rather than after the hold expires, and force a full re-render as for a
+   * new picture.  Returning TRUE lets the caller skip the gln_graphics_paint()
+   * repaint, whose smoothing delay would otherwise postpone the redraw.
+   */
+  gln_graphics_hold_active = FALSE;
+  gln_graphics_new_picture = TRUE;
+  gln_graphics_start ();
+  return TRUE;
 }
 
 
@@ -2934,6 +3583,7 @@ gln_graphics_cleanup (void)
   gln_graphics_on_screen = NULL;
   free (gln_graphics_bitmap_directory);
   gln_graphics_bitmap_directory = NULL;
+  FreePixels();
 
   gln_graphics_bitmap_type = NO_BITMAPS;
   gln_graphics_picture = -1;
@@ -2950,11 +3600,14 @@ gln_graphics_cleanup (void)
  * over-vibrant, so to soften it a bit this table uses non-primary colors.
  */
 static const gln_rgb_t GLN_LINEGRAPHICS_COLOR_TABLE[] = {
-  { 47,  79,  79},  /* DarkSlateGray  [Black] */
+//  { 47,  79,  79},  /* DarkSlateGray  [Black] */
+  { 11,  19,  19},  /* DarkSlateGray  [Black] */
   {238,  44,  44},  /* Firebrick2     [Red] */
-  { 67, 205, 128},  /* SeaGreen3      [Green] */
+//  { 67, 205, 128},  /* SeaGreen3      [Green] */
+  { 22, 192, 62},  /* SeaGreen3      [Green] */
   {238, 201,   0},  /* Gold2          [Yellow] */
-  { 92, 172, 238},  /* SteelBlue2     [Blue] */
+//  { 92, 172, 238},  /* SteelBlue2     [Blue] */
+  { 36, 67, 206},  /* SteelBlue2     [Blue] */
   {139,  87,  66},  /* LightSalmon4   [Brown] */
   {175, 238, 238},  /* PaleTurquoise  [Cyan] */
   {245, 245, 245},  /* WhiteSmoke     [White] */
@@ -3028,6 +3681,14 @@ gln_linegraphics_clear_context (void)
 
   /* Clear palette colors to all black. */
   memset (gln_graphics_palette, 0, sizeof (gln_graphics_palette));
+  /*
+   * Do NOT FreePixels() here: pixels from the previous picture may still be
+   * draining when the game calls os_cleargraphics, and tossing them would
+   * make Adrian Mole's title image disappear before it could finish drawing.
+   * gln_linegraphics_process() frees them at the start of the next picture
+   * (when new graphic opcodes arrive), and DrawSomeL9VectorPixels frees them
+   * on natural drain completion.
+   */
 }
 
 
@@ -3067,13 +3728,28 @@ gln_linegraphics_get_pixel (int x, int y)
   return gln_graphics_bitmap[y * gln_graphics_width + x];
 }
 
+#pragma mark gln_linegraphics_set_pixel
+
 static void
 gln_linegraphics_set_pixel (int x, int y, gln_byte color)
 {
   assert (x >= 0 && x < gln_graphics_width
           && y >= 0 && y < gln_graphics_height);
 
+  if (VectorState == DRAWING_VECTOR_IMAGE) {
+    FreePixels();
+    VectorState = NO_VECTOR_IMAGE;
+  }
+
   gln_graphics_bitmap[y * gln_graphics_width + x] = color;
+  if (gln_graphics_interpreter_state == GLN_GRAPHICS_LINE_MODE) {
+    ensure_capacity();
+    pixel_to_draw *todraw = &pixels_to_draw[total_draw_instructions++];
+    todraw->x = x;
+    todraw->y = y;
+    todraw->colour = color;
+    //  fprintf(stderr, "gln_linegraphics_set_pixel: total_draw_instructions: %d\n", total_draw_instructions);
+  }
 }
 
 
@@ -3346,11 +4022,280 @@ skip:         for (x++;
  * Interpreter entry points for line drawing graphics.  All calls to these
  * are ignored if line drawing mode is not set.
  */
+
+static void gln_output_flush (void);
+
 void
 os_cleargraphics (void)
 {
-  if (gln_graphics_interpreter_state == GLN_GRAPHICS_LINE_MODE)
-    gln_linegraphics_clear_context ();
+  if (gln_graphics_interpreter_state != GLN_GRAPHICS_LINE_MODE)
+    return;
+
+  /*
+   * Snapshot the dwell flag: a TRUE value means the previous picture has
+   * not yet been flushed via a real input wait, so two pictures are arriving
+   * back-to-back (e.g. The Secret Diary of Adrian Mole's intro).  Snapshot
+   * here so we can use the same value to gate the synchronous slow-draw
+   * reveal below.
+   */
+  int was_back_to_back = gln_picture_dwell_pending;
+
+  /* Clear the dwell flag now that we've snapshotted it; the visibility
+   * window for back-to-back pictures is provided by the synchronous
+   * slow-draw below, not by an explicit pause. */
+  gln_picture_dwell_pending = FALSE;
+
+  /*
+   * Finish drawing the previous picture before revealing it.
+   * At least The Secret Diary of Adrian Mole draws its pictures in
+   * two parts: the common-frame border, run synchronously by bsrunsub(0)
+   * ainside show_picture(), and the picture detail, stepped incrementally
+   * by RunGraphics().  The intro shows pictures back-to-back with no input
+   * pause between them, so the detail of the previous picture may not have
+   * been pumped yet (gln_linegraphics_process() only runs from os_readchar/
+   * os_input). At this point gfxa5 still points at the previous picture
+   * - it isn't reassigned until absrunsub(0) runs after we return -
+   * so step it to completion here to accumulate its detail pixels.
+   */
+  while (RunGraphics ())
+    ;
+
+  /*
+   * Commit the previous picture to screen before the next one's absrunsub(0)
+   * frame setup overwrites the palette/bitmap.  Without this, back-to-back
+   * show_picture calls during an intro lose every picture except the last:
+   * each new absrunsub() updates the bitmap while the previous picture's
+   * setup never actually painted to the window.
+   *
+   * Three sub-paths:
+   *   1) hold from the previous picture still active → defer: take ownership
+   *      of pixels_to_draw and let gln_graphics_timeout fire the actual paint
+   *      after the hold expires.  Mirrors the bitmap-graphics async hold so
+   *      the interpreter keeps running (text emission etc.) while the held
+   *      picture stays on screen.
+   *   2) gli_slowdraw + back-to-back → existing synchronous slow-draw branch
+   *      for the gradual reveal (only used on the first commit of an intro,
+   *      since subsequent commits hit path 1).
+   *   3) otherwise → fast-paint the buffered pixels directly.
+   *
+   * Paths 2/3 arm the hold for the just-committed picture so the NEXT
+   * os_cleargraphics defers via path 1.  Path 1 doesn't arm a new hold here
+   * — the existing hold stays active; a fresh hold for the deferred picture
+   * is armed by gln_graphics_timeout when the deferred paint completes.
+   */
+  if (total_draw_instructions > 0
+      && gln_graphics_enabled && gln_graphics_open ())
+    {
+      int x_offset, y_offset;
+      static glui32 palette[GLN_PALETTE_SIZE];
+      event_t event;
+
+      gln_graphics_position_picture (gln_graphics_window,
+                                     GLN_GRAPHICS_PIXEL,
+                                     gln_graphics_width, gln_graphics_height,
+                                     &x_offset, &y_offset);
+      gln_graphics_convert_palette (gln_graphics_palette, palette);
+
+      /* Queue depth is 1: if a paint is still pending from a previous defer
+       * (the timer-driven deferred paint hasn't had a chance to run yet —
+       * e.g. intro storylets arriving faster than glk_select can fire),
+       * commit it synchronously now to make room.  Arm a fresh hold for the
+       * just-flushed picture so the upcoming defer (if any) waits it out. */
+      if (gln_pending_paint_pending)
+        {
+          glui32 prev_palette[GLN_PALETTE_SIZE];
+          gln_graphics_convert_palette (gln_pending_paint_palette,
+                                        prev_palette);
+          if (!gln_pending_paint_background_done)
+            {
+              gln_graphics_clear_and_border (gln_graphics_window,
+                                             gln_pending_paint_x_offset,
+                                             gln_pending_paint_y_offset,
+                                             GLN_GRAPHICS_PIXEL,
+                                             gln_pending_paint_width,
+                                             gln_pending_paint_height);
+              glk_window_fill_rect (gln_graphics_window, prev_palette[0],
+                                    gln_pending_paint_x_offset,
+                                    gln_pending_paint_y_offset,
+                                    gln_pending_paint_width * GLN_GRAPHICS_PIXEL,
+                                    gln_pending_paint_height * GLN_GRAPHICS_PIXEL);
+            }
+          for (int i = gln_pending_paint_index;
+               i < gln_pending_paint_count; i++)
+            {
+              const pixel_to_draw *p = &gln_pending_paint_list[i];
+              glk_window_fill_rect (gln_graphics_window,
+                                    prev_palette[p->colour],
+                                    p->x * GLN_GRAPHICS_PIXEL
+                                      + gln_pending_paint_x_offset,
+                                    p->y * GLN_GRAPHICS_PIXEL
+                                      + gln_pending_paint_y_offset,
+                                    GLN_GRAPHICS_PIXEL,
+                                    GLN_GRAPHICS_PIXEL);
+            }
+          free (gln_pending_paint_list);
+          gln_pending_paint_list = NULL;
+          gln_pending_paint_count = 0;
+          gln_pending_paint_index = 0;
+          gln_pending_paint_pending = FALSE;
+          gln_pending_paint_background_done = FALSE;
+
+          gln_graphics_hold_active = TRUE;
+          gln_graphics_hold_start = gln_graphics_get_millisecs ();
+        }
+
+      /* Treat an expired hold as inactive even if no timer event has cleared
+       * the flag yet (timer events only fire from glk_select callers, and
+       * between text-only commits we may not hit one for many seconds). */
+      int hold_in_effect = gln_graphics_hold_active
+        && gln_graphics_get_millisecs () - gln_graphics_hold_start
+           < GLN_GRAPHICS_TITLE_WAIT_MS;
+      if (!hold_in_effect)
+        gln_graphics_hold_active = FALSE;
+
+      if (hold_in_effect && was_back_to_back)
+        {
+          /* Path 1: defer.  Take ownership of pixels_to_draw plus the picture
+           * dimensions and palette.  Reset the live pixels_to_draw to NULL
+           * so the next picture's absrunsub(0) starts with a fresh buffer.
+           * gln_graphics_timeout will commit this snapshot once the held
+           * picture's hold expires. */
+          gln_pending_paint_list = pixels_to_draw;
+          gln_pending_paint_count = total_draw_instructions;
+          gln_pending_paint_index = 0;
+          gln_pending_paint_background_done = FALSE;
+          gln_pending_paint_width = gln_graphics_width;
+          gln_pending_paint_height = gln_graphics_height;
+          memcpy (gln_pending_paint_palette, gln_graphics_palette,
+                  sizeof (gln_graphics_palette));
+          gln_pending_paint_x_offset = x_offset;
+          gln_pending_paint_y_offset = y_offset;
+          gln_pending_paint_pending = TRUE;
+
+          /* Detach the live pixels_to_draw without freeing it — we now own
+           * those pixels via gln_pending_paint_list. */
+          pixels_to_draw = NULL;
+          total_draw_instructions = 0;
+          current_draw_instruction = 0;
+          draw_ops_capacity = 100;
+          vector_background_painted = FALSE;
+
+          /* Ensure timer events drive gln_graphics_timeout, which will fire
+           * the deferred paint once gln_graphics_hold_active clears. */
+          gln_graphics_start ();
+        }
+      else if (gli_slowdraw && was_back_to_back)
+        {
+          /* Path 2: synchronous slow-draw for the first intro commit (no
+           * prior hold to wait out).  Setting new_picture lets
+           * gln_graphics_timeout() do its full setup including the
+           * clear_and_border that draws the black frame around the picture
+           * area. */
+          current_draw_instruction = 0;
+          gln_graphics_new_picture = TRUE;
+          gln_graphics_start ();
+          while (gln_graphics_active)
+            {
+              gln_event_wait (evtype_Timer, &event);
+            }
+
+          /* Arm hold for this picture so the next os_cleargraphics defers. */
+          gln_graphics_hold_active = TRUE;
+          gln_graphics_hold_start = gln_graphics_get_millisecs ();
+        }
+      else
+        {
+          /* Path 3: fast-paint the buffered pixels directly.  Used for the
+           * first intro commit when gli_slowdraw is off, and for non-intro
+           * (gameplay) commits.  We continue from current_draw_instruction
+           * rather than resetting to 0 so we don't re-plot pixels the async
+           * slow-draw already pushed.
+           *
+           * Intro fast-paints additionally draw the shaded picture frame,
+           * matching the regular new_picture setup path; gameplay commits
+           * skip it, since the frame was drawn previously and the async
+           * slow-draw has already populated parts of the picture that we
+           * don't want to clear. */
+          if (was_back_to_back)
+            {
+              gln_graphics_clear_and_border (gln_graphics_window,
+                                             x_offset, y_offset,
+                                             GLN_GRAPHICS_PIXEL,
+                                             gln_graphics_width,
+                                             gln_graphics_height);
+            }
+          if (!vector_background_painted)
+            {
+              glk_window_fill_rect (gln_graphics_window, palette[0],
+                                    x_offset, y_offset,
+                                    gln_graphics_width * GLN_GRAPHICS_PIXEL,
+                                    gln_graphics_height * GLN_GRAPHICS_PIXEL);
+              vector_background_painted = TRUE;
+            }
+          for (int i = current_draw_instruction;
+               i < total_draw_instructions; i++)
+            {
+              const pixel_to_draw *p = &pixels_to_draw[i];
+              glk_window_fill_rect (gln_graphics_window,
+                                    palette[p->colour],
+                                    p->x * GLN_GRAPHICS_PIXEL + x_offset,
+                                    p->y * GLN_GRAPHICS_PIXEL + y_offset,
+                                    GLN_GRAPHICS_PIXEL,
+                                    GLN_GRAPHICS_PIXEL);
+            }
+          FreePixels ();
+          gln_graphics_stop ();
+
+          /* Force a Glk buffer flush so any text the game printed during
+           * this picture transition reaches GlkTextBufferWindow now, in
+           * proportion to this picture's worth of output, rather than
+           * piling up until the next os_input fires its own glk_select.
+           * Path 2's synchronous slow-draw already does this implicitly via
+           * its many gln_event_wait() calls; the fast-paint loop above
+           * makes none, so we mirror the behaviour with one poll here.
+           * Without this, the accumulated text dumps in one batch on the
+           * next input and the auto-scroll over-shoots a viewport. */
+          gln_output_flush ();
+          glk_select_poll (&event);
+
+          /* Arm hold only for intro commits.  was_back_to_back is the right
+           * gate: Adrian Mole's text-paging polls between intro pictures
+           * short-circuit in os_readchar without going through the event
+           * loop, so gln_picture_dwell_pending stays TRUE across them.
+           * Gameplay input (LineInput / real CharInput) clears it via
+           * gln_event_wait_2, keeping per-command transitions snappy. */
+          if (was_back_to_back)
+            {
+              gln_graphics_hold_active = TRUE;
+              gln_graphics_hold_start = gln_graphics_get_millisecs ();
+            }
+        }
+    }
+
+  /*
+   * Always mark dwell_pending — even when we had nothing to commit (the
+   * very first os_cleargraphics of a session, before any picture's pixels
+   * have been generated).  This way, when the next os_cleargraphics arrives
+   * to commit the picture that absrunsub() is about to populate, it sees
+   * dwell_pending = TRUE and routes to the synchronous slow-draw branch
+   * instead of fast-paint.  That gives the first picture in a back-to-back
+   * sequence (e.g. The Secret Diary of Adrian Mole's title image, which
+   * arrives BEFORE any prior dwell flag has been set) the same gradual
+   * visible reveal as the rest of the intro.  Real input (LineInput/
+   * CharInput) clears the flag from gln_event_wait_2, so normal gameplay
+   * still falls into the fast-paint branch.
+   */
+  gln_picture_dwell_pending = TRUE;
+
+  gln_linegraphics_clear_context ();
+
+  /*
+   * Revealing and holding the picture above can dwell here for several seconds
+   * of real time.  That is interpreter-side display time, not the game looping,
+   * so tick the watchdog before returning - otherwise the elapsed time counts
+   * against the infinite-loop timeout and trips a false "infinite loop" prompt.
+   */
+  gln_watchdog_tick ();
 }
 
 void
@@ -3374,6 +4319,7 @@ os_fill (int x, int y, int colour1, int colour2)
     gln_linegraphics_fill_4way_if (x, y, colour1, colour2);
 }
 
+#pragma mark gln_linegraphics_process
 
 /*
  * gln_linegraphics_process()
@@ -3392,7 +4338,14 @@ gln_linegraphics_process (void)
     {
       int opcodes_count;
 
-      /* Run all the available graphics opcodes. */
+      /* Run all the available graphics opcodes, accumulating the picture's
+       * pixels.  We do NOT FreePixels() here even when new opcodes are
+       * pending, because the absrunsub(0) frame for this picture has just
+       * added its border pixels to pixels_to_draw and clearing them would
+       * lose the border.  os_cleargraphics() drains the previous picture
+       * synchronously, so by the time we arrive here pixels_to_draw holds
+       * only this picture's frame pixels — to which we now append the
+       * detail. */
       for (opcodes_count = 0; RunGraphics (); )
         {
           opcodes_count++;
@@ -3408,6 +4361,7 @@ gln_linegraphics_process (void)
           if (gln_graphics_open ())
             {
               /* Set the new picture flag, and start the updating "thread". */
+              current_draw_instruction = 0;
               gln_graphics_new_picture = TRUE;
               gln_graphics_start ();
             }
@@ -5156,8 +6110,9 @@ gln_command_escape (const char *string)
     return FALSE;
 
   /* Take a copy of the string, without any leading space or introducer. */
-  string_copy = gln_malloc (strlen (string + posn) + 1 - strlen ("glk"));
-  strcpy (string_copy, string + posn + strlen ("glk"));
+  size_t stringsize = strlen (string + posn) + 1 - strlen ("glk");
+  string_copy = gln_malloc (stringsize);
+  strncpy (string_copy, string + posn + strlen ("glk"), stringsize);
 
   /*
    * Find the subcommand; the first word in the string copy.  Find its end,
@@ -5274,8 +6229,9 @@ gln_command_intercept (char *string)
 
   /* Take a copy of the string, excluding any leading whitespace. */
   posn = strspn (string, "\t ");
-  string_copy = gln_malloc (strlen (string + posn) + 1);
-  strcpy (string_copy, string + posn);
+  size_t stringsize = strlen (string + posn) + 1;
+  string_copy = gln_malloc (stringsize);
+  strncpy (string_copy, string + posn, stringsize);
 
   /*
    * Find the space or NUL after the first word, and check that anything
@@ -5963,14 +6919,37 @@ gln_event_wait_2 (glui32 wait_type_1, glui32 wait_type_2, event_t * event)
         {
         case evtype_Arrange:
         case evtype_Redraw:
-          /* Refresh any sensitive windows on size events. */
+          /* Refresh any sensitive windows on size events.  A colour-preference
+           * toggle arrives as one of these too: if it changed, re-decode the
+           * current picture and repaint it at once; otherwise fall back to the
+           * normal resize repaint. */
           gln_status_redraw ();
-          gln_graphics_paint ();
+          if (!gln_graphics_recolor ())
+            gln_graphics_paint ();
           break;
 
         case evtype_Timer:
           /* Do background graphics updates on timeout. */
           gln_graphics_timeout ();
+          break;
+
+        case evtype_CharInput:
+        case evtype_LineInput:
+          /* Real input has been delivered: glk_select has flushed Glk's
+           * buffer, so the previously drawn picture is safely on screen and
+           * the next os_cleargraphics does not need to defer to keep it
+           * visible. */
+          gln_picture_dwell_pending = FALSE;
+          /* Cut a picture hold short on player input ONLY if the hold has
+           * already been on screen for a minimum dwell — otherwise games like
+           * The Secret Diary of Adrian Mole, which use char input almost
+           * exclusively, would never let the just-drawn picture be seen at
+           * all: each prompt's keypress would clear the hold the moment it
+           * was armed, and the next picture would render immediately on top. */
+          if (gln_graphics_hold_active
+              && gln_graphics_get_millisecs () - gln_graphics_hold_start
+                 >= 2000)
+            gln_graphics_hold_active = FALSE;
           break;
         }
     }
@@ -6106,6 +7085,126 @@ os_load_file (gln_byte * ptr, int *bytes, int max)
  * platforms that don't implement a file path/name mechanism that matches
  * the expectations of the Level 9 base interpreter fairly closely.
  */
+/* Case-insensitive extension test against the trailing chars of 's'. */
+static int
+gln_str_ends_with (const char *s, const char *suffix)
+{
+  size_t sl = strlen (s), el = strlen (suffix);
+  if (sl < el) return 0;
+  const char *p = s + sl - el;
+  for (size_t i = 0; i < el; i++)
+    if (tolower ((unsigned char)p[i]) != tolower ((unsigned char)suffix[i]))
+      return 0;
+  return 1;
+}
+
+/*
+ * gln_bump_marker()
+ *
+ * Advance the digit (or letter) that follows the last case-insensitive
+ * occurrence of `word` in a filename's basename, in place: with word "side",
+ * "... - Side 1.tzx" becomes "... - Side 2.tzx" (and "Side A" -> "Side B");
+ * with word "tape", "Tape 1 - ..." becomes "Tape 2 - ...".  Used to step to
+ * the next file of a multi-load game.  The bump is single-character and
+ * length-preserving, so any pointers into the name stay valid.  The last
+ * occurrence is used so a stray match inside a game's title is ignored.
+ * Returns 1 if the marker was found and advanced, 0 otherwise.
+ */
+static int
+gln_bump_marker (char *name, const char *word)
+{
+  char *basename, *marker = NULL, *p;
+  size_t wl = strlen (word);
+
+  basename = strrchr (name, GLN_FILE_DELIM);
+  basename = basename ? basename + 1 : name;
+
+  for (p = basename; *p; p++)
+    {
+      size_t i;
+      for (i = 0; i < wl; i++)
+        if (tolower ((unsigned char)p[i]) != tolower ((unsigned char)word[i]))
+          break;
+      if (i == wl)
+        marker = p;
+    }
+  if (!marker)
+    return 0;
+
+  /* Skip the word and any spaces, then advance the digit or letter that
+   * follows.  Refuse to roll past 9 / Z. */
+  p = marker + wl;
+  while (*p == ' ')
+    p++;
+  if (isdigit ((unsigned char)*p) && *p < '9')
+    {
+      (*p)++;
+      return 1;
+    }
+  if (isalpha ((unsigned char)*p) && tolower ((unsigned char)*p) < 'z')
+    {
+      (*p)++;
+      return 1;
+    }
+  return 0;
+}
+
+/* True if `path` names an existing, readable file. */
+static int
+gln_file_exists (const char *path)
+{
+  FILE *f = fopen (path, "rb");
+  if (f)
+    {
+      fclose (f);
+      return 1;
+    }
+  return 0;
+}
+
+/*
+ * gln_advance_tape_file()
+ *
+ * Advance a bare tape path (no "#N" suffix) to the next physical file of a
+ * multi-load game, trying the next tape ("Tape 1" -> "Tape 2") before the
+ * next side ("Side 1" -> "Side 2").  The tape preference matters for releases
+ * like Ingrid's Back, whose parts live on successive "Tape N - Side 1" files
+ * while each tape's Side 2 carries a parallel 128K edition that must not be
+ * mistaken for the next part.  The next-tape file is chosen only when it
+ * actually exists, so genuinely side-split games (e.g. The Growing Pains of
+ * Adrian Mole, with no "Tape" marker, or a single tape whose part 2 is on its
+ * second side) still fall through to the side bump.  Returns 1 and updates
+ * `name` in place on success.
+ */
+static int
+gln_advance_tape_file (char *name, int size)
+{
+  char attempt[MAX_PATH];
+
+  if (strlen (name) + 1 > sizeof attempt)
+    return 0;
+
+  strncpy (attempt, name, sizeof attempt - 1);
+  attempt[sizeof attempt - 1] = '\0';
+  if (gln_bump_marker (attempt, "tape") && gln_file_exists (attempt))
+    {
+      strncpy (name, attempt, size - 1);
+      name[size - 1] = '\0';
+      return 1;
+    }
+
+  strncpy (attempt, name, sizeof attempt - 1);
+  attempt[sizeof attempt - 1] = '\0';
+  if (gln_bump_marker (attempt, "side") && gln_file_exists (attempt))
+    {
+      strncpy (name, attempt, size - 1);
+      name[size - 1] = '\0';
+      return 1;
+    }
+
+  return 0;
+}
+
 gln_bool
 os_get_game_file (char *newname, int size)
 {
@@ -6118,9 +7217,88 @@ os_get_game_file (char *newname, int size)
   basename = strrchr (newname, GLN_FILE_DELIM);
   basename = basename ? basename + 1 : newname;
 
-  /* Search for the last numeric character in the basename. */
+  /* Spectrum tape images can contain multiple game parts in a single file.
+   * Walk through them by appending a "#N" suffix that level9.c's load()
+   * parses to select the Nth game. The file is opened from the same path
+   * each time; only the in-tape part index changes. */
+  {
+    char *hash = strrchr (basename, '#');
+    char saved = 0;
+    if (hash) { saved = *hash; *hash = '\0'; }
+    int is_tape = gln_str_ends_with (basename, ".tzx") ||
+                  gln_str_ends_with (basename, ".tap");
+    if (hash) *hash = saved;
+    if (is_tape) {
+      int current = hash ? atoi (hash + 1) : 1;
+      int next = current + 1;
+      int parts;
+      char *write_at;
+      int room;
+      if (next > 99) {
+        gln_watchdog_tick ();
+        return FALSE;
+      }
+
+      /* Work on the bare tape path (no "#N" suffix) while we probe it and,
+       * if needed, advance to the next physical side. */
+      if (hash) *hash = '\0';
+
+      /* Verify the underlying tape file is still openable. */
+      stream = fopen (newname, "rb");
+      if (!stream) {
+        if (hash) *hash = saved;
+        gln_watchdog_tick ();
+        return FALSE;
+      }
+      fclose (stream);
+
+      /* A multi-load game's parts can be split across several physical tapes
+       * or tape sides (e.g. Ingrid's Back puts each part on its own "Tape N -
+       * Side 1", while The Growing Pains of Adrian Mole holds parts 1-2 on
+       * "Side 1" and 3-4 on "Side 2").  When the next part lies beyond those
+       * on the current image, roll over to the following tape/side and resume
+       * the part count from 1 there. */
+      parts = CountTapeParts (newname);
+      if (parts > 0 && next > parts) {
+        if (!gln_advance_tape_file (newname, size)) {
+          if (hash) *hash = saved;
+          gln_watchdog_tick ();
+          return FALSE;        /* no further tape/side to continue on */
+        }
+        next -= parts;
+      }
+
+      /* Write the selected part's "#N" suffix onto the (possibly side-
+       * advanced) tape path. */
+      write_at = newname + strlen (newname);
+      room = size - (int)(write_at - newname);
+      if (room < 5) {  /* "#NN" + NUL */
+        gln_watchdog_tick ();
+        return FALSE;
+      }
+      snprintf (write_at, room, "#%d", next);
+
+      gln_output_flush ();
+      gln_game_prompted ();
+      gln_standout_string ("\nNext part: ");
+      gln_standout_string (basename);
+      gln_standout_string ("\n\n");
+      gln_gameid_game_name_reset ();
+      gln_watchdog_tick ();
+      return TRUE;
+    }
+  }
+
+  /* Search for the last numeric character in the basename, ignoring any
+   * file extension so we change the digit in the game name itself rather
+   * than a digit inside the extension - ADRMOLE1.Z80 -> ADRMOLE2.Z80, not
+   * ADRMOLE1.Z81. */
   digit = -1;
-  for (index = strlen (basename) - 1; index >= 0; index--)
+  {
+    char *dot = strrchr (basename, '.');
+    index = dot ? (int)(dot - basename) - 1 : (int)strlen (basename) - 1;
+  }
+  for (; index >= 0; index--)
     {
       if (isdigit (basename[index]))
         {
@@ -6209,9 +7387,85 @@ os_set_filenumber (char *newname, int size, int file_number)
   basename = strrchr (newname, GLN_FILE_DELIM);
   basename = basename ? basename + 1 : newname;
 
-  /* Search for the last numeric character in the basename. */
+  /* Spectrum tape images hold multiple game parts in one file. Select the
+   * Nth part with a "#N" suffix that level9.c's load() parses; same approach
+   * os_get_game_file uses. Without this, tapes like Lancelot - Side A.tzx
+   * (no digit to replace) would silently fall through and reload part 1
+   * instead of jumping to the requested part. */
+  {
+    char *hash = strrchr (basename, '#');
+    char saved = 0;
+    if (hash) { saved = *hash; *hash = '\0'; }
+    int is_tape = gln_str_ends_with (basename, ".tzx") ||
+                  gln_str_ends_with (basename, ".tap");
+    int is_disk = gln_str_ends_with (basename, ".dsk");
+    if (hash) *hash = saved;
+    if (is_tape) {
+      int part = file_number;
+      char *write_at;
+      int room, parts;
+      if (hash) *hash = '\0';
+
+      /* Continue onto the next physical tape/side when the requested part
+       * lies beyond those on this one (see os_get_game_file). */
+      parts = CountTapeParts (newname);
+      if (parts > 0 && part > parts && gln_advance_tape_file (newname, size))
+        part -= parts;
+
+      write_at = newname + strlen (newname);
+      room = size - (int)(write_at - newname);
+      if (room < 5) {
+        gln_watchdog_tick ();
+        return;
+      }
+      snprintf (write_at, room, "#%d", part);
+
+      gln_output_flush ();
+      gln_game_prompted ();
+      gln_standout_string ("\nNext part: ");
+      gln_standout_string (basename);
+      gln_standout_string ("\n\n");
+      gln_gameid_game_name_reset ();
+      gln_watchdog_tick ();
+      return;
+    }
+    if (is_disk) {
+      /* +3/CPC disk compilations (e.g. Time and Magik) pack their sub-games
+       * as GAMEDAT_N + ACODE_N in a single image; the disk filename carries
+       * no part digit to bump.  Select the Nth sub-game with a "#N" suffix
+       * that level9.c's load()/extract_dsk parse, replacing any existing one. */
+      char *write_at;
+      int room;
+      if (hash) *hash = '\0';
+      write_at = newname + strlen (newname);
+      room = size - (int)(write_at - newname);
+      if (room < 5) {
+        gln_watchdog_tick ();
+        return;
+      }
+      snprintf (write_at, room, "#%d", file_number);
+
+      gln_output_flush ();
+      gln_game_prompted ();
+      gln_standout_string ("\nNext disk file: ");
+      gln_standout_string (basename);
+      gln_standout_string ("\n\n");
+      gln_gameid_game_name_reset ();
+      gln_watchdog_tick ();
+      return;
+    }
+  }
+
+  /* Search for the last numeric character in the basename, ignoring any
+   * file extension so we change the digit in the game name itself rather
+   * than a digit inside the extension - ADRMOLE1.Z80 -> ADRMOLE2.Z80, not
+   * ADRMOLE1.Z81. */
   digit = -1;
-  for (index = strlen (basename) - 1; index >= 0; index--)
+  {
+    char *dot = strrchr (basename, '.');
+    index = dot ? (int)(dot - basename) - 1 : (int)strlen (basename) - 1;
+  }
+  for (; index >= 0; index--)
     {
       if (isdigit (basename[index]))
         {
@@ -6379,8 +7633,9 @@ gln_establish_picture_filename (char *name, char **graphics)
   assert (name && graphics);
 
   /* Take a destroyable copy of the input filename. */
-  base = gln_malloc (strlen (name) + 1);
-  strcpy (base, name);
+  size_t stringsize = strlen (name) + 1;
+  base = gln_malloc (stringsize);
+  strncpy (base, name, stringsize);
 
   /* If base has an extension .LEV, .SNA, or similar, remove it. */
   if (strrchr (base, '.'))
@@ -6389,50 +7644,51 @@ gln_establish_picture_filename (char *name, char **graphics)
     }
 
   /* Allocate space for the return graphics file. */
-  graphics_file = gln_malloc (strlen (base) + strlen (".PIC") + 1);
+  size_t gfsize = strlen (base) + strlen (".PIC") + 1;
+  graphics_file = gln_malloc (gfsize);
 
   /* Form a candidate graphics file, using a .PIC extension. */
   if (!stream)
     {
-      strcpy (graphics_file, base);
-      strcat (graphics_file, ".PIC");
+      strncpy (graphics_file, base, gfsize);
+      strncat (graphics_file, ".PIC", gfsize);
       stream = fopen (graphics_file, "rb");
     }
 
   if (!stream)
     {
-      strcpy (graphics_file, base);
-      strcat (graphics_file, ".pic");
+      strncpy (graphics_file, base, gfsize);
+      strncat (graphics_file, ".pic", gfsize);
       stream = fopen (graphics_file, "rb");
     }
 
   /* Form a candidate graphics file, using a .CGA extension. */
   if (!stream)
     {
-      strcpy (graphics_file, base);
-      strcat (graphics_file, ".CGA");
+      strncpy (graphics_file, base, gfsize);
+      strncat (graphics_file, ".CGA", gfsize);
       stream = fopen (graphics_file, "rb");
     }
 
   if (!stream)
     {
-      strcpy (graphics_file, base);
-      strcat (graphics_file, ".cga");
+      strncpy (graphics_file, base, gfsize);
+      strncat (graphics_file, ".cga", gfsize);
       stream = fopen (graphics_file, "rb");
     }
 
   /* Form a candidate graphics file, using a .HRC extension. */
   if (!stream)
     {
-      strcpy (graphics_file, base);
-      strcat (graphics_file, ".HRC");
+      strncpy (graphics_file, base, gfsize);
+      strncat (graphics_file, ".HRC", gfsize);
       stream = fopen (graphics_file, "rb");
     }
 
   if (!stream)
     {
-      strcpy (graphics_file, base);
-      strcat (graphics_file, ".hrc");
+      strncpy (graphics_file, base, gfsize);
+      strncat (graphics_file, ".hrc", gfsize);
       stream = fopen (graphics_file, "rb");
     }
 
@@ -6463,17 +7719,18 @@ gln_establish_picture_filename (char *name, char **graphics)
   base[directory_end - base] = '\0';
 
   /* Again, allocate space for the return graphics file. */
-  graphics_file = gln_malloc (strlen (base) + strlen ("PICTURE.DAT") + 1);
+  gfsize = strlen (base) + strlen ("PICTURE.DAT") + 1;
+  graphics_file = gln_malloc (gfsize);
 
   /* As above, form a candidate graphics file. */
-  strcpy (graphics_file, base);
-  strcat (graphics_file, "PICTURE.DAT");
+  strncpy (graphics_file, base, gfsize);
+  strncat (graphics_file, "PICTURE.DAT", gfsize);
   stream = fopen (graphics_file, "rb");
   if (!stream)
     {
       /* Retry, using picture.dat extension instead. */
-      strcpy (graphics_file, base);
-      strcat (graphics_file, "picture.dat");
+      strncpy (graphics_file, base, gfsize);
+      strncat (graphics_file, "picture.dat", gfsize);
       stream = fopen (graphics_file, "rb");
       if (!stream)
         {
@@ -6558,6 +7815,33 @@ gln_startup_code (int argc, char *argv[])
   if (argv_index == argc - 1)
     {
       gln_gamefile = argv[argv_index];
+
+      /*
+       * Several Level 9 +3 disk releases (Scapeghost, Gnome Ranger, ...) ship
+       * as a two-sided pair.  "Side A.dsk" holds the game (ACODE1-3.ACD) plus
+       * its initial pictures (TITLE.PIC, 1.PIC); "Side B.dsk" holds the rest
+       * of the pictures in the file ALLPICS.PIC.  If the user opens Side B,
+       * redirect to the sibling Side A so the actual game loads, and so the
+       * picture-extractor's forward Side A -> Side B walk picks up both intro
+       * pictures (Side A) and the rest (Side B). Without this, opening Side B
+       * would extract only ALLPICS and miss the Side-A pictures.  We only
+       * redirect when a sibling Side A.dsk actually exists, so a genuinely
+       * single-sided file named "... Side B.dsk" is left untouched.
+       */
+      {
+        static char gln_redirect_buf[MAX_PATH];
+        const char *side_b = " - Side B.dsk";
+        size_t flen = strlen (gln_gamefile), blen = strlen (side_b);
+        if (flen >= blen && flen < sizeof gln_redirect_buf
+            && strcmp (gln_gamefile + flen - blen, side_b) == 0)
+          {
+            memcpy (gln_redirect_buf, gln_gamefile, flen + 1);
+            gln_redirect_buf[flen - 5] = 'A';  /* flip 'B' before ".dsk" */
+            if (access (gln_redirect_buf, R_OK) == 0)
+              gln_gamefile = gln_redirect_buf;
+          }
+      }
+
       gln_game_message = NULL;
 #ifdef GARGLK
     {
@@ -6591,7 +7875,7 @@ gln_main (void)
 
   /* Ensure Level 9 internal types have the right sizes. */
   if (!(sizeof (gln_byte) == 1
-      && sizeof (gln_uint16) == 2 && sizeof (gln_uint32) >= 4))
+      && sizeof (gln_uint16) == 2 && sizeof (gln_uint32) == 4))
     {
       gln_fatal ("GLK: Types sized incorrectly, recompilation is needed");
       glk_exit ();
@@ -6659,10 +7943,10 @@ gln_main (void)
    */
 #ifdef SPATTERLIGHT
   if (!gli_determinism)
-      srand (time (NULL));
+      set_erkyrath_random (0);
   else {
       /* When implementing predictable random number generation, I found that at least The Growing Pains of Adrian Mole breaks if a) the randomseed global never changes and b) it is set to certain values. So we generate a set array of 100  values here that are known to work */
-      srand (1234);
+      set_erkyrath_random (1234);
       L9UINT16 seed = 2;
       for (int i = 0; i < 99; i++) {
           seed=(((seed<<8) + 0x0a - seed) <<2) + seed + 1;
@@ -6670,7 +7954,7 @@ gln_main (void)
       }
   }
 #else
-  srand (time (NULL));
+  set_erkyrath_random (0);
 #endif
   /* Repeat this game until no more restarts requested. */
   do
@@ -6890,10 +8174,15 @@ glkunix_startup_code (glkunix_startup_t * data)
 
 
 /*---------------------------------------------------------------------*/
-/*  Glk linkage relevant only to the Mac platform                      */
+/*  Glk linkage relevant only to the classic (pre-OS X) Mac platform    */
 /*---------------------------------------------------------------------*/
+/* TARGET_OS_MAC is 1 on every Apple platform, so it is not enough to select
+ * the classic Mac Toolbox (macglk) code below.  Modern, Mach-based macOS
+ * predefines __MACH__ (classic Mac OS never did), so exclude this block there;
+ * it would otherwise pull in macglk_startup.h, which exists only for pre-OS X
+ * Macs. */
 #ifndef GARGLK
-#ifdef TARGET_OS_MAC
+#if defined(TARGET_OS_MAC) && !defined(__MACH__)
 
 #include "macglk_startup.h"
 
@@ -6967,5 +8256,5 @@ macglk_startup_code (macglk_startup_t * data)
   /* macglk_setprefs(); */
   return TRUE;
 }
-#endif /* TARGET_OS_MAC */
+#endif /* classic Mac OS (TARGET_OS_MAC && !__MACH__) */
 #endif

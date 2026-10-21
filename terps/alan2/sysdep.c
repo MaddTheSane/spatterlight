@@ -328,6 +328,9 @@ char *stringUpper(char str[])   /* INOUT - ISO string to convert */
 }
 
 
+/* Input buffers passed to toIso/fromIso are always LISTLEN+1 (defined as 101 in parse.c) */
+#define TOISO_BUFSIZE 101
+
 /*----------------------------------------------------------------------
   toIso
 
@@ -382,7 +385,7 @@ static unsigned char dosMap[256]
   switch (charset) {
   case 0: /* ISO */
     if (copy != original)
-      (void)strcpy(copy, original);
+      strlcpy(copy, original, TOISO_BUFSIZE);
     break;
   case 1:			/* Mac */
     for (o = (unsigned char *)original, c = (unsigned char *)copy; *o; o++, c++)
@@ -458,7 +461,7 @@ void fromIso(char copy[],       /* OUT - Mapped string */
     *c = '\0';
 #else
     if (copy != original)
-      (void)strcpy(copy, original);
+      strlcpy(copy, original, TOISO_BUFSIZE);
 #endif
 }
 

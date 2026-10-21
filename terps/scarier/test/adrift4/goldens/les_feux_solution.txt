@@ -1,0 +1,156 @@
+# Les Feux de l'enfer (Les Feux de l'enfer.taf) -- French dungeon crawl,
+# ADRIFT 4.00, demo release.  75 of the declared 115 points; the other 40 are
+# unreachable in this build (see the harness comment for the proof).  The
+# route needs SCR_SEED=45: every fight length, the shop's guard roll and the
+# grappling-hook throw are all rolls off that one shared stream, so any
+# inserted or removed command reshuffles the hit counts downstream.  The
+# per-fight attack counts below are just what this seed happens to need:
+# assassin 9, ogre 10, goule 5, demon 9, voyou 9, voleur 10.  Some of them
+# include surplus `attack`s after the kill ("<enemy> n'est pas la!"), which
+# still spend a turn; they were kept wherever removing one lost the route.
+# (Re-seeded from 18 on 2026-09-13, when the type-7 battle raise cap made
+# `passer`'s stat gains stop at their max, as run400 does.)
+#
+# The second "swim" (getting `get corde` on the little island) can trigger a
+# stochastic leg-grab/drowning ambush; it either resolves within the same
+# turn (as it does at this seed -- no extra command needed) or loops forever
+# ("Vous ne pouvez aller dans aucune direction!" to everything after),
+# desyncing the flute tune and hook throw that follow.  That is pure luck
+# tied to the RNG stream position at that exact point and is not fixable by
+# adding commands -- SCR_SEED=45 was chosen (by sweeping seeds with the
+# route above) specifically because the ambush resolves favorably here.
+#
+# 1/passer/2 pick the opening character options.  Rooms follow the map in
+# terps/scarier/test/adrift4/notes: 2 ENTREE -> 4 -> 5 JONCTION -> 3/31/32 ->
+# 6 -> 7 -> 8 -> 9 -> 10 -> 11 -> 12 -> 13 -> 14/15 (island) -> 34 -> 33.
+#
+# Scoring stops: the dying woman (give her both potions), the assassin's
+# chest, `x objet` (+5, and it is what drops the grappin into room 32 -- take
+# it there, it is never listed anywhere else), the ogre, `Hors d'ici` + the
+# ghoul, the dread demon, two of the shop guards, `push bouton droit`, the
+# flute tune, and the hook throw.
+#
+# Three traps the route steps around.  Answer 2 (not 3) to the shopkeeper:
+# 3 completes task 99, which with the two guard kills satisfies task 105
+# ***2mobtuer*** -> task 106 ***mort du player***, an EndGame.  Kill only the
+# voyou and the voleur and walk away: this seed rolls four guards, and killing
+# the truant as well would complete task 102 and fire the same chain.  Leave
+# the silver mace in the tree house -- the player is over the carry weight
+# with the grappling hook, so `get corde` fails while holding it, and nothing
+# afterwards needs the mace (the room 29 golem only wakes on `x sabres`).
+1
+passer
+2
+s
+s
+w
+open sac
+give potion femme
+give guerison femme
+get pieces
+e
+e
+attack assassin
+attack assassin
+attack assassin
+attack assassin
+attack assassin
+attack assassin
+attack assassin
+attack assassin
+attack assassin
+open coffre
+x coffre
+get pieces
+get flute
+get clef rouge
+x objet
+get grappin
+w
+s
+open coffre
+attack ogre
+attack ogre
+attack ogre
+attack ogre
+attack ogre
+attack ogre
+attack ogre
+attack ogre
+attack ogre
+attack ogre
+get pieces
+w
+n
+Hors d'ici
+x cadavre
+attack goule
+attack goule
+attack goule
+attack goule
+attack goule
+n
+open porte
+attack demon
+attack demon
+attack demon
+attack demon
+attack demon
+attack demon
+attack demon
+attack demon
+attack demon
+n
+go north
+open porte
+x petit homme
+2
+attack voyou
+attack voyou
+attack voyou
+attack voyou
+attack voyou
+attack voyou
+attack voyou
+attack voyou
+attack voyou
+attack voleur
+attack voleur
+attack voleur
+attack voleur
+attack voleur
+attack voleur
+attack voleur
+attack voleur
+attack voleur
+attack voleur
+ne
+s
+push bouton droit
+n
+n
+get cristal
+w
+swim
+x branches
+climb corde
+search
+d
+get corde
+swim
+e
+s
+sw
+sw
+s
+jouer note mi mi
+jouer note si re
+jouer note do re
+jouer note mi do
+n
+w
+accrocher corde sur grappin
+throw grappin on rocher
+throw grappin on rocher
+throw grappin on rocher
+score

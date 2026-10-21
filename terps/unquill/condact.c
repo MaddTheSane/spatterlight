@@ -24,7 +24,6 @@ uchar runact(ushort ccond,uchar noun)
 /* WARNING: This procedure contains goto statements - take care! */
 
     uchar cact, cdone=0, cobj, nout,n;
-    time_t wait1;
 
     cact=zmem(ccond);  /* Action byte */
 
@@ -99,6 +98,12 @@ uchar runact(ushort ccond,uchar noun)
         case 9: /* TURNS */
 	  sysmess(17);
 	  dec32(TURNLO+(256*TURNHI));
+	  /* Separate the count from the " turn(s)" message. In dbver>0 games
+	   * that message is printed via oneitem(), which resets xpos to 0, so
+	   * its own leading space is swallowed by the reformatter's "no space at
+	   * the start of a line" rule; emit one explicitly. Duplicate spaces are
+	   * collapsed, so this is harmless when the message has its own. */
+	  opch32(' ');
 	  sysmess(18);
 	  if (TURNLO+(256*TURNHI) !=1)
 	  {
@@ -114,6 +119,7 @@ uchar runact(ushort ccond,uchar noun)
 	case 10: /* SCORE */
   	  sysmess(19+ (dbver ? 2 : 0));
   	  dec32(flags[30]);
+	  opch32(' ');	/* separator before " point(s)" - see TURNS above */
   	  if(dbver > 0)
   	        sysmess(22);
   	  else	opch32('.');
@@ -226,12 +232,7 @@ uchar runact(ushort ccond,uchar noun)
           if (n>0) n--;
           n=n/50;
           n++;
-          wait1=time(NULL);
-          while (time(NULL)<(wait1+n))
-#ifdef YES_GETCH		  /* In case the clock is nonexistent */
-          	if(kbhit()) break  /* (as on some CP/M boxes) */
-#endif
-          	;
+          do_pause((glui32)n * 1000);
           break;
 	case 19:	/* INK */
 	  if (arch == ARCH_CPC) ++ccond;	/* On CPCs, INK has 2 parameters */
@@ -338,20 +339,30 @@ rem0001:  cdone=1;
           flags[n]=zmem(++ccond);
           break;
 	case 36: /* BEEP */
-          if (!nobeep) fputc(7,stderr);
-          n=zmem(++ccond);
-	  ccond++;
-          if (n>0) n--;
-          n=n/100;
-          n++;
-          wait1=time(NULL);
-          while (time(NULL)<(wait1+n))
-#ifdef YES_GETCH			/* In case the clock is non- */
-          	if(kbhit()) break       /* existent, as it might be on */
-#endif					/* some CP/M boxes */
-          	;
-          fflush(stderr);
+        {
+          uchar bdur = zmem(++ccond);	/* note duration, in centiseconds */
+          uchar bpitch = zmem(++ccond);	/* note pitch */
+          if (!nobeep)
+          {
+#ifdef SPATTERLIGHT
+            /* Play the actual ZX Spectrum tone. The sound system queues each
+             * note to start when the previous one ends, so the interpreter
+             * does not have to block to preserve a tune's rhythm. */
+            win_beep_spectrum(bpitch, bdur);
+#else
+            fputc(7, stderr);
+            fflush(stderr);
+#endif
+          }
+#ifndef SPATTERLIGHT
+          /* Hold for the note's real length so a tune keeps its rhythm (and the
+           * synthesised tone has time to play). The old code rounded every note
+           * up to a whole second, so the 15-note intro tune in Bored of the
+           * Rings dragged on for 15s instead of ~2.4s. */
+          do_pause((glui32)bdur * 10);
+#endif
           break;
+        }
         default:
           fprintf(stderr,"Invalid action %d\n",cact);
         }
@@ -404,7 +415,7 @@ uchar condtrue(ushort ccond)
           ctrue=(objpos[zmem(++ccond)]!=254);
           break;                      
         case 10:  /* CHANCE */
-          ctrue=((rand () % 100) < (zmem(++ccond)));
+          ctrue=((erkyrath_random () % 100) < (zmem(++ccond)));
           break;                      
         case 11:  /* ZERO */
           ctrue=(flags[zmem(++ccond)]==0);

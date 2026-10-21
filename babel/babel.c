@@ -33,7 +33,7 @@ extern "C" {
 char *fn;
 
 /* checked malloc function */
-void *my_malloc(int, char *);
+void *my_malloc(uint32, char *);
 
 /* babel performs several fundamental operations, which are specified
    by command-line objects. Each of these functions corresponds to
@@ -174,16 +174,18 @@ int main(int argc, char **argv)
         l=ftell(f)+1;
         fseek(f,0,SEEK_SET);
         md=(char *)my_malloc(l,"Input file buffer");
-        fread(md,1,l-1,f);
-        md[l-1]=0;
+        md[fread(md,1,l-1,f)]=0;
     }
     else {
+        /* l is only a "this is a story" flag from here on */
+        l=1;
         while(!feof(stdin))
         {
             char *tt, mdb[1024];
             int ii;
             ii=fread(mdb,1,1024,stdin);
-            tt=(char *)my_malloc(ll+ii,"file buffer");
+            /* One byte more than read, so that md is NUL-terminated for strstr */
+            tt=(char *)my_malloc(ll+ii+1,"file buffer");
             if (md) { memcpy(tt,md,ll); free(md); }
             memcpy(tt+ll,mdb,ii);
             md=tt;

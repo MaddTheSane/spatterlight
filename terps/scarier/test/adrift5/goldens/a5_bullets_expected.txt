@@ -1,0 +1,107 @@
+SIX SILVER BULLETS
+
+===========================
+
+
+
+/////SIX///////////////////
+///////SILVER//////////////
+//////////BULLETS///////////
+
+A Game of Mystery by William Dooling
+(Type HELP or CREDITS at any time)
+
+===========================
+
+
+
+You are asleep, and sleep is a terrible thing.
+You must WAKE UP!
+
+
+> wake up
+
+"...and in the blood of Time that Sword shall rust away."
+
+- Lord Dunsanay, The Gods of Pegana
+
+***
+
+You dream of garden. Paths diverge and converge, forking endlessly. It is night. The stars are cold and bitter. Something hunts for you. You run, madly, down paths you do not choose. Are you running from the monster? Are you running toward it? A shot rings out in the night.
+
+You awaken.
+
+You know nothing about yourself. If you had memories, they are gone.
+
+Before you LOOK, You listen carefully. You hear sounds you have heard before. A voice in your head. You, of course, but not you. Your training. It tells you things. It says you must get up. It says you must not fall asleep. It says to ask for HELP, if you need it.
+
+It says you are the Silver Agent.
+It says you must escape the City.
+
+
+> look
+
+The Suite
+
+Woke up here. Seems expensive. Wallpaper's terrible. Silver and gold. Floor is tile. Well maintained. 
+
+There is a bed. A feeling of horror. Do not sleep. Must not sleep.
+There is a door. Opens to the Southeast. There is a peephole. 
+There is a window. Opens to the Northwest.
+There is a safe. Do you know the combination?
+There is a table. Laquered. Beautiful. 
+
+On the table: A yellow note, a silver gun, and six silver bullets
+
+
+> examine table
+
+Exceptional woodwork. Tectona grandis. Sri Lankan Teak. Very Expensive.  The yellow note, the silver gun and the silver bullets are on the Table.
+
+
+> examine note
+
+Paper is a dull yellow. They call this ivory? Faint watermark. A serpent eating its own tail. Orobos. Infinity and extinction. Who sent this? You must find them.
+
+
+> take note
+(from the Table)
+You take the Yellow Note from the Table.
+
+
+> take gun
+(from the Table)
+You take the Silver Gun from the Table.  
+
+ENCOUNTER: THE VISITOR
+
+Three knocks on the hotel door. Sharp. Strangely Hesitant. Foreboding, almost. They override your other concerns. Your training speaks to you. Behind that door, an enemy waits. You are sure of it.
+
+...but the whole City is behind that door.
+
+What will you do?
+
+LOOK through the peephole
+OPEN the door
+IGNORE the visitor
+HIDE from the visitor (difficult)
+
+
+> inventory
+You have The Yellow Note and The Silver Gun.  
+And zero Silver Bullets
+
+
+> examine peephole
+
+Small, dark, like an eye into hell. The hall beyond opens onto the lobby.
+
+
+> drop note
+You put down the Yellow Note.
+
+
+> inventory
+You have The Silver Gun.  
+And zero Silver Bullets
+

@@ -1,0 +1,36 @@
+# Built test binaries / tools (produced by `make test` and `make test/pixtest`)
+pixtest
+test_talisman_pics
+test_gmcga_pics
+test_gmcgav1_pics
+test_dhgr_pics
+test_dhgr_determinism
+test_gmpcjr_pics
+cmdhgrtest
+titledhgrtest
+cmhourglasstest
+dhgrtrace
+cmextract
+op5scan
+gmcgatest
+gmcgav1test
+gmpcjr/pcjrtest
+gmcgav1/trace_crypt
+*.dSYM/
+*.ppm
+diff_gmcga
+
+# Reference screenshots kept only for eyeballing; moved into per-folder images/
+# subfolders, local-only.
+*.png
+images/
+
+# Renderer fixtures derived from copyrighted games -- the .img vector streams, the
+# .fb/VRAM and .page (Apple II hi-res) goldens, and .bin slices / raw disk files
+# (e.g. dhgr/fixtures/RA, T5). Kept local-only in per-folder fixtures/ subfolders
+# (same policy as the saga groundtruth corpora); the harnesses read them from there.
+*.img
+*.fb
+*.page
+*.bin
+fixtures/

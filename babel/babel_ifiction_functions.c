@@ -25,7 +25,7 @@
 #define IFICTION_EXT ".ifi"
 #endif
 
-void *my_malloc(int, char *);
+void *my_malloc(uint32, char *);
 
 struct IFiction_Info
 {
@@ -48,7 +48,7 @@ static void write_story_to_disk(struct XMLTag *xtg, void *ctx)
         l=end-begin+1;
         b=(char *)my_malloc(l,"XML buffer");
         memcpy(b,begin,l-1);
-        b[l]=0;
+        b[l-1]=0;
         j=ifiction_get_IFID(b,buffer,TREATY_MINIMUM_EXTENT);
         if (!j)
         {
@@ -143,7 +143,7 @@ void deep_ifiction_verify(char *md, int f)
     int i=0;
     ii.wmode=0;
     isok=1;
-    strcpy(ii.ifid,"UNKNOWN");
+    strncpy(ii.ifid, "UNKNOWN", sizeof(ii.ifid));
     ifiction_parse(md,examine_tag,&ii,verify_eh,&i);
     if (f&& isok) printf("Verified %s\n",ii.ifid);
 }
@@ -160,7 +160,7 @@ void babel_ifiction_lint(char *md)
     int i=1;
     ii.wmode=1;
     isok=1;
-    strcpy(ii.ifid,"UNKNOWN");
+    strncpy(ii.ifid, "UNKNOWN", sizeof(ii.ifid));
     ifiction_parse(md,examine_tag,&ii,verify_eh,&i);
     if (isok) printf("%s conforms to iFiction style guidelines\n",ii.ifid);
 }

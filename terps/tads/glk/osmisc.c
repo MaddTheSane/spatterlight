@@ -82,7 +82,27 @@ void os_gen_charmap_filename(char *filename, char *internal_id, char *argv0)
 #ifdef SPATTERLIGHT
 
 #include "glk.h"
+#include "randomness.h"
 extern glui32 gli_determinism;
+
+/*
+ *   All randomness draws from the shared erkyrath_random()
+ *   (terps/common_utils/randomness.c), the same RNG used by the Scott,
+ *   TaylorMade, Plus and Comprehend ports.  These functions are TADS's seed
+ *   sources (os_rand seeds the LCG; os_gen_rand_bytes seeds ISAAC, the default
+ *   RNG) -- so once they draw from erkyrath_random() all of TADS's randomness
+ *   is reproducible under a fixed seed.  The generator is seeded once: the
+ *   fixed seed 1234 under the determinism testing theme, otherwise 0 to let it
+ *   pick a platform-native seed.
+ */
+static void ensure_erkyrath_seeded(void)
+{
+    static int seeded = 0;
+    if (!seeded) {
+        set_erkyrath_random(gli_determinism ? 1234 : 0);
+        seeded = 1;
+    }
+}
 
 #endif
 
@@ -90,17 +110,17 @@ time_t time(time_t *);
 
 void os_rand(long *seed)
 {
+#ifdef SPATTERLIGHT
+    ensure_erkyrath_seeded();
+    *seed = (long)erkyrath_random();
+#else
     time_t t;
     time( &t );
-    
-#ifdef SPATTERLIGHT
-    if (gli_determinism)
-        *seed = 1234;
-    else
-#endif
     *seed = (long)t;
+#endif
 }
 
+#ifndef SPATTERLIGHT
 /*
  *   Xorshift PRNG from http://www.jstatsoft.org/v08/i14/paper
  */
@@ -125,12 +145,19 @@ static void xorinit(void)
     seed[3] = seed[1] & ~seed[2];
     xorshift();
 }
+#endif
 
 /*
  *   Generate random bytes for use in seeding a PRNG.
  */
 void os_gen_rand_bytes(unsigned char *buf, size_t len)
 {
+#ifdef SPATTERLIGHT
+    size_t ct;
+    ensure_erkyrath_seeded();
+    for (ct = 0; ct < len; ct++)
+        buf[ct] = (unsigned char)(erkyrath_random() & 0xFF);
+#else
     /* seed the Xorshift PRNG */
     xorinit();
 
@@ -140,6 +167,7 @@ void os_gen_rand_bytes(unsigned char *buf, size_t len)
         val = (int)xorshift();
         buf[ct] = (val - 1) & 0xFF;
     }
+#endif
 }
 
 
@@ -332,18 +360,18 @@ void os_set_save_ext(const char *ext)
 void os_get_charmap(char *mapname, int charmap_id)
 {
 #ifndef GLK_UNICODE
-    strcpy(mapname, "asc7dflt");
+    strncpy(mapname, "asc7dflt", 32);
 #else
     switch (charmap_id)
     {
         case OS_CHARMAP_DISPLAY:
         case OS_CHARMAP_FILECONTENTS:
-            strcpy(mapname, "utf-8");
+            strncpy(mapname, "utf-8", 32);
             break;
 
         case OS_CHARMAP_FILENAME:
         default:
-            strcpy(mapname, "asc7dflt");
+            strncpy(mapname, "asc7dflt", 32);
             break;
     }
 #endif

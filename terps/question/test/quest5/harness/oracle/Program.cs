@@ -1,0 +1,570 @@
+using System.Text;
+using System.Text.RegularExpressions;
+using QuestViva.Common;
+using QuestViva.Engine;
+using QuestViva.Engine.GameLoader;
+
+// qvh <game.quest|game.aslx> [command-script.txt]
+//
+// Ground-truth oracle for the planned native Question ASLX (Quest 5) engine.
+// Loads a Quest 5 game headless, drives it with a command script, and writes a
+// normalised plain-text transcript to stdout. Diagnostics go to stderr.
+//
+// The command script mirrors QuestViva's own WalkthroughRunner step format so
+// that a game's built-in <walkthrough> and hand-written scripts are driven the
+// same way the reference player drives them:
+//   plain line        -> SendCommand (also feeds a pending `get input`)
+//   menu:KEY          -> answer a `show menu` (KEY is an option key)
+//   answer:yes|no     -> answer an `ask`
+//   assert:EXPR       -> evaluate EXPR, record Pass/Fail in the transcript
+//   label:... delay:N -> ignored (editor bookkeeping)
+//   event:NAME;PARAM  -> SendEvent
+//   # ...             -> comment
+// `wait` / `DoPause` "press any key" prompts are auto-continued (they consume
+// no script line), matching WalkthroughRunner.
+//
+// A prompt that a TIMER script blocks on (`Ask(...)`, `GetInput()`, a blocking
+// menu) is answered with the next script line while the tick is still running,
+// as a browser player answers it by typing into the box; see TickSettled.
+//
+// Leniency for human-authored walkthroughs (which lack the menu:/answer:
+// prefixes): while a menu or question is pending, a bare line is resolved as a
+// menu key / option number / yes-no answer.
+
+if (args.Length < 1)
+{
+    Console.Error.WriteLine("usage: qvh <game> [script]");
+    return 2;
+}
+
+// Ground truth is culture-neutral. QuestViva formats a double with the CURRENT
+// culture when a script concatenates it into a string (`"..." + 25.1 * 4`),
+// so on a Swedish machine GiantKiller Too's voice said "100,4"; the games were
+// written (and the native engine prints) with the invariant "100.4". Expression
+// PARSING already uses InvariantCulture inside QuestNCalcExpressionFactory, so
+// this only touches formatting. Upstream #2501 made concatenation inside an
+// expression invariant, but `msg (x)` of a bare double still prints through
+// Utility.ExpressionResultToString's plain ToString(), so the pin stays
+// (checked 2026-10-17 at 290a87df: "100,4" under sv_SE without it).
+System.Globalization.CultureInfo.DefaultThreadCurrentCulture =
+    System.Globalization.CultureInfo.InvariantCulture;
+System.Globalization.CultureInfo.DefaultThreadCurrentUICulture =
+    System.Globalization.CultureInfo.InvariantCulture;
+System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
+System.Globalization.CultureInfo.CurrentUICulture = System.Globalization.CultureInfo.InvariantCulture;
+
+var transcript = new StringBuilder();
+var emitCount = 0;
+var errorCount = 0;
+
+// QuestViva ends the game itself once its error circuit-breaker trips (20 script
+// errors, WorldModel.cs:1195) — "session unrecoverably wedged" — which sets
+// State=Finished exactly like a real `finish`. Distinguish the two so a walkthrough
+// that drifted into failing turnscripts is not miscounted as a genuine win. The
+// breaker's private counter (_scriptErrorCount) increments ONLY on errors thrown
+// through RunScriptAsync (line 1195); but expression-evaluation errors during
+// OUTPUT formatting (e.g. display-name recursion) are logged via a separate,
+// NON-fatal path (line 1456) that fires our LogError WITHOUT feeding the breaker.
+// So the LogError count over-counts and is the WRONG wedge signal: The Bony King of
+// Nowhere finishes genuinely (full ending + credits) while emitting 31 such display
+// errors. Read the breaker's own private _scriptErrorsFatal flag by reflection
+// (set up right after `world` is created, below) — that is the only faithful
+// "did the breaker actually fire?" signal.
+
+void Emit(string html)
+{
+    var t = Strip(html);
+    if (t.Length == 0) return;
+    emitCount++;
+    transcript.Append(t);
+    if (!t.EndsWith('\n')) transcript.Append('\n');
+}
+
+void Line(string s) => transcript.Append(s).Append('\n');
+
+// A `#!errorlimit=N` directive line in the command script raises the
+// script-error breaker threshold for this game (see patch_questviva.py §4 —
+// legacy Quest had no breaker; some games are legacy-tolerable error storms).
+// Must be set before WorldModel's static init runs.
+//
+// A `#!clock=N` directive switches the real-time model from DrainTimers (a
+// player who waits out every pending SetTimeout before typing the next command)
+// to a typing clock: the game clock advances by exactly N seconds after each
+// command, and nothing else drains. See DrainTimers below for why a game with a
+// real-time chase needs this.
+var clockSecs = 0;
+// Live mode (script "-"): commands are read from stdin one at a time and the new
+// transcript text is written to stdout after each, ended by a \u0001 line, so a
+// solver process can inspect the game between moves. `eval:EXPR` prints a value.
+var live = args.Length >= 2 && args[1] == "-";
+IEnumerable<string> ScriptLines()
+{
+    if (args.Length < 2) yield break;
+    if (!live) { foreach (var l in File.ReadLines(args[1])) yield return l; yield break; }
+    string? l2;
+    while ((l2 = Console.In.ReadLine()) != null) yield return l2;
+}
+if (args.Length >= 2 && !live)
+{
+    foreach (var l in File.ReadLines(args[1]))
+    {
+        if (l.StartsWith("#!errorlimit="))
+            Environment.SetEnvironmentVariable("QVH_ERROR_LIMIT", l["#!errorlimit=".Length..].Trim());
+        else if (l.StartsWith("#!seed="))
+            Environment.SetEnvironmentVariable("QVH_SEED", l["#!seed=".Length..].Trim());
+        else if (l.StartsWith("#!clock=") && int.TryParse(l["#!clock=".Length..].Trim(), out var cs) && cs > 0)
+            clockSecs = cs;
+    }
+}
+
+var gameData = QvhGameFile.Load(args[0]);
+
+// QVH_LOADSAVE=<file>: boot from a saved game (native .quest-save format). The
+// save may be one QuestViva wrote (`save:` step below) or one the native Question
+// engine wrote -- this is the save-compat cross-test's loader. GameLoader reads
+// the save's <asl original=..>, reloads the original .quest, then overlays the
+// saved elements; BeginInternalAsync then skips StartGame (_loadedFromSaved).
+Stream? saveData = null;
+var loadSavePath = Environment.GetEnvironmentVariable("QVH_LOADSAVE");
+if (!string.IsNullOrEmpty(loadSavePath))
+    saveData = new MemoryStream(await File.ReadAllBytesAsync(loadSavePath));
+
+var world = new WorldModel(gameData, saveData);
+world.LogError += ex => {
+    errorCount++;
+    Console.Error.WriteLine("[error] " + ex.Message);
+    // QVH_TRACE_ERRORS=1: dump the managed stack at each logged error — the only
+    // way to see the exact catch-boundary topology (which caller each error was
+    // swallowed at) when matching the native engine's error cascade.
+    if (Environment.GetEnvironmentVariable("QVH_TRACE_ERRORS") == "1")
+        Console.Error.WriteLine("[error-stack #" + errorCount + "]\n" + ex.StackTrace + "\n[/error-stack]");
+};
+world.PrintText += Emit;                 // legacy output path (ASL < v540)
+
+// Faithful "did the error circuit-breaker actually fire?" probe (see the block
+// above for why the LogError count is the wrong signal).
+var fatalField = typeof(WorldModel).GetField("_scriptErrorsFatal",
+    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+bool BreakerFired() => fatalField != null && (bool)fatalField.GetValue(world)!;
+// Set while `get input`/`GetInput()` waits for the next command line.
+var commandOverrideField = typeof(WorldModel).GetField("_commandOverride",
+    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+bool CommandOverride() => commandOverrideField != null && (bool)commandOverrideField.GetValue(world)!;
+
+TaskScheduler.UnobservedTaskException += (_, e) =>
+    Console.Error.WriteLine("[unobserved] " + e.Exception.GetBaseException().Message);
+
+// Real-time timer draining. The interactive players (WebPlayer/WasmPlayer) run a
+// 1-second JS interval that, after RequestNextTimerTick(seconds), advances
+// game.timeelapsed and calls Tick(elapsed), firing SetTimeout timers. A headless
+// run has no wall clock, so without this the game's SetTimeout-based gates never
+// fire (e.g. the nightclub's "eyes adjust to the dark" reveal, and the yard->town
+// MoveObject after three tasks). We reproduce it deterministically: after each
+// command settles, drain any pending SetTimeout timer by ticking exactly its
+// trigger delta. Only self-destructing SetTimeout timers (named "timeout*" by
+// SetTimeoutID) are drained, so recurring authored timers never loop.
+var pendingTick = 0;
+world.RequestNextTimerTick += s => pendingTick = s;
+
+var player = new HeadlessPlayer(Emit);
+if (!await world.Initialise(player))
+{
+    Console.Error.WriteLine("[fatal] game failed to initialise");
+    if (world.Errors != null)
+        foreach (var e in world.Errors) Console.Error.WriteLine("[load-error] " + e);
+    return 3;
+}
+
+var echoCommands = world.Version >= WorldModelVersion.v520; // engine self-echoes below v520
+Console.Error.WriteLine($"[diag] version={world.Version} objects={world.Objects.Count()} " +
+    $"hasStartGame={world.Elements.ContainsKey(ElementType.Function, "StartGame")} " +
+    $"errors={(world.Errors == null ? 0 : world.Errors.Count)}");
+
+// One enumerator for the whole run: the step loop reads it, and so does
+// TickSettled when a timer script stops on a prompt (which can happen inside
+// Begin's own timer drain, before the step loop starts).
+var script = ScriptLines().GetEnumerator();
+var stepCount = 0;
+var scriptExhausted = true;
+
+// Begin() completes when the opening turn suspends (finished, or blocked on a
+// prompt). No polling needed — the suspend TCS is the real settle signal.
+await world.Begin();
+await AutoAdvance();
+await SettleClock(false);
+Console.Error.WriteLine($"[diag] after begin: emits={emitCount} state={world.State} clock={clockSecs}");
+
+if (args.Length >= 2)
+{
+    var liveSent = 0;
+    while (script.MoveNext())
+    {
+        var raw = script.Current;
+        if (world.State == GameState.Finished) { scriptExhausted = false; break; }
+        var cmd = raw.Trim();
+        if (cmd.Length == 0 || cmd.StartsWith('#')) continue;
+        stepCount++;
+
+        // Typing-clock accounting: only a command (or an event) costs the
+        // player N seconds. Answering a menu/question belongs to the command
+        // that raised it, and save:/assert:/tick: are harness bookkeeping.
+        var typed = false;
+        if (player.PendingMenu is { } menu)
+        {
+            var key = ResolveMenuKey(menu, cmd);
+            player.PendingMenu = null;
+            if (key == null)
+                Console.Error.WriteLine($"[warn] step {stepCount}: '{cmd}' is not a valid menu option; cancelling menu");
+            await world.SetMenuResponse(key);
+        }
+        else if (player.PendingQuestion != null)
+        {
+            player.PendingQuestion = null;
+            await world.SetQuestionResponse(ParseYesNo(cmd));
+        }
+        else if (cmd.StartsWith("save:"))
+        {
+            // Write QuestViva's native saved game (SaveMode.SavedGame) to a
+            // file -- the ground-truth `.quest-save` the native engine's reader
+            // is tested against, and the baseline our writer is compared to.
+            var path = cmd[5..].Trim();
+            var saved = world.Save(SaveMode.SavedGame, html: "");
+            await File.WriteAllTextAsync(path, saved);
+        }
+        else if (cmd.StartsWith("assert:"))
+        {
+            var expr = cmd[7..];
+            var ok = await world.AssertAsync(expr);
+            Line($"[assert {(ok ? "PASS" : "FAIL")}] {expr}");
+            if (!ok) Console.Error.WriteLine($"[assert-fail] {expr}");
+        }
+        else if (cmd.StartsWith("eval:"))
+        {
+            // An invalid expression must not kill a live session.
+            try
+            {
+                var v = await world.EvaluateAsync(cmd[5..]);
+                Line($"[eval] {cmd[5..]} = {v}");
+            }
+            catch (Exception ex) { Line($"[eval-error] {cmd[5..]}: {ex.Message}"); }
+        }
+        else if (cmd.StartsWith("label:") || cmd.StartsWith("delay:") || cmd.StartsWith("runtime:"))
+        {
+            // editor bookkeeping — ignore
+        }
+        else if (cmd.StartsWith("event:"))
+        {
+            var parts = cmd[6..].Split(';', 2);
+            await world.SendEvent(parts[0], parts.Length > 1 ? parts[1] : "");
+            typed = true;
+        }
+        else if (cmd.StartsWith("clock:"))
+        {
+            // Switch the real-time model from this step on: `clock:N` (N > 0)
+            // runs the typing clock, `clock:0` returns to DrainTimers. For a
+            // DrainTimers script with one short real-time window (a song that
+            // stops after 10 s) that the header would impose on every step.
+            // `clock:manual` stops the clock: commands cost nothing and
+            // nothing drains, so only `tick:N` moves time -- for a dodging
+            // window where a player makes several moves inside one second.
+            if (cmd[6..].Trim() == "manual")
+                clockSecs = -1;
+            else if (int.TryParse(cmd[6..].Trim(), out var ncs) && ncs >= 0)
+                clockSecs = ncs;
+        }
+        else if (cmd.StartsWith("tick:"))
+        {
+            // Deterministic real-time advance: tick the game clock by exactly N
+            // seconds, firing any AUTHORED timers that come due — the explicit,
+            // script-driven counterpart of the interactive players' 1s JS
+            // interval. DrainTimers only ever fires SetTimeout ("timeout*")
+            // timers, so games whose progression gates on authored one-shot
+            // timers (First Times' choice/heart/neglect gates) need the script
+            // to say how long the player waits. Recurring timers fire at most
+            // the scripted N seconds' worth — no unbounded looping.
+            if (int.TryParse(cmd[5..].Trim(), out var tsecs) && tsecs > 0)
+            {
+                pendingTick = 0;
+                await TickSettled(tsecs);
+                await AutoAdvance();
+            }
+        }
+        else
+        {
+            if (echoCommands) Line("> " + cmd);
+            await world.SendCommand(cmd);
+            typed = true;
+        }
+
+        await AutoAdvance();
+        await SettleClock(typed);
+        if (live)
+        {
+            var all = transcript.ToString();
+            Console.Out.Write(all[liveSent..]);
+            Console.Out.Write(world.State == GameState.Finished ? "\n[state=Finished]\n\u0001\n" : "\u0001\n");
+            Console.Out.Flush();
+            liveSent = all.Length;
+        }
+    }
+}
+
+// A Finished reached only because the error breaker actually fired is reported as
+// "Wedged", not "Finished" — a faithfully-recorded dead end, not a win. Use the
+// breaker's real flag (see BreakerFired above), not the over-counting LogError
+// total: display-formatting errors inflate errorCount without wedging the game.
+var wedged = world.State == GameState.Finished && BreakerFired();
+var reportedState = wedged ? "Wedged" : world.State.ToString();
+Console.Error.WriteLine($"[diag] end: steps={stepCount} emits={emitCount} state={reportedState} " +
+    $"errors={errorCount} scriptExhausted={scriptExhausted}");
+Line($"[state={reportedState}]");
+
+if (!live) Console.Out.Write(Normalise(transcript.ToString()));
+return 0;
+
+// Auto-continue `wait`/`DoPause` prompts, which carry no player text. A menu or
+// ask callback can itself hit a wait, so loop until the turn settles clean.
+async Task AutoAdvance()
+{
+    while (world.State != GameState.Finished && (player.IsWaiting || player.IsPausing))
+    {
+        if (player.IsWaiting)  { player.IsWaiting = false;  await world.FinishWait(); }
+        if (player.IsPausing)  { player.IsPausing = false;  await world.FinishPause(); }
+    }
+}
+
+// Tick the clock, finishing any `wait`/pause a timer script parks on while the
+// tick is still in flight. Unlike SendCommand (which returns as soon as the turn
+// suspends), WorldModel.Tick awaits every due timer script to completion, so a
+// timer that hits a synchronous `play sound` (Mt. Underlook's c4: `play sound
+// ("4.mp3", true, false)`) would otherwise await a FinishWait nobody can call --
+// the browser's audio-ended callback has no headless counterpart.
+//
+// A timer script can also stop on a prompt that needs player text: Mystery
+// Musical's opening `Ask("Do you want to play?")` runs in a SetTimeout, and each
+// room's quiz timer calls `GetInput()`. A browser player answers those while the
+// tick is still in flight (the JS interval's Tick call is fire-and-forget), so
+// do the same: once the tick has stalled with a prompt open, take the next
+// script line as the answer. The stall threshold keeps this off the ordinary
+// non-blocking `show menu`, whose timer script runs to the end and leaves the
+// menu for the next step to answer, exactly as before.
+async Task TickSettled(int secs)
+{
+    var tick = world.Tick(secs);
+    var answers = new List<Task>();
+    var idle = 0;
+    while (!tick.IsCompleted)
+    {
+        if (player.IsWaiting)      { player.IsWaiting = false;  await world.FinishWait(); idle = 0; }
+        else if (player.IsPausing) { player.IsPausing = false;  await world.FinishPause(); idle = 0; }
+        else if (idle >= 20 && TimerPromptOpen() && NextAnswerLine() is { } answer)
+        {
+            answers.Add(AnswerTimerPrompt(answer));
+            idle = 0;
+        }
+        else if (++idle > 5000) throw new Exception("timer script suspended on something other than a wait, a pause or a prompt the script answers");
+        else await Task.Delay(1);
+    }
+    await tick;
+    await Task.WhenAll(answers);
+}
+
+bool TimerPromptOpen() =>
+    player.PendingQuestion != null || player.PendingMenu != null || CommandOverride();
+
+// The next command line of the script, counted as a step like any other.
+string? NextAnswerLine()
+{
+    while (script.MoveNext())
+    {
+        var line = script.Current.Trim();
+        if (line.Length == 0 || line.StartsWith('#')) continue;
+        stepCount++;
+        return line;
+    }
+    return null;
+}
+
+Task AnswerTimerPrompt(string answer)
+{
+    if (player.PendingQuestion != null)
+    {
+        player.PendingQuestion = null;
+        return world.SetQuestionResponse(ParseYesNo(answer));
+    }
+    if (player.PendingMenu is { } menu)
+    {
+        player.PendingMenu = null;
+        return world.SetMenuResponse(ResolveMenuKey(menu, answer));
+    }
+    if (echoCommands) Line("> " + answer);
+    return world.SendCommand(answer);
+}
+
+// Let real time pass after a step, under whichever model the script chose.
+//
+// Default (no `#!clock=`): DrainTimers — the player waits out every pending
+// SetTimeout before the next command. That is the right model for gates ("your
+// eyes adjust to the dark" after 2s) but fatal for a real-time chase: a
+// "SetTimeout(60) { if (still here) die }" countdown fires inside the very
+// command that created it, and because RequestNextTimerTick reports the
+// earliest trigger of ANY enabled timer, a just-enabled recurring "chase"
+// timer with a short interval fires (possibly several times) while the drain
+// is still waiting out an unrelated ambient chain. A Story of Salvation's
+// catacombs, The Encyclopedia of Elementals' rescue window and Mt. Underlook's
+// Kokouson chase are all of this shape.
+//
+// `#!clock=N`: a typing clock — each typed command costs N seconds, ticked
+// once after the command settles (the moment the interactive players' 1s JS
+// interval would run), and nothing is ever drained. Timeouts still fire, N
+// seconds per command later; a chase with interval T grants T/N commands; the
+// script says `tick:M` where the player deliberately stands still. The header
+// names N, so the golden states its own assumption about typing speed.
+async Task SettleClock(bool typed)
+{
+    if (clockSecs == 0) { await DrainTimers(); return; }
+    if (clockSecs < 0) return;  // clock:manual -- only tick:N advances time
+    if (!typed || world.State == GameState.Finished) return;
+    pendingTick = 0;
+    await TickSettled(clockSecs);
+    await AutoAdvance();
+}
+
+// Drain pending SetTimeout timers deterministically. `pendingTick` holds the
+// seconds until the next timer fires, as reported by RequestNextTimerTick (the
+// same value the interactive players' JS interval waits out). Tick(secs) advances
+// game.timeelapsed by exactly that delta and runs the due timer(s); a SetTimeout
+// timer self-destroys when it fires, so the loop settles. Only "timeout*" timers
+// (created by SetTimeoutID) are drained, keeping recurring authored timers — which
+// would otherwise loop forever in the absence of a real clock — dormant. (Dormant
+// only as far as the LOOP condition goes: see SettleClock for the side-fire.)
+async Task DrainTimers()
+{
+    var guard = 0;
+    while (world.State != GameState.Finished && guard++ < 500 && PendingTimeoutSeconds(out var secs))
+    {
+        pendingTick = 0;
+        await TickSettled(secs > 0 ? secs : 1);
+        await AutoAdvance();
+    }
+}
+
+bool PendingTimeoutSeconds(out int secs)
+{
+    secs = pendingTick;
+    return world.Elements.GetElements(ElementType.Timer)
+        .Any(t => t.Name.StartsWith("timeout", StringComparison.Ordinal)
+                  && t.Fields.GetAsType<bool>("enabled"));
+}
+
+// Resolve a script line to a menu option key: exact key, exact display text,
+// or 1-based option number. Returns null (cancel) if nothing matches.
+static string? ResolveMenuKey(MenuData menu, string line)
+{
+    if (line.StartsWith("menu:")) line = line[5..].Trim();
+    if (menu.Options.ContainsKey(line)) return line;
+    foreach (var kv in menu.Options)
+        if (string.Equals(kv.Value, line, StringComparison.OrdinalIgnoreCase)) return kv.Key;
+    if (int.TryParse(line, out var n) && n >= 1 && n <= menu.Options.Count)
+        return menu.Options.Keys.ElementAt(n - 1);
+    return null;
+}
+
+static bool ParseYesNo(string line)
+{
+    if (line.StartsWith("answer:")) line = line[7..].Trim();
+    return line.Trim().ToLowerInvariant() is "yes" or "y" or "true" or "1";
+}
+
+// Strip the constrained HTML Quest emits down to plain text.
+static string Strip(string s)
+{
+    s = Regex.Replace(s, "<br\\s*/?>", "\n");
+    s = Regex.Replace(s, "<[^>]+>", "");
+    return System.Net.WebUtility.HtmlDecode(s);
+}
+
+// Normalise for a stable diff: strip trailing whitespace per line, collapse
+// runs of blank lines to a single blank line, ensure a trailing newline.
+static string Normalise(string s)
+{
+    var lines = s.Replace("\r\n", "\n").Split('\n').Select(l => l.TrimEnd());
+    var outp = new StringBuilder();
+    var blank = 0;
+    foreach (var l in lines)
+    {
+        if (l.Length == 0) { blank++; if (blank > 1) continue; }
+        else blank = 0;
+        outp.Append(l).Append('\n');
+    }
+    // trim leading/trailing blank lines
+    return outp.ToString().Trim('\n') + "\n";
+}
+
+// Every IPlayer member is a UI hook; a headless run no-ops all but the ones the
+// driver inspects (menu / question / wait / pause) and the text channels.
+class HeadlessPlayer(Action<string> emit) : IPlayer
+{
+    public MenuData? PendingMenu;
+    public string? PendingQuestion;
+    public bool IsWaiting;
+    public bool IsPausing;
+
+    public void ShowMenu(MenuData menuData) => PendingMenu = menuData;
+    // inline (v600+, Quest Viva #2288): the engine has already drawn the Yes/No links itself.
+    public void ShowQuestion(string caption, bool inline) => PendingQuestion = caption;
+    public void DoWait() => IsWaiting = true;
+    public void DoPause(int ms) => IsPausing = true;
+    public void SetTurnPending(bool pending) { }  // IPlayer (Quest Viva #2177); the driver reads the engine state directly
+
+    public void WriteHTML(string html) => emit(html);
+    // Quest 5 (v540+) delivers game text as JS calls: JS.addText(html) arrives
+    // here as RunScriptAsync("addText", [html]). That is the real output channel.
+    public Task RunScriptAsync(string function, object[]? parameters)
+    {
+        if (function == "addText" && parameters is { Length: > 0 })
+            emit(parameters[0]?.ToString() ?? "");
+        return Task.CompletedTask;
+    }
+
+    public void SetWindowMenu(MenuData menuData) { }
+
+    // A *synchronous* `play sound` is a suspend, not just a UI hook: PlaySoundScript
+    // parks the script on WorldModel._waitTcs — the same TCS `wait` uses — and only
+    // resumes on FinishWait(), which the browser calls when the audio ends. Headless
+    // there is no audio, so without this the rest of the script (often the ending's
+    // msg + finish) never runs, while the game still accepts commands — a silent
+    // half-dead session. QuestViva's own WebPlayer has exactly this problem and
+    // solves it the same way: when a WalkthroughRunner is attached it forces
+    // synchronous=false and calls Runner.BeginWait(). Flagging IsWaiting hands the
+    // resume to AutoAdvance, which finishes it like any other wait.
+    // HMS Victory is the corpus case: its win is `play sound ("Eight bells.wav",
+    // true, false)` immediately before the THE END message and `finish`.
+    public Task PlaySoundAsync(string filename, bool synchronous, bool looped)
+    {
+        if (synchronous) IsWaiting = true;
+        return Task.CompletedTask;
+    }
+    public void StopSound() { }
+    public Task<string> GetUrlAsync(string filename) => Task.FromResult(filename);
+    public void LocationUpdated(string location) { }
+    public void UpdateGameName(string name) { }
+    public void ClearScreen() { }
+    public Task ShowPictureAsync(string filename) => Task.CompletedTask;
+    public void SetPanesVisible(string data) { }
+    public void SetStatusText(string text) { }
+    public void SetBackground(string colour) { }
+    public void SetForeground(string colour) { }
+    public void SetLinkForeground(string colour) { }
+    public void Quit() { }
+    public void SetFont(string fontName) { }
+    public void SetFontSize(string fontSize) { }
+    public void Speak(string text) { }
+    public void RequestSave(string html) { }
+    public void Show(string element) { }
+    public void Hide(string element) { }
+    public void SetCompassDirections(IEnumerable<string> dirs) { }
+    public void SetInterfaceString(string name, string text) { }
+    public void SetPanelContents(string html) { }
+    public void Log(string text) { }
+}

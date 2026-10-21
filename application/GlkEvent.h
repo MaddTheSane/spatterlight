@@ -6,7 +6,7 @@
 
 unsigned chartokeycode(unsigned ch);
 
-@interface GlkEvent : NSObject <NSSecureCoding>
+@interface GlkEvent : NSObject
 
 - (instancetype)initPrefsEventForTheme:(Theme *)theme;
 - (instancetype)initCharEvent:(unsigned)v forWindow:(NSInteger)name;
@@ -16,6 +16,7 @@ unsigned chartokeycode(unsigned ch);
 - (instancetype)initArrangeWidth:(NSInteger)aw height:(NSInteger)ah theme:(Theme *)theme force:(BOOL)forceFlag;
 - (instancetype)initRedrawEvent;
 - (instancetype)initQuitEvent;
+- (instancetype)initAutosaveEvent;
 - (instancetype)initSoundNotify:(NSInteger)notify withSound:(NSInteger)sound;
 - (instancetype)initVolumeNotify:(NSInteger)notify;
 - (instancetype)initLinkEvent:(NSUInteger)linkid forWindow:(NSInteger)name;

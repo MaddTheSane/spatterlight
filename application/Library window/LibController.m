@@ -2,22 +2,20 @@
  *
  */
 
-#import <BlorbFramework/Blorb.h>
-
 #import "AppDelegate.h"
 #import "CoreDataManager.h"
 #import "Game.h"
 #import "TableViewController.h"
+#import "TableViewController+DragDrop.h"
+#import "TableViewController+GameActions.h"
+#import "TableViewController+InfoWindows.h"
+#import "TableViewController+TableDelegate.h"
+#import "MetadataHandler.h"
+#import "LibHelperTableView.h"
 
 #import "LibController.h"
 
-#ifdef DEBUG
-#define NSLog(FORMAT, ...)                                                     \
-fprintf(stderr, "%s\n",                                                    \
-[[NSString stringWithFormat:FORMAT, ##__VA_ARGS__] UTF8String]);
-#else
-#define NSLog(...)
-#endif
+#import "DebugLog.h"
 
 @interface MyButtonToolbarItem : NSToolbarItem
 @end
@@ -50,14 +48,25 @@ fprintf(stderr, "%s\n",                                                    \
 @implementation WindowViewController
 @end
 
-@interface LibController () {
-    NSToolbarItemIdentifier addToLibrary;
-    NSToolbarItemIdentifier showInfo;
-    NSToolbarItemIdentifier playGame;
-    NSToolbarItemIdentifier searchBar;
-}
+static NSToolbarItemIdentifier const kSearchBarItem = @"searchBar";
 
-@end
+// The toolbar buttons. -validateToolbarItem: in TableViewController+GameActions.m
+// matches these identifiers by value.
+typedef struct {
+    NSToolbarItemIdentifier __unsafe_unretained identifier;
+    NSString * __unsafe_unretained symbolName;  // macOS 11+: SF Symbol
+    NSString * __unsafe_unretained imageName;   // macOS 10.x: asset image
+    NSString * __unsafe_unretained action;      // selector name; @selector() is not a constant
+    NSString * __unsafe_unretained label;
+    NSString * __unsafe_unretained tooltip;
+    BOOL enabled;
+} ButtonItemSpec;
+
+static const ButtonItemSpec kButtonItems[] = {
+    { @"addToLibrary", @"plus.circle", @"plus",     @"addGamesToLibrary:", @"Add",       @"Add games to library",        YES },
+    { @"showInfo",     @"eye.circle",  @"eye.fill", @"showGameInfo:",      @"Show info", @"Show info for selected game", NO },
+    { @"playGame",     @"play.circle", @"play.fill", @"play:",              @"Play",      @"Play selected game",          NO },
+};
 
 @implementation LibController
 
@@ -67,12 +76,7 @@ fprintf(stderr, "%s\n",                                                    \
     self.windowFrameAutosaveName = @"LibraryWindow";
     self.window.acceptsMouseMovedEvents = YES;
     self.window.excludedFromWindowsMenu = YES;
-    [self.window registerForDraggedTypes:@[ NSFilenamesPboardType ]];
-
-    addToLibrary = @"addToLibrary";
-    showInfo = @"showInfo";
-    playGame = @"playGame";
-    searchBar = @"searchBar";
+    [self.window registerForDraggedTypes:@[ NSPasteboardTypeFileURL ]];
 
     // This view controller determines the window toolbar's content.
     NSToolbar *toolbar = [[NSToolbar alloc] initWithIdentifier:@"toolbar"];
@@ -90,14 +94,6 @@ fprintf(stderr, "%s\n",                                                    \
 
 - (NSDragOperation)draggingEntered:sender {
     return [self.tableViewController draggingEntered:sender];
-}
-
-- (void)draggingExited:sender {
-    // unhighlight window
-}
-
-- (BOOL)prepareForDragOperation:sender {
-    return [self.tableViewController prepareForDragOperation:sender];
 }
 
 - (BOOL)performDragOperation:(id<NSDraggingInfo>)sender {
@@ -128,7 +124,7 @@ fprintf(stderr, "%s\n",                                                    \
 - (void)windowDidBecomeKey:(NSNotification *)notification {
     if ([[NSUserDefaults standardUserDefaults] boolForKey:@"HasAskedToDownload"] == NO) {
         if (_tableViewController)
-            [_tableViewController askToDownload];
+            [_tableViewController.metadataHandler askToDownloadInWindow:self.window context:self.managedObjectContext];
     }
     if (self.window.firstResponder == self.window)
         [self.window makeFirstResponder:_tableViewController.gameTableView];
@@ -138,91 +134,107 @@ fprintf(stderr, "%s\n",                                                    \
     return self.managedObjectContext.undoManager;
 }
 
-- (MyButtonToolbarItem *)buttonToolbarItemWithImage:(NSString *)imageName selector:(SEL)selector label:(NSString *)label tooltip:(NSString *)tooltip identifier:(NSToolbarItemIdentifier)identifier enabled:(BOOL)enabled {
-    NSImage *image = [NSImage imageNamed:imageName];
-    image.accessibilityDescription = NSLocalizedString(tooltip, nil);
-    NSSegmentedControl *button = [NSSegmentedControl segmentedControlWithImages:@[image] trackingMode:NSSegmentSwitchTrackingMomentary target: self.tableViewController action:selector];
-    button.enabled = enabled;
-    MyButtonToolbarItem *toolbarItem = [[MyButtonToolbarItem alloc] initWithItemIdentifier:identifier];
-    toolbarItem.view = button;
-    toolbarItem.label = NSLocalizedString(label, nil);
-    toolbarItem.toolTip = NSLocalizedString(tooltip, nil);
+- (NSToolbarItem *)toolbarItemForSpec:(const ButtonItemSpec *)spec {
+    NSString *tooltip = NSLocalizedString(spec->tooltip, nil);
+    NSToolbarItem *toolbarItem;
+    if (@available(macOS 11.0, *)) {
+        toolbarItem = [[NSToolbarItem alloc] initWithItemIdentifier:spec->identifier];
+        NSImageSymbolConfiguration *config = [NSImageSymbolConfiguration configurationWithScale:NSImageSymbolScaleLarge];
+        NSImage *image = [NSImage imageWithSystemSymbolName:spec->symbolName accessibilityDescription:tooltip];
+        toolbarItem.image = [image imageWithSymbolConfiguration:config];
+        toolbarItem.action = NSSelectorFromString(spec->action);
+        toolbarItem.target = self.tableViewController;
+        toolbarItem.bordered = YES;
+        toolbarItem.enabled = spec->enabled;
+    } else {
+        NSImage *image = [NSImage imageNamed:spec->imageName];
+        image.accessibilityDescription = tooltip;
+        NSSegmentedControl *button = [NSSegmentedControl segmentedControlWithImages:@[image] trackingMode:NSSegmentSwitchTrackingMomentary target:self.tableViewController action:NSSelectorFromString(spec->action)];
+        button.enabled = spec->enabled;
+        toolbarItem = [[MyButtonToolbarItem alloc] initWithItemIdentifier:spec->identifier];
+        toolbarItem.view = button;
+    }
+    toolbarItem.label = NSLocalizedString(spec->label, nil);
+    toolbarItem.toolTip = tooltip;
     return toolbarItem;
 }
 
-- (NSToolbarItem *)toolbarItemWithImage:(NSString *)imageName selector:(SEL)selector label:(NSString *)label tooltip:(NSString *)tooltip identifier:(NSToolbarItemIdentifier)identifier enabled:(BOOL)enabled API_AVAILABLE(macos(11.0)){
-    NSToolbarItem *toolbarItem = [[NSToolbarItem alloc] initWithItemIdentifier:identifier];
-    NSImageSymbolConfiguration *config = [NSImageSymbolConfiguration configurationWithScale:NSImageSymbolScaleLarge];
-    NSImage *image = [NSImage imageWithSystemSymbolName:imageName accessibilityDescription:tooltip];
-    image = [image imageWithSymbolConfiguration:config];
-    toolbarItem.image = image;
-    toolbarItem.action = selector;
-    toolbarItem.target = self.tableViewController;
-    toolbarItem.bordered = YES;
-    toolbarItem.label = NSLocalizedString(label, nil);
-    toolbarItem.toolTip = NSLocalizedString(tooltip, nil);
-    toolbarItem.enabled = enabled;
-    return toolbarItem;
+- (NSSearchField *)configureSearchField:(NSSearchField *)field {
+    field.action = @selector(searchForGames:);
+    field.target = self.tableViewController;
+    // Keep the existing weak-ish reference used elsewhere (state restore, etc.)
+    _searchField = field;
+    // Stop AppKit's autofill heuristic from walking outward into the
+    // library window's content hierarchy. AppKit re-links the field's
+    // key-view neighbours after the toolbar lays out, so we re-assert
+    // this self-loop on focus in -controlTextDidBeginEditing: as well.
+    field.delegate = self;
+    [field setNextKeyView:field];
+    return field;
 }
 
+- (NSToolbarItem *)searchToolbarItem {
+    NSToolbarItem *toolbarItem;
+    if (@available(macOS 11.0, *)) {
+        NSSearchToolbarItem *searchItem =
+        [[NSSearchToolbarItem alloc] initWithItemIdentifier:kSearchBarItem];
+        // Configure the built-in search field. Don't replace it — just configure it.
+        [self configureSearchField:searchItem.searchField];
+        searchItem.resignsFirstResponderWithCancel = YES;
+        searchItem.preferredWidthForSearchField = 100;
+        toolbarItem = searchItem;
+    } else {
+        // Pre-11 fallback: cache & reuse so we don't leak a dangling field
+        // into the window's key-view chain.
+        if (!_searchField)
+            [self configureSearchField:[[NSSearchField alloc] initWithFrame:CGRectZero]];
+        toolbarItem = [[NSToolbarItem alloc] initWithItemIdentifier:kSearchBarItem];
+        toolbarItem.view    = _searchField;
+        toolbarItem.maxSize = NSMakeSize(200, 20);
+        toolbarItem.minSize = NSMakeSize(100, 20);
+    }
+    toolbarItem.label   = NSLocalizedString(@"Search", nil);
+    toolbarItem.toolTip = NSLocalizedString(@"Search game database", nil);
+    return toolbarItem;
+}
 
 - (NSToolbarItem *)toolbar:(NSToolbar *)toolbar itemForItemIdentifier:(NSToolbarItemIdentifier)itemIdentifier willBeInsertedIntoToolbar:(BOOL)flag {
-    NSToolbarItem *toolbarItem = nil;
-
-    if (itemIdentifier == addToLibrary) {
-        if (@available(macOS 11.0, *)) {
-            return [self toolbarItemWithImage:@"plus.circle" selector:@selector(addGamesToLibrary:) label:@"Add" tooltip:@"Add games to library" identifier:itemIdentifier enabled:YES];
-        } else {
-            return [self buttonToolbarItemWithImage:@"plus" selector:@selector(addGamesToLibrary:) label:@"Add" tooltip:@"Add games to library" identifier:itemIdentifier enabled:YES];
-        }
-    } else if (itemIdentifier == showInfo) {
-        if (@available(macOS 11.0, *)) {
-            return [self toolbarItemWithImage:@"eye.circle" selector:@selector(showGameInfo:) label:@"Show info" tooltip:@"Show info for selected game" identifier:itemIdentifier enabled:NO];
-        } else {
-            return [self buttonToolbarItemWithImage:@"eye.fill" selector:@selector(showGameInfo:) label:@"Show Info" tooltip:@"Show info for selected game" identifier:itemIdentifier enabled:NO];
-        }
-    } else if (itemIdentifier == playGame) {
-        if (@available(macOS 11.0, *)) {
-            return [self toolbarItemWithImage:@"play.circle" selector:@selector(play:) label:@"Play" tooltip:@"Play selected game" identifier:itemIdentifier enabled:NO];
-        } else {
-            return [self buttonToolbarItemWithImage:@"play.fill" selector:@selector(play:) label:@"Play" tooltip:@"Play selected game" identifier:itemIdentifier enabled:NO];
-        }
-    } else if (itemIdentifier == searchBar) {
-        NSSearchField *searchField = [[NSSearchField alloc] initWithFrame: CGRectZero];
-        _searchField = searchField;
-        searchField.action = @selector(searchForGames:);
-        searchField.target = self.tableViewController;
-        toolbarItem = [[NSToolbarItem alloc] initWithItemIdentifier:itemIdentifier];
-        toolbarItem.view = searchField;
-        toolbarItem.label = NSLocalizedString(@"Search", nil);
-        toolbarItem.toolTip = NSLocalizedString(@"Search game database", nil);
-
-        if (@available(macOS 11.0, *)) {
-        } else {
-            toolbarItem.maxSize = NSMakeSize(200, 20);
-            toolbarItem.minSize = NSMakeSize(100, 20);
-        }
+    if ([itemIdentifier isEqualToString:kSearchBarItem])
+        return [self searchToolbarItem];
+    for (size_t i = 0; i < sizeof(kButtonItems) / sizeof(kButtonItems[0]); i++) {
+        if ([itemIdentifier isEqualToString:kButtonItems[i].identifier])
+            return [self toolbarItemForSpec:&kButtonItems[i]];
     }
-    return toolbarItem;
+    return nil;
+}
+
+// When the search field gains focus, AppKit schedules its password-autofill
+// heuristic (NSAutoFillHeuristicController) as a run-loop block. That block
+// walks the key-view loop outward via -previousValidKeyView; if the walk
+// reaches a neighbouring view that can't handle the message it sends, the app
+// traps in CoreFoundation's forwarding path. This notification fires
+// synchronously on focus -- before that deferred block runs -- so re-asserting
+// the self-contained key-view loop here keeps the walk from ever leaving the
+// field, even after AppKit re-links neighbours during toolbar layout.
+- (void)controlTextDidBeginEditing:(NSNotification *)obj {
+    if (obj.object == _searchField) {
+        [_searchField setNextKeyView:_searchField];
+    }
 }
 
 - (NSArray<NSToolbarItemIdentifier> *)toolbarDefaultItemIdentifiers:(NSToolbar *)toolbar {
+    NSMutableArray<NSToolbarItemIdentifier> *toolbarItemIdentifiers =
+    [NSMutableArray arrayWithObject:NSToolbarToggleSidebarItemIdentifier];
+    for (size_t i = 0; i < sizeof(kButtonItems) / sizeof(kButtonItems[0]); i++)
+        [toolbarItemIdentifiers addObject:kButtonItems[i].identifier];
 
-    NSMutableArray<NSToolbarItemIdentifier> *toolbarItemIdentifiers = [NSMutableArray new];
-
-    [toolbarItemIdentifiers addObject:NSToolbarToggleSidebarItemIdentifier];
-
-    [toolbarItemIdentifiers addObject:addToLibrary];
-    [toolbarItemIdentifiers addObject:showInfo];
-    [toolbarItemIdentifiers addObject:playGame];
-
+    // macOS 11+ pushes the search item to the trailing edge by itself.
     if (@available(macOS 11.0, *)) {
     } else {
         [toolbarItemIdentifiers addObject:NSToolbarFlexibleSpaceItemIdentifier];
     }
 
-    [toolbarItemIdentifiers addObject:searchBar];
-
+    [toolbarItemIdentifiers addObject:kSearchBarItem];
     return toolbarItemIdentifiers;
 }
 
@@ -237,19 +249,21 @@ fprintf(stderr, "%s\n",                                                    \
     [state encodeObject:_searchField.stringValue forKey:@"searchText"];
     [state encodeObject:@(self.tableViewController.gameTableView.enclosingScrollView.contentView.bounds.origin.y) forKey:@"scrollPosition"];
     if (self.tableViewController.selectedGames.count) {
-        NSMutableArray *selectedGameIfids = [NSMutableArray arrayWithCapacity:_tableViewController.selectedGames.count];
+        NSMutableArray *selectedGameHashtags = [NSMutableArray arrayWithCapacity:_tableViewController.selectedGames.count];
         NSString *str;
         for (Game *game in _tableViewController.selectedGames) {
-            str = game.ifid;
+            str = game.hashTag;
             if (str) {
-                [selectedGameIfids addObject:str];
+                [selectedGameHashtags addObject:str];
             }
         }
-        [state encodeObject:selectedGameIfids forKey:@"selectedGames"];
+        [state encodeObject:selectedGameHashtags forKey:@"selectedGames"];
     }
 }
 
 - (void)window:(NSWindow *)window didDecodeRestorableState:(NSCoder *)state {
+    if ([TableViewController launchedWithTestGames])
+        return;
     NSString *searchText = [state decodeObjectOfClass:[NSString class] forKey:@"searchText"];
     if (searchText.length) {
         _searchField.stringValue = searchText;
@@ -258,21 +272,21 @@ fprintf(stderr, "%s\n",                                                    \
         });
     }
     NSNumber *scrollPosNum = [state decodeObjectOfClass:[NSNumber class] forKey:@"scrollPosition"];
-    CGFloat scrollPosition = scrollPosNum.floatValue;
-    NSArray *selectedIfids;
+    CGFloat scrollPosition = scrollPosNum.doubleValue;
+    NSArray *selectedHashtags;
     if (@available(macOS 11.0, *)) {
         @try {
-            selectedIfids = [state decodeArrayOfObjectsOfClasses:[NSSet setWithObject:[NSString class]] forKey:@"selectedGames"];
+            selectedHashtags = [state decodeArrayOfObjectsOfClasses:[NSSet setWithObject:[NSString class]] forKey:@"selectedGames"];
         } @catch (NSException *exception) {
-            selectedIfids = [state decodeObjectOfClass:[NSArray class] forKey:@"selectedGames"];
+            selectedHashtags = [state decodeObjectOfClass:[NSArray class] forKey:@"selectedGames"];
         }
     } else {
-        selectedIfids = [state decodeObjectOfClass:[NSArray class] forKey:@"selectedGames"];
+        selectedHashtags = [state decodeObjectOfClass:[NSArray class] forKey:@"selectedGames"];
     }
 
     [self.tableViewController updateTableViews];
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^(void) {
-        [self.tableViewController selectGamesWithIfids:selectedIfids scroll:NO];
+        [self.tableViewController selectGamesWithHashes:selectedHashtags scroll:YES];
         NSRect bounds = self.tableViewController.gameTableView.enclosingScrollView.contentView.bounds;
         bounds.origin.y = scrollPosition;
         self.tableViewController.gameTableView.enclosingScrollView.contentView.bounds = bounds;

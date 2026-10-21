@@ -15,6 +15,7 @@
 
 #include "gi_blorb.h"
 #include "glulxe.h"
+#include "autosavefiles.h"
 
 #if VM_DEBUGGER
 /* This header file may come with the Glk library. If it doesn't, comment
@@ -28,11 +29,17 @@ static void *accel_func_array; /* used by the archive/unarchive hooks */
 //static void spatterglk_game_start(void);
 static void spatterglk_game_autorestore(void);
 static void spatterglk_game_select(glui32 selector, glui32 arg0, glui32 arg1, glui32 arg2);
+static void spatterglk_autosave_now(void);
 static void spatterglk_library_archive(TempLibrary *library, NSCoder *encoder);
 static void spatterglk_library_unarchive(TempLibrary *library, NSCoder *decoder);
 static void recover_library_state(LibraryState *library_state);
 
 static char autosavename[1024] = "";
+
+/* The operands of the @glk call the VM is blocked in, and whether the timer
+ * pacing in spatterglk_game_select has skipped a save since the last one. */
+static glui32 blocked_selector, blocked_arg0, blocked_arg1, blocked_arg2;
+static BOOL autosave_skipped = NO;
 
 /* The only command-line argument is the filename. And the profiling switch,
  if that's compiled in. The only *two* command-line arguments are...
@@ -67,8 +74,8 @@ int glkunix_startup_code(glkunix_startup_t *data)
     unsigned char buf[64];
     int res;
 
-    garglk_set_program_name("Glulxe 0.5.4.147");
-    garglk_set_program_info("Glulxe 0.5.4 by Andrew Plotkin");
+    garglk_set_program_name("Glulxe 0.6.1");
+    garglk_set_program_info("Glulxe 0.6.1 by Andrew Plotkin");
 
     char *cx = strrchr(data->argv[1], '/');
     if (!cx) cx = strrchr(data->argv[1], '\\');
@@ -214,6 +221,7 @@ int glkunix_startup_code(glkunix_startup_t *data)
 
     set_library_autorestore_hook(&spatterglk_game_autorestore);
     set_library_select_hook(&spatterglk_game_select);
+    gli_autosave_request_hook = &spatterglk_autosave_now;
     max_undo_level = 32; // allow 32 undo steps
 
     lastAutosaveTimestamp = [NSDate distantPast];
@@ -232,43 +240,13 @@ static void spatterglk_game_autorestore(void)
 
     @autoreleasepool {
 
-        TempLibrary *newlib = nil;
-        getautosavedir(gamefile->filename);
-        if (autosavedir == NULL)
+        if (!gli_autosave_exists(gamefile->filename))
             return;
         NSString *dirname = @(autosavedir);
-        if (dirname.length == 0)
-            return;
         NSString *glksavepath = [dirname stringByAppendingPathComponent:@"autosave.glksave"];
-        NSString *libsavepath = [dirname stringByAppendingPathComponent:@"autosave.plist"];
 
-        if (![[NSFileManager defaultManager] fileExistsAtPath:glksavepath])
-            return;
-        if (![[NSFileManager defaultManager] fileExistsAtPath:libsavepath]) {
-
-            // If there is a glksave but no plist, we delete the glksave
-            // to make sure it does not cause trouble later.
-            NSError *error;
-
-            if ([[NSFileManager defaultManager] isDeletableFileAtPath:glksavepath]) {
-                BOOL success = [[NSFileManager defaultManager] removeItemAtPath:glksavepath error:&error];
-                if (!success) {
-                    NSLog(@"glulxe spatterglk_game_autorestore: Error removing Glk autosave: %@", error);
-                }
-            }
-            return;
-        }
-
-
-        [TempLibrary setExtraUnarchiveHook:spatterglk_library_unarchive];
-        @try {
-            newlib = [NSKeyedUnarchiver unarchiveObjectWithFile:libsavepath];
-        }
-        @catch (NSException *ex) {
-            // leave newlib as nil
-            NSLog(@"Unable to restore autosave library: %@", ex);
-        }
-        [TempLibrary setExtraUnarchiveHook:nil];
+        TempLibrary *newlib = gli_autosave_load_library(gamefile->filename,
+                                                        spatterglk_library_unarchive);
 
         if (!newlib||!((LibraryState *)newlib.extraData).active) {
             /* Without a Glk state, there's no point in even trying the VM state. We reset the game */
@@ -365,39 +343,53 @@ static void spatterglk_game_select(glui32 selector, glui32 arg0, glui32 arg1, gl
 {
 //    NSLog(@"### game called select, last event was %d", lasteventtype);
 
-    if (!gli_enable_autosave)
+    /* Remembered for spatterglk_autosave_now: a save requested while the VM
+     * is blocked in this call must find the same operands. */
+    blocked_selector = selector;
+    blocked_arg0 = arg0;
+    blocked_arg1 = arg1;
+    blocked_arg2 = arg2;
+
+    /* Do not autosave if we've just started up, or if the last event was a rearrange event. (We get rearranges in clusters, and they don't change anything interesting anyhow.) */
+    if (!gli_autosave_wanted())
         return;
 
-    if (lasteventtype == evtype_Timer && lastAutosaveTimestamp.timeIntervalSinceNow > -0.05) {
-//        NSLog(@"last autosave was less than 0.05 seconds ago. skipping this one.");
+    /* A timer-driven game would otherwise save on every tick: each save is a
+     * VM save plus a library archive here, and a keyed archive of the whole
+     * window hierarchy in the app. Saves after player input stay immediate,
+     * so this bounds only how much timer-driven state a crash can lose; the
+     * window server asks for the skipped save before it closes the game. */
+    if (lasteventtype == evtype_Timer && lastAutosaveTimestamp.timeIntervalSinceNow > -1.0) {
+        autosave_skipped = YES;
         return;
     }
 
-    if (lasteventtype == 0xFFFFFFFF
-      || lasteventtype == 0xFFFFFFFE)
+    if (lasteventtype == 0xFFFFFFFE)
       return;
 
-	/* Do not autosave if we've just started up, or if the last event was a rearrange event. (We get rearranges in clusters, and they don't change anything interesting anyhow.) */
-
-    if (lasteventtype == evtype_Timer && !gli_enable_autosave_on_timer)
-    {
-        return;
-    }
-
-    if ((int)lasteventtype == -1 || lasteventtype == evtype_Arrange || lasteventtype == evtype_Redraw)
-    {
-		return;
-    }
-
     lastAutosaveTimestamp = [NSDate date];
+    autosave_skipped = NO;
 
     spatterglk_do_autosave(selector, arg0, arg1, arg2);
+}
+
+/* The gli_autosave_request_hook: the window server is about to close the
+ * game and wants the autosave on disk to match the VM. Called from inside
+ * win_select, so the VM is still blocked in the @glk call the select hook
+ * last saw, with that call's operands on the stack. Nothing to do unless
+ * the timer pacing above skipped a save since the last one written. */
+static void spatterglk_autosave_now(void)
+{
+    if (!autosave_skipped || !gli_enable_autosave)
+        return;
+    lastAutosaveTimestamp = [NSDate date];
+    autosave_skipped = NO;
+    spatterglk_do_autosave(blocked_selector, blocked_arg0, blocked_arg1, blocked_arg2);
 }
 
 void spatterglk_do_autosave(glui32 selector, glui32 arg0, glui32 arg1, glui32 arg2)
 {
     @autoreleasepool {
-        TempLibrary *library = [[TempLibrary alloc] init];
         /* When the save file is autorestored, the VM will restart the @glk opcode. That means that the Glk argument (the event structure address) must be waiting on the stack. Possibly also the @glk opcode's operands -- these might or might not have come off the stack. */
 
         glui32 oldmode, oldrock;
@@ -408,8 +400,7 @@ void spatterglk_do_autosave(glui32 selector, glui32 arg0, glui32 arg1, glui32 ar
         if (!res)
             return;
 
-        getautosavedir(gamefile->filename);
-        if (autosavedir == NULL) {
+        if (create_autosavedir(gamefile->filename) == 0) {
             return;
         }
         NSString *dirname = @(autosavedir);
@@ -503,47 +494,14 @@ void spatterglk_do_autosave(glui32 selector, glui32 arg0, glui32 arg1, glui32 ar
 
         if (res) {
             NSLog(@"VM autosave failed!");
+            gli_autosave_discard_tmp(gamefile->filename);
             return;
         }
 
-        //stash_library_state();
-        /* The spatterglk_library_archive hook will write out the contents of library_state. */
-
-        NSString *tmplibpath = [dirname stringByAppendingPathComponent:@"autosave-tmp.plist"];
-        [TempLibrary setExtraArchiveHook:spatterglk_library_archive];
-        res = [NSKeyedArchiver archiveRootObject:library toFile:tmplibpath];
-        [TempLibrary setExtraArchiveHook:nil];
-
-        if (!res) {
-            NSLog(@"library serialize failed!");
-            return;
-        }
-
-        NSString *finallibpath = [dirname stringByAppendingPathComponent:@"autosave.plist"];
-        NSString *finalgamepath = [dirname stringByAppendingPathComponent:@"autosave.glksave"];
-
-        NSString *oldlibpath = [dirname stringByAppendingPathComponent:@"autosave-bak.plist"];
-        NSString *oldgamepath = [dirname stringByAppendingPathComponent:@"autosave-bak.glksave"];
-
-        NSError *error = nil;
-        /* This is not really atomic, but we're already past the serious failure modes. */
-        [[NSFileManager defaultManager] removeItemAtPath:oldlibpath error:&error];
-        [[NSFileManager defaultManager] removeItemAtPath:oldgamepath error:&error];
-        [[NSFileManager defaultManager] moveItemAtPath:finallibpath toPath:oldlibpath error:&error];
-        [[NSFileManager defaultManager] moveItemAtPath:finalgamepath toPath:oldgamepath error:&error];
-
-        res = [[NSFileManager defaultManager] moveItemAtPath:tmpgamepath toPath:finalgamepath error:nil];
-        if (!res) {
-            NSLog(@"could not move game autosave to final position!");
-            return;
-        }
-        res = [[NSFileManager defaultManager] moveItemAtPath:tmplibpath toPath:finallibpath error:nil];
-        if (!res) {
-            NSLog(@"could not move library autosave to final position");
-            return;
-        }
-//        NSLog(@"Glulxe created an autosave with tag %u", library.autosaveTag);
-        win_autosave(library.autosaveTag); // Call window server to do its own autosave
+        /* The spatterglk_library_archive hook will write out the library
+         * state; glkimp's autosavefiles.m writes the plist and renames it
+         * and the glksave into place as a pair. */
+        gli_autosave_commit(gamefile->filename, spatterglk_library_archive);
     }
 }
 

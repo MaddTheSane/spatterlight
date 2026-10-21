@@ -1,5 +1,5 @@
 //
-//  CoverImageComparisonViewController.m
+//  ImageCompareViewController.m
 //  Spatterlight
 //
 //  Created by Administrator on 2021-05-21.
@@ -7,13 +7,7 @@
 
 #import <Foundation/Foundation.h>
 
-#ifdef DEBUG
-#define NSLog(FORMAT, ...)                                                     \
-fprintf(stderr, "%s\n",                                                    \
-[[NSString stringWithFormat:FORMAT, ##__VA_ARGS__] UTF8String]);
-#else
-#define NSLog(...)
-#endif
+#import "DebugLog.h"
 
 
 #import "NSData+Categories.h"
@@ -22,40 +16,40 @@ fprintf(stderr, "%s\n",                                                    \
 #import "ImageCompareViewController.h"
 #import "Preferences.h"
 
-#import "OSImageHashing.h"
+#import "ImageSimilarity.h"
+#import "Constants.h"
 
 @interface ImageCompareViewController ()
+
+@property (weak) IBOutlet NSImageView *leftImage;
+@property (weak) IBOutlet NSImageView *rightImage;
+
+@property (weak) IBOutlet NSButton *imageSelectDialogSuppressionButton;
 
 @end
 
 @implementation ImageCompareViewController
 
-+ (kImageComparisonResult)chooseImageA:(NSData *)imageA orB:(NSData *)imageB source:(kImageComparisonSource)source force:(BOOL)force {
++ (kImageComparisonResult)chooseImageA:(NSData *)imageA orB:(nullable NSData *)imageB source:(kImageComparisonSource)source force:(BOOL)force {
     if (!imageB.length || [imageB isPlaceHolderImage])
         return kImageComparisonResultA;
     if (!imageA.length || [imageA isPlaceHolderImage])
         return kImageComparisonResultB;
 
-    if([imageA isEqualToData:imageB]) {
+    if ([ImageSimilarity imageData:imageA looksLike:imageB]) {
         NSLog(@"The images are the same");
-        return kImageComparisonResultB;
-    }
-
-    if ([[OSImageHashing sharedInstance] compareImageData:imageA to:imageB]) {
-        NSLog(@"The images are the same according to OSImageHashing");
         return kImageComparisonResultB;
     }
 
     if (!force) {
         NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-
+        kImageReplacementPrefsType userSetting = (kImageReplacementPrefsType)[defaults integerForKey:kImageReplacementKey];
         if (source == kImageComparisonDownloaded) {
-            if ([defaults integerForKey:@"ImageReplacement"] == kNeverReplace)
+            if (userSetting == kNeverReplace)
                 return kImageComparisonResultB;
-            
-            if ([defaults integerForKey:@"ImageReplacement"] == kAlwaysReplace)
+            if (userSetting == kAlwaysReplace)
                 return kImageComparisonResultA;
-        } else if (source == kImageComparisonLocalFile && [defaults boolForKey:@"ImageComparisonSuppression"]) {
+        } else if (source == kImageComparisonLocalFile && [defaults boolForKey:kImageComparisonSuppressionKey]) {
             return kImageComparisonResultA;
         }
     }
@@ -83,7 +77,7 @@ fprintf(stderr, "%s\n",                                                    \
     _rightImage.image = [[NSImage alloc] initWithData:imageA];
     _leftImage.image = [[NSImage alloc] initWithData:imageB];
 
-    [alert setMessageText:NSLocalizedString(@"Do you want the replace this image?", nil)];
+    [alert setMessageText:NSLocalizedString(@"Do you want to replace this image?", nil)];
     [alert addButtonWithTitle:NSLocalizedString(@"Yes", nil)];
     [alert addButtonWithTitle:NSLocalizedString(@"No", nil)];
 
@@ -100,13 +94,13 @@ fprintf(stderr, "%s\n",                                                    \
 
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
 
-    if (checkbox.state == NSOnState) {
+    if (checkbox.state == NSControlStateValueOn) {
         if (source == kImageComparisonDownloaded) {
-            [defaults setInteger:(choice == NSAlertFirstButtonReturn) ? kAlwaysReplace : kNeverReplace forKey:@"ImageReplacement"];
+            [defaults setInteger:(choice == NSAlertFirstButtonReturn) ? kAlwaysReplace : kNeverReplace forKey:kImageReplacementKey];
             if (Preferences.instance)
                 [Preferences.instance updatePrefsPanel];
         } else {
-            [defaults setBool:YES forKey: @"ImageComparisonSuppression"];
+            [defaults setBool:YES forKey: kImageComparisonSuppressionKey];
         }
     }
     return choice;

@@ -4,61 +4,55 @@
 //
 //  Created by Administrator on 2021-03-30.
 //
+//  The pictures of the running game, by Glk resource number, and Glk's
+//  one-slot "last image": FINDIMAGE, LOADIMAGE and PURGEIMG each make a
+//  picture current, and DRAWIMAGE and SIZEIMAGE use whichever that is.
+//
+//  Main thread only, except for the Blorb parsing that
+//  cacheImagesFromBlorbURL:withData: starts on a background queue. Every
+//  other method waits for that to finish before it looks anything up.
+//
 
-#import <Foundation/Foundation.h>
+#import <AppKit/AppKit.h>
+#import "ImageAnimation.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface ImageFile : NSObject
-
-- (instancetype)initWithPath:(NSString *)path;
-- (instancetype)initWithURL:(NSURL *)path;
-- (void)resolveBookmark;
-
-@property (nullable) NSData *bookmark;
-@property (nullable) NSURL *URL;
-
-@end
-
-
-@interface ImageResource : NSObject
-
-- (instancetype)initWithFilename:(NSString *)filename offset:(NSUInteger)offset length:(NSUInteger)length;
-@property (NS_NONATOMIC_IOSONLY, readonly) BOOL load NS_SWIFT_UNAVAILABLE("Use the throwing method instead");
-- (BOOL)loadWithError:(NSError**)outError;
-@property (NS_NONATOMIC_IOSONLY, readonly, copy) NSImage * _Nullable createImage;
-
-@property (nullable) NSData *data;
-@property (nullable) ImageFile *imageFile;
-@property NSString *filename;
-@property NSUInteger offset;
-@property NSUInteger length;
-@property NSString *a11yDescription;
-
-@end
-
-
 @interface ImageHandler : NSObject
 
-@property NSCache<NSNumber *, NSImage *> *imageCache;
+// The current picture and its number, or nil and -1.
+@property (readonly, nullable) NSImage *lastimage;
+@property (readonly) NSInteger lastimageresno;
 
-@property NSInteger lastimageresno;
-@property (nullable) NSImage *lastimage;
-@property NSMutableDictionary <NSNumber *, ImageResource *> *resources;
-@property NSMutableDictionary <NSString *, ImageFile *> *files;
-@property NSMutableDictionary <NSNumber *, NSString *> *imageDescriptions;
+// Reads the pictures of the game's Blorb (the game file itself, or a .blb
+// next to it) in the background.
+- (void)cacheImagesFromBlorbURL:(NSURL *)file withData:(nullable NSData *)data;
 
-- (void)cacheImagesFromBlorbURL:(NSURL *)file withData:(NSData *)data;
-@property (readonly, nonatomic, copy) NSString *lastImageLabel;
+#pragma mark Glk requests: these change the last image
 
+// Makes picture resno current. Returns NO, leaving no current picture, if
+// it is unknown or cannot be decoded.
 - (BOOL)handleFindImageNumber:(NSInteger)resno;
+// Declares picture resno as size bytes at offset in path, unless it is
+// known already, and makes it current.
 - (void)handleLoadImageNumber:(NSInteger)resno
                          from:(NSString *)path
                        offset:(NSUInteger)offset
-                       size:(NSUInteger)size;
+                         size:(NSUInteger)size;
+// Forgets picture resno. With a replacement, the whole file at path (a
+// temporary file the handler then owns and deletes once it has decoded it)
+// becomes picture resno and current.
+- (void)purgeImage:(NSInteger)resno withReplacement:(nullable NSString *)path;
 
-- (void)purgeImage:(NSInteger)resno withReplacement:(nullable NSString *)path
-            size:(NSUInteger)size;
+#pragma mark Lookups: these leave the last image alone
+
+// So a rescale or an autorestore can ask about any picture in a window
+// without changing what the next draw request draws.
+- (nullable NSImage *)imageForNumber:(NSInteger)resno;
+// The undecoded bytes of picture resno.
+- (nullable NSData *)dataForImageNumber:(NSInteger)resno;
+// The animation for picture resno, or nil if it is a still image.
+- (nullable ImageAnimation *)animationForImageNumber:(NSInteger)resno;
 
 @end
 

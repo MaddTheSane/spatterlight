@@ -1,0 +1,507 @@
+
+
+open trunk
+get flashlight
+north
+x grass
+get all from grass
+break window
+turn light on
+look under chair
+take saw
+ne
+open refrigerator
+take vial
+sw
+north
+saw door
+west
+dig
+take laptop
+east
+open door
+north
+down
+91020
+put vial in machine
+press button
+get in box
+
+
+
+
+north
+north
+dig
+wear mask
+north
+north
+east
+east
+east
+north
+take rock
+north
+dig
+south
+south
+west
+break chain
+look
+look
+look
+look
+look
+throw rock at bird
+look
+west
+look
+take medallion
+west
+look
+take medallion
+south
+look
+take medallion
+south
+look
+take medallion
+south
+look
+take medallion
+south
+look
+take medallion
+give medallion to woman
+north
+north
+north
+north
+east
+east
+east
+north
+look
+take medallion
+wear medallion
+north
+open gate
+
+
+
+
+look
+look
+look
+look
+look
+look
+look
+look
+look
+take blue box
+close blue box
+look
+look
+look
+look
+look
+look
+
+
+
+
+look
+
+look
+look
+look
+look
+look
+look
+take blanket
+look
+look
+look
+look
+look
+look
+look
+take red box
+open red box
+take child
+use blanket on child
+
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+open box
+
+look
+look
+look
+look
+look
+his name is Shane
+
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+take blank box
+open blank box
+take red orb
+take orange orb
+take yellow orb
+take green orb
+take blue orb
+take indigo orb
+take violet orb
+put violet orb in indigo orb
+put indigo orb in blue orb
+put blue orb in green orb
+put green orb in yellow orb
+put yellow orb in orange orb
+put orange orb in red orb
+shout
+
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+take green box
+open green box
+take lighter
+attack chip
+take lighter
+attack chip
+take lighter
+attack chip
+take lighter
+attack chip
+take lighter
+attack chip
+take lighter
+attack chip
+
+
+
+hard
+north
+attack ozgat
+take lighter
+attack ozgat
+take lighter
+take lighter
+take lighter
+take lighter
+take lighter
+take lighter
+take lighter
+east
+attack riven
+take lighter
+attack riven
+take lighter
+take lighter
+take lighter
+take lighter
+take lighter
+take lighter
+take lighter
+look
+look
+look
+north
+attack ozgat
+take lighter
+attack riven
+take lighter
+attack ozgat
+take lighter
+take lighter
+take lighter
+take lighter
+take lighter
+take lighter
+take lighter
+take lighter
+take lighter
+take lighter
+take lighter
+take lighter
+take lighter
+take lighter
+east
+take double-lighter
+west
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+west
+attack riven
+take double-lighter
+take lighter
+attack riven
+take double-lighter
+take lighter
+attack riven
+take double-lighter
+take lighter
+attack riven
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+north
+north
+attack higher
+take double-lighter
+take lighter
+attack higher
+take double-lighter
+take lighter
+attack higher
+take double-lighter
+take lighter
+attack higher
+take double-lighter
+take lighter
+attack higher
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+look
+look
+look
+look
+look
+look
+northeast
+attack ozgat
+take double-lighter
+take lighter
+attack higher
+take double-lighter
+take lighter
+attack riven
+take double-lighter
+take lighter
+attack ozgat
+take double-lighter
+take lighter
+attack higher
+take double-lighter
+take lighter
+attack riven
+take double-lighter
+take lighter
+attack ozgat
+take double-lighter
+take lighter
+attack higher
+take double-lighter
+take lighter
+attack riven
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+attack higher
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+attack higher
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+attack higher
+take double-lighter
+
+
+
+attack ozgat
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+take double-lighter
+take lighter
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+north
+east
+look
+look
+look
+look
+look
+look
+

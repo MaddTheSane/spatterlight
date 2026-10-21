@@ -1,0 +1,190 @@
+# CloDDemo (cloddemo / clod_demo.taf) -- ADRIFT 4.00. "Clod's Quest: The
+# Dungeons of Zivulda [demo version 1.0]" by Duncan Bowsman: a comedic fantasy
+# dungeon crawl. Clod is a janitor's apprentice at the College of Wizardry,
+# sent into Zivulda's dungeon. This is a menu-driven demo, not a free-text
+# parser: each screen shows a single highlighted option, cycled forward with
+# `\` (or `'`), chosen with `1`; `2` opens/closes the inventory, where `1`
+# uses or equips (and unequips) the highlighted item. The highlighted option
+# is kept after a choice, and the inventory cursor always opens on SWORD.
+#
+# FULL WIN, 140/140. The ending is task 741 (#slab_resume, Dimly-lit Landing),
+# an EndGame-win action run by task 742 ("Enter the dark passage"), which needs
+# the stone slab gone: task 923 (#E2R4) -- emerald in the second socket, ruby
+# in the fourth. The other three emerald/ruby layouts (tasks 917-922) kill.
+# The twelve #score-- tasks (1223-1234) are all collected on this route.
+# Deterministic: no RNG is consulted (same result under any seed).
+#
+# Title screen: dismiss the splash, read the introduction, back, START.
+# A blank line answers the intro <waitkey> ("press enter or almost any other key").
+
+1
+
+\
+1
+# Dungeon Entrance. Eat the sandwich (+5; the potion refuses an empty stomach).
+2
+\
+\
+\
+1
+
+# Equip the sword, slice the dead bush (+5): shrub lizards flee, a stick falls.
+1
+2
+\
+\
+1
+
+# Unequip the sword; pick up the stick (+5).
+2
+1
+2
+1
+
+# Equip the stick, poke the dragon's head statue: the tarnished key drops.
+2
+\
+\
+\
+1
+2
+\
+\
+1
+
+# Unequip the stick, take the key (+15).
+2
+\
+\
+\
+1
+2
+1
+
+# Drink the potion of strength (+10), lift the portcullis (+10), go in.
+2
+\
+\
+1
+
+2
+\
+\
+1
+
+1
+
+
+# Entryway Tunnel. Equip the stick, poke the worm-infested skull: an emerald
+# (+20). Unequip, bag the emerald.
+2
+\
+\
+1
+2
+\
+\
+1
+
+2
+\
+\
+1
+2
+1
+
+# Wipe the boots on the entry mat -- the archway kills muddy boots -- then
+# pass through the ornate archway (+10).
+\
+\
+1
+
+\
+\
+\
+\
+1
+
+# Pedestal Room. Equip the key, unlock the heavy wooden door (+10; the key is
+# discarded), open it, enter the Privy.
+2
+\
+\
+\
+1
+2
+\
+\
+\
+\
+\
+\
+\
+1
+
+1
+
+1
+
+# Privy. Equip the magnifying glass, examine the chamberpot: a ruby (+5).
+2
+\
+1
+2
+\
+1
+
+# Unequip the glass, take the long-glove from the shelf, equip it, reach into
+# the chamberpot for the ruby (+15; the glove is discarded). Back out.
+2
+\
+1
+2
+\
+\
+1
+
+2
+\
+\
+\
+\
+1
+2
+1
+
+\
+1
+
+# Emerald into the second socket, ruby into the fourth (+30): the slab
+# vanishes.
+2
+\
+\
+\
+1
+2
+\
+\
+\
+\
+\
+1
+
+2
+\
+\
+\
+1
+2
+\
+\
+1
+
+
+# Enter the dark passage: the slab closes behind, the demo's ending.
+\
+\
+\
+1
+

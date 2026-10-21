@@ -7,25 +7,39 @@
 
 #include "glk.h"
 
-#import "GlkEvent.h"
 #import "GlkTextGridWindow.h"
 #import "InputTextField.h"
 #import "GlkController.h"
+#import "GlkController+Speech.h"
 #import "CommandScriptHandler.h"
 
 @implementation MyFieldEditor
 
+// Our delegate is the InputTextField, whose delegate is the GlkWindow.
+// AppKit may hand this editor to another field while it is not installed
+// on ours, so check both links.
+- (nullable GlkWindow *)glkWindow {
+    id field = self.delegate;
+    if (![field isKindOfClass:[InputTextField class]])
+        return nil;
+    id win = ((InputTextField *)field).delegate;
+    if (![win isKindOfClass:[GlkWindow class]])
+        return nil;
+    return win;
+}
+
+// Terminators, char requests and history travel are handled by the window.
+- (BOOL)shouldForwardKey:(unsigned)ch toGlkWindow:(GlkWindow *)glkWin {
+    return [glkWin.currentTerminators[@(ch)] isEqual:@(YES)] || glkWin.hasCharRequest || ch == keycode_Up || ch == keycode_Down;
+}
+
 - (void)keyDown:(NSEvent *)evt {
-    NSString *str = evt.characters;
-    unsigned ch = keycode_Unknown;
-    if (str.length)
-        ch = chartokeycode([str characterAtIndex:str.length - 1]);
-    GlkWindow *glkWin = (GlkWindow *)((NSTextField *)self.delegate).delegate;
-    if ([glkWin.currentTerminators[@(ch)] isEqual:@(YES)] || [glkWin hasCharRequest] || ((ch == keycode_Up || ch == keycode_Down) && ![glkWin hasCharRequest]))
+    unsigned ch = [GlkWindow keycodeForEvent:evt mapNumericPad:NO];
+    GlkWindow *glkWin = self.glkWindow;
+    if (glkWin && [self shouldForwardKey:ch toGlkWindow:glkWin])
         [glkWin keyDown:evt];
-    else {
+    else
         [super keyDown:evt];
-    }
 }
 
 - (void)mouseMoved:(NSEvent *)event {
@@ -36,13 +50,24 @@
     return YES;
 }
 
+// VoiceOver collects custom rotors from the focused element only, and does not
+// walk up accessibilityParent. While the player is at the command prompt this
+// field editor is the focused element, so without vending the rotors here the
+// player would see only the system rotors (Window spots, Misspelled words) and
+// lose the Command history / Game windows rotors.
+- (NSArray *)accessibilityCustomRotors {
+    return self.glkWindow.glkctl.createCustomRotors ?: @[];
+}
+
 - (void)paste:(id)sender {
     NSString* string = [[NSPasteboard generalPasteboard] stringForType:NSPasteboardTypeString];
 
     if ([string rangeOfCharacterFromSet:[NSCharacterSet newlineCharacterSet]].location != NSNotFound) {
-        GlkTextGridWindow *delegate = (GlkTextGridWindow *)((NSTextField *)self.delegate).delegate;
-        [delegate.glkctl.commandScriptHandler startCommandScript:string inWindow:delegate];
-        return;
+        GlkWindow *glkWin = self.glkWindow;
+        if (glkWin) {
+            [glkWin.glkctl.commandScriptHandler startCommandScript:string inWindow:glkWin];
+            return;
+        }
     }
 
     [super paste:sender];
@@ -52,21 +77,20 @@
 {
     NSPasteboard *pboard = sender.draggingPasteboard;
 
-    GlkTextGridWindow *delegate = (GlkTextGridWindow *)((NSTextField *)self.delegate).delegate;
-   if ([delegate.glkctl.commandScriptHandler commandScriptInPasteboard:pboard fromWindow:delegate])
+    GlkWindow *glkWin = self.glkWindow;
+    if (glkWin && [glkWin.glkctl.commandScriptHandler commandScriptInPasteboard:pboard fromWindow:glkWin])
         return YES;
-    else
-        return [super performDragOperation:sender];
+    return [super performDragOperation:sender];
 }
 
 @end
 
 
-/*
- * Extend NSTextField to ...
- *   - set insertion point color
- *   - set selection at end on becoming key
- */
+// The line input field of a grid window. Vends its own field editor (see
+// GlkController windowWillReturnFieldEditor:), limits the input length with
+// a MyTextFormatter, and on becoming first responder sets the insertion
+// point colour, puts the caret at the end and makes the editor an
+// accessibility child of the grid text view.
 
 @implementation InputTextField
 
@@ -89,8 +113,6 @@
         MyTextFormatter *inputFormatter =
         [[MyTextFormatter alloc] initWithMaxLength:maxLength];
         self.formatter = inputFormatter;
-
-        _fieldEditor = nil;
     }
     return self;
 }
@@ -117,8 +139,9 @@
         // But let's be paranoid, better show an invisible black-on-black cursor
         // than crash.
         MyFieldEditor* textField = (MyFieldEditor *)[self currentEditor];
-        GlkTextGridWindow *gridWin = (GlkTextGridWindow *)self.delegate;
-        textField.accessibilityParent = gridWin.textview;
+        id gridWin = self.delegate;
+        if ([gridWin isKindOfClass:[GlkTextGridWindow class]])
+            textField.accessibilityParent = ((GlkTextGridWindow *)gridWin).textview;
 
         textField.delegate = self;
         if( [textField respondsToSelector: @selector(setInsertionPointColor:)] )
@@ -145,16 +168,12 @@
 @implementation MyTextFormatter
 
 - (instancetype)init {
-    if (self = [super init]) {
-        self.maxLength = INT_MAX;
-    }
-
-    return self;
+    return [self initWithMaxLength:INT_MAX];
 }
 
 - (instancetype)initWithMaxLength:(NSUInteger)maxLength {
     if (self = [super init]) {
-        self.maxLength = maxLength;
+        _maxLength = maxLength;
     }
 
     return self;
@@ -177,15 +196,9 @@
 #pragma mark Textual Representation of Cell Content
 
 - (NSString *)stringForObjectValue:(id)object {
-    NSString *stringValue = nil;
-    if ([object isKindOfClass:[NSString class]]) {
-
-        // A new NSString is perhaps not required here
-        // but generically a new object would be generated
-        stringValue = [NSString stringWithString:object];
-    }
-
-    return stringValue;
+    if ([object isKindOfClass:[NSString class]])
+        return [object copy];
+    return nil;
 }
 
 #pragma mark -
@@ -193,13 +206,10 @@
 
 - (BOOL)getObjectValue:(__autoreleasing id * _Nullable)object forString:(NSString *)string errorDescription:(NSString * __autoreleasing *)error
 {
-    BOOL valid = YES;
-
     // Be sure to generate a new object here or binding woe ensues
     // when continuously updating bindings are enabled.
     *object = [NSString stringWithString:string];
-
-    return valid;
+    return YES;
 }
 
 #pragma mark -
@@ -213,17 +223,27 @@
 {
     BOOL valid = YES;
     NSString *proposedString = *partialStringPtr;
-    if (proposedString.length > self.maxLength && self.maxLength) {
+    // Always allow deleting, even when the text is over the limit.
+    if (proposedString.length <= origString.length)
+        return YES;
+
+    if (proposedString.length > _maxLength) {
 
         // The original string has been modified by one or more characters (via
         // pasting). Either way compute how much of the proposed string can be
-        // accommodated.
-        NSUInteger origLength = origString.length;
-        NSUInteger insertLength = self.maxLength - origLength;
+        // accommodated. Characters in the selected range are replaced, so they
+        // do not count. The field may already be over the limit, if its text
+        // was set in code or maxLength was lowered.
+        NSUInteger keptLength = origString.length - origSelRange.length;
+        NSUInteger insertLength = _maxLength > keptLength ? _maxLength - keptLength : 0;
 
-        // If a range is selected then characters in that range will be removed
-        // so adjust the insert length accordingly
-        insertLength += origSelRange.length;
+        // Don't cut a surrogate pair or a composed character sequence in two.
+        NSUInteger insertEnd = origSelRange.location + insertLength;
+        if (insertLength && insertEnd < proposedString.length) {
+            NSUInteger sequenceStart = [proposedString rangeOfComposedCharacterSequenceAtIndex:insertEnd].location;
+            if (sequenceStart < insertEnd)
+                insertLength = sequenceStart > origSelRange.location ? sequenceStart - origSelRange.location : 0;
+        }
 
         // Get the string components
         NSString *prefix = [origString substringToIndex:origSelRange.location];
