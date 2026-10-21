@@ -644,7 +644,7 @@
 
     self.savePanel = [NSSavePanel savePanel];
     NSSavePanel *panel = self.savePanel;
-    panel.nameFieldLabel = NSLocalizedString(@"Save text: ", nil);
+    panel.nameFieldLabel = NSLocalizedString(@"Save text: ", @"Save text prompt");
     panel.extensionHidden = NO;
     panel.canCreateDirectories = YES;
 
@@ -748,9 +748,9 @@
 
     NSArray *buttonItems;
     if (hasImages)
-        buttonItems = @[@"Rich Text Format with images", @"Rich Text Format without images", @"Plain Text"];
+        buttonItems = @[NSLocalizedString(@"Rich Text Format with images", @"Rich Text Format with images"), NSLocalizedString(@"Rich Text Format without images", @"Rich Text Format without images"), NSLocalizedString(@"Plain Text", @"Plain Text")];
     else
-        buttonItems = @[@"Rich Text Format", @"Plain Text"];
+        buttonItems = @[NSLocalizedString(@"Rich Text Format", @"Rich Text Format"), NSLocalizedString(@"Plain Text", @"Plain Text")];
 
     NSView  *accessoryView = [[NSView alloc] initWithFrame:NSMakeRect(0.0, 0.0, 300, 32.0)];
 

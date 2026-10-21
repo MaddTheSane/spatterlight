@@ -566,7 +566,7 @@ static kZoomDirectionType sZoomDirection = ZOOMRESET;
         if (_timerTextField.doubleValue != floor(1000.0 / self.theme.minTimer)) {
             _timerTextField.doubleValue = floor(1000.0 / (CGFloat)self.theme.minTimer);
         }
-        _timerSlider.accessibilityValueDescription = [NSString stringWithFormat:NSLocalizedString(@"%ld per second", nil), _timerSlider.integerValue];
+        _timerSlider.accessibilityValueDescription = [NSString localizedStringWithFormat:NSLocalizedString(@"%ld per second", nil), _timerSlider.integerValue];
     }
 }
 
@@ -584,9 +584,9 @@ static kZoomDirectionType sZoomDirection = ZOOMRESET;
 - (NSString *)secondsAccessibilityString {
     CGFloat fractional = _vODelaySlider.doubleValue - (CGFloat)_vODelaySlider.integerValue;
     if (fractional < 0.05 || fractional > 0.95) {
-        return [NSString stringWithFormat:NSLocalizedString(@"%ld seconds", nil), (long)round(_vODelaySlider.doubleValue)];
+        return [NSString localizedStringWithFormat:NSLocalizedString(@"%ld seconds", nil), (long)round(_vODelaySlider.doubleValue)];
     } else {
-        return [NSString stringWithFormat:NSLocalizedString(@"%.1f seconds", nil), _vODelaySlider.doubleValue];
+        return [NSString localizedStringWithFormat:NSLocalizedString(@"%.1f seconds", nil), _vODelaySlider.doubleValue];
     }
 }
 

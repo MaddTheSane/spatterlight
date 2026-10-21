@@ -212,7 +212,19 @@ typedef NS_ENUM(int32_t, MetadataImportResult) {
             else
                 importResult = kImportResultPartialMatchesOnly;
 
-            msg2 = [NSString stringWithFormat:@"%@ound partial match%@ for %@%@.", importResult == kImportResultExactAndPartialMatches ? @"Also f" : @"F", indirectGames.count > 1 ? @"es" : @"", [NSString stringWithSummaryOfGames:indirectGames.allObjects], importResult == kImportResultExactAndPartialMatches ? @"" : @" in iFiction file"];
+            if (importResult == kImportResultExactAndPartialMatches) {
+                if (indirectGames.count > 1) {
+                    msg2 = [NSString stringWithFormat:NSLocalizedString(@"Also found partial matches for %@ in iFiction file.", nil), [NSString stringWithSummaryOfGames:indirectGames.allObjects]];
+                } else {
+                    msg2 = [NSString stringWithFormat:NSLocalizedString(@"Also found partial match for %@ in iFiction file.", nil), [NSString stringWithSummaryOfGames:indirectGames.allObjects]];
+                }
+            } else {
+                if (indirectGames.count > 1) {
+                    msg2 = [NSString stringWithFormat:NSLocalizedString(@"Found partial matches for %@.", nil), [NSString stringWithSummaryOfGames:indirectGames.allObjects]];
+                } else {
+                    msg2 = [NSString stringWithFormat:NSLocalizedString(@"Found partial match for %@.", nil), [NSString stringWithSummaryOfGames:indirectGames.allObjects]];
+                }
+            }
         } else if (indirectDict.count) {
             NSLog(@"askAboutImportingMetadata: None of the %ld indirect matches found in database (or they were also exact matches)", indirectDict.count);
         }
@@ -243,7 +255,7 @@ typedef NS_ENUM(int32_t, MetadataImportResult) {
                 }
             }
             if (importResult == kImportResultExactAndPartialMatches) {
-                NSAlert *alert2 = [NSAlert alertWithMessage:NSLocalizedString(msg2, nil)
+                NSAlert *alert2 = [NSAlert alertWithMessage:msg2
                                                        info:anAlert.informativeText
                                                     buttons:@[ NSLocalizedString(@"Okay", nil), NSLocalizedString(@"Cancel", nil) ]];
                 [alert2 beginSheetModalForWindow:tvc.view.window completionHandler:^(NSModalResponse result2){

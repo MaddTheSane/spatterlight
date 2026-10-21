@@ -142,31 +142,31 @@ static void playSoundNamed(NSString *name) {
 
     switch (fileusage) {
         case fileusage_Data:
-            prompt = @"Save data file: ";
+            prompt = NSLocalizedString(@"Save data file: ", @"Save data file prompt");
             ext = @"glkdata";
-            filename = @"Data";
+            filename = NSLocalizedString(@"Data", @"Save data file");
             break;
         case fileusage_SavedGame:
-            prompt = @"Save game: ";
+            prompt = NSLocalizedString(@"Save game: ", @"Save game prompt");
             ext = @"glksave";
             break;
         case fileusage_Transcript:
-            prompt = @"Save transcript: ";
+            prompt = NSLocalizedString(@"Save transcript: ", @"Save transcript prompt");
             ext = @"txt";
-            filename = @"Transcript of ";
+            filename = NSLocalizedString(@"Transcript of ", @"Save transcript prefix");
             break;
         case fileusage_InputRecord:
-            prompt = @"Save recording: ";
+            prompt = NSLocalizedString(@"Save recording: ", @"Save recording prompt");
             ext = @"rec";
-            filename = @"Recording of ";
+            filename = NSLocalizedString(@"Recording of ", @"Save recording prefix");
             break;
         default:
-            prompt = @"Save: ";
+            prompt = NSLocalizedString(@"Save: ", @"Unknown/generic save prompt");
             ext = nil;
             break;
     }
 
-    panel.nameFieldLabel = NSLocalizedString(prompt, nil);
+    panel.nameFieldLabel = prompt;
     if (ext)
         panel.allowedFileTypes = @[ ext ];
     panel.directoryURL = directory;

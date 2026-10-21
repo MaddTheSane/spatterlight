@@ -570,7 +570,7 @@
 
 - (IBAction)saveImage:(id)sender {
     NSSavePanel *panel = [NSSavePanel savePanel];
-    panel.nameFieldLabel = NSLocalizedString(@"Save image: ", nil);
+    panel.nameFieldLabel = NSLocalizedString(@"Save image: ", @"Save image prompt");
     panel.allowedFileTypes = @[ @"png" ];
     panel.extensionHidden = NO;
     [panel setCanCreateDirectories:YES];
@@ -578,7 +578,7 @@
     NSString *fileName = [game.path.lastPathComponent.stringByDeletingPathExtension stringByAppendingPathExtension:@"png"];
     if (!fileName.length)
         fileName = @"image.png";
-    panel.nameFieldStringValue = NSLocalizedString(fileName, nil);
+    panel.nameFieldStringValue = fileName;
 
     [panel beginSheetModalForWindow:self.window
                   completionHandler:^(NSInteger result) {
