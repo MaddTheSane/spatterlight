@@ -104,6 +104,9 @@ static BOOL IsBoringCoverImage(NSData *imageData) {
     NSData *data = [NSData dataWithContentsOfURL:url
                                          options:NSDataReadingMappedIfSafe
                                            error:NULL];
+    if (!data) {
+      return nil;
+    }
     return [[self alloc] initWithData:data];
   } @catch (NSException *exception) {
     NSLog(@"Blorb: exception parsing %@: %@", url.path, exception);

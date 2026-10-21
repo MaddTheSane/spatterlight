@@ -34,11 +34,11 @@ NS_ASSUME_NONNULL_BEGIN
 
 // The image returned by coverImageData, and whether it was picked from the
 // pictures because the file has no Fspc chunk.
-@property(readonly, nullable) NSData *coverImageData;
+@property(readonly, copy, nullable) NSData *coverImageData;
 @property(readonly) BOOL fakeFrontispiece;
 
 // ZCODE-release-serial[-checksum], or nil if there is no IFhd chunk.
-@property(readonly, nullable) NSString *ifidFromIFhd;
+@property(readonly, copy, nullable) NSString *ifidFromIFhd;
 
 + (BOOL)isBlorbURL:(nullable NSURL *)url;
 
