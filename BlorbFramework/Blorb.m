@@ -15,7 +15,7 @@
 #include "iff.h"
 #import <BlorbFramework/BlorbFramework-Swift.h>
 
-// FORM header: 'FORM', length, 'IFRS'.
+/// FORM header: 'FORM', length, 'IFRS'.
 static const NSUInteger kFormHeaderLength = 12;
 static const NSUInteger kChunkHeaderLength = 8;
 
@@ -29,7 +29,7 @@ enum : FourCharCode {
   kZCOD = 'ZCOD',
 };
 
-// Text chunks copied into optionalChunks, with their encodings.
+/// Text chunks copied into optionalChunks, with their encodings.
 static NSDictionary<NSNumber *, NSNumber *> *OptionalChunkEncodings(void) {
   static NSDictionary<NSNumber *, NSNumber *> *encodings;
   static dispatch_once_t onceToken;
@@ -50,12 +50,12 @@ static NSString *FourCCString(FourCharCode code) {
   return [[NSString alloc] initWithBytes:bytes length:4 encoding:NSASCIIStringEncoding];
 }
 
-// The pictures that Narcolepsy, Dracula, Pytho's Mask and Mysterious
-// Adventures would get as a fake frontispiece are really boring, so we skip
-// them. Calls FileSignature directly rather than the -[NSData sha256String]
-// category, so that Blorb does not depend on app-level categories that may
-// not be compiled into every target using the framework. FileSignature.m is
-// compiled into BlorbFramework itself.
+/// The pictures that Narcolepsy, Dracula, Pytho's Mask and Mysterious
+/// Adventures would get as a fake frontispiece are really boring, so we skip
+/// them. Calls FileSignature directly rather than the ``-[NSData sha256String]``
+/// category, so that Blorb does not depend on app-level categories that may
+/// not be compiled into every target using the framework. FileSignature.m is
+/// compiled into BlorbFramework itself.
 static BOOL IsBoringCoverImage(NSData *imageData) {
   static NSSet<NSString *> *boring;
   static dispatch_once_t onceToken;
@@ -88,11 +88,7 @@ static BOOL IsBoringCoverImage(NSData *imageData) {
 @synthesize fakeFrontispiece = _fakeFrontispiece;
 
 + (BOOL)isBlorbURL:(nullable NSURL *)url {
-  static NSSet<NSString *> *extensions;
-  static dispatch_once_t onceToken;
-  dispatch_once(&onceToken, ^{
-    extensions = [NSSet setWithArray:@[@"zblorb", @"blorb", @"blb", @"gblorb", @"zlb"]];
-  });
+  static NSSet<NSString *> *const extensions = @[@"zblorb", @"blorb", @"blb", @"gblorb", @"zlb"];
   NSString *pathExtension = url.pathExtension.lowercaseString;
   return pathExtension && [extensions containsObject:pathExtension];
 }
@@ -155,9 +151,9 @@ static BOOL IsBoringCoverImage(NSData *imageData) {
 
 #pragma mark - Parsing
 
-// Reads the RIdx count and entries starting at offset (just past the chunk
-// header). Returns the offset after the last entry read, where the parser
-// carries on looking for other chunks.
+/// Reads the RIdx count and entries starting at offset (just past the chunk
+/// header). Returns the offset after the last entry read, where the parser
+/// carries on looking for other chunks.
 - (NSUInteger)parseResourceIndexAt:(NSUInteger)offset
                          intoArray:(NSMutableArray<BlorbResource *> *)resources {
   const unsigned char *base = _data.bytes;
@@ -182,7 +178,7 @@ static BOOL IsBoringCoverImage(NSData *imageData) {
   return offset;
 }
 
-// Walks the chunks that follow the resource index.
+/// Walks the chunks that follow the resource index.
 - (void)parseChunksFromOffset:(NSUInteger)offset {
   NSDictionary<NSNumber *, NSNumber *> *optionalEncodings = OptionalChunkEncodings();
   NSMutableDictionary<NSString *, NSString *> *optionalChunks = [NSMutableDictionary dictionary];
@@ -219,8 +215,8 @@ static BOOL IsBoringCoverImage(NSData *imageData) {
   _optionalChunks = optionalChunks;
 }
 
-// Game Identifier Chunk. These values only make sense in a Z-code game; see
-// the comment on releaseNumber in Blorb.h.
+/// Game Identifier Chunk. These values only make sense in a Z-code game; see
+/// the comment on releaseNumber in Blorb.h.
 - (void)parseIFhd:(nullable NSData *)payload {
   BlorbResource *resource = [self findResourceOfUsage:ExecutableResource];
   if (resource && ![resource.chunkType isEqualToString:FourCCString(kZCOD)])
@@ -233,8 +229,8 @@ static BOOL IsBoringCoverImage(NSData *imageData) {
   _checkSum = info.checksum;
 }
 
-// Resource Description Chunk: a count, then (usage, number, length, text)
-// entries.
+/// Resource Description Chunk: a count, then (usage, number, length, text)
+/// entries.
 - (void)parseResourceDescriptionsAt:(NSUInteger)offset {
   const unsigned char *base = _data.bytes;
   NSUInteger length = _data.length;
@@ -261,17 +257,17 @@ static BOOL IsBoringCoverImage(NSData *imageData) {
   }
 }
 
-// Returns a subrange of the backing data, or nil if the range would fall
-// outside the file. Used to protect against corrupt or truncated Blorbs whose
-// index entries and chunk lengths point past the end of the data.
+/// Returns a subrange of the backing data, or nil if the range would fall
+/// outside the file. Used to protect against corrupt or truncated Blorbs whose
+/// index entries and chunk lengths point past the end of the data.
 - (nullable NSData *)safeSubdataFromOffset:(NSUInteger)offset length:(NSUInteger)len {
   if (offset > _data.length || len > _data.length - offset)
     return nil;
   return [_data subdataWithRange:NSMakeRange(offset, len)];
 }
 
-// The payload of the chunk starting at offset, or nil if the chunk does not
-// fit in the file. If expectedID is non-zero, the chunk must also have that ID.
+/// The payload of the chunk starting at offset, or nil if the chunk does not
+/// fit in the file. If `expectedID` is non-zero, the chunk must also have that ID.
 - (nullable NSData *)payloadOfChunkAtOffset:(NSUInteger)offset expectedID:(FourCharCode)expectedID {
   uint32_t chunkID, len;
   if (!chunkHeaderAt(_data.bytes, _data.length, offset, &chunkID, &len))
@@ -316,10 +312,10 @@ static BOOL IsBoringCoverImage(NSData *imageData) {
 
 #pragma mark - Cover image
 
-// The Fspc picture if there is one. Otherwise (or if Fspc names a picture
-// that is missing or unreadable) the first picture in index order that is
-// readable and not on the boring list, flagged as fake. Worked out once, so
-// repeated calls return the same answer.
+/// The Fspc picture if there is one. Otherwise (or if Fspc names a picture
+/// that is missing or unreadable) the first picture in index order that is
+/// readable and not on the boring list, flagged as fake. Worked out once, so
+/// repeated calls return the same answer.
 - (void)resolveCoverImage {
   if (_coverImageResolved)
     return;

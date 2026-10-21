@@ -22,9 +22,9 @@ NS_ASSUME_NONNULL_BEGIN
 @property(readonly, nullable) NSData *pictureData;
 @property(readonly, nullable) NSData *metaData;
 
-// From the IFhd chunk. Only read for Z-code Blorbs (or Blorbs without an
-// executable): Glulx identifies a game by the first 128 bytes of the story
-// file instead, and that is left to Babel.
+/// From the IFhd chunk. Only read for Z-code Blorbs (or Blorbs without an
+/// executable): Glulx identifies a game by the first 128 bytes of the story
+/// file instead, and that is left to Babel.
 @property(readonly) NSUInteger releaseNumber;
 @property(readonly) NSUInteger checkSum;
 @property(readonly, nullable) NSString *serialNumber;
@@ -32,20 +32,20 @@ NS_ASSUME_NONNULL_BEGIN
 /// Text chunks keyed by chunk ID: ANNO, AUTH, "(c) " and SNam.
 @property(readonly) NSDictionary<NSString *, NSString *> *optionalChunks;
 
-// The image returned by coverImageData, and whether it was picked from the
-// pictures because the file has no Fspc chunk.
+/// The image returned by ``coverImageData``, and whether it was picked from the
+/// pictures because the file has no Fspc chunk.
 @property(readonly, copy, nullable) NSData *coverImageData;
 @property(readonly) BOOL fakeFrontispiece;
 
-/// ZCODE-release-serial[-checksum], or nil if there is no IFhd chunk.
+/// ZCODE-release-serial[-checksum], or `nil` if there is no IFhd chunk.
 @property(readonly, copy, nullable) NSString *ifidFromIFhd;
 
 + (BOOL)isBlorbURL:(nullable NSURL *)url;
 
-/// Reads and parses the file at url. Returns nil if it can't be read, is too
+/// Reads and parses the file at url. Returns `nil` if it can't be read, is too
 /// short, or the parser throws, so a malformed file only means "no Blorb".
 + (nullable instancetype)blorbAtURL:(nullable NSURL *)url;
-/// The cover image of the Blorb at url, or nil if url has no Blorb extension
+/// The cover image of the Blorb at url, or `nil` if url has no Blorb extension
 /// or ``blorbAtURL:`` fails.
 + (nullable NSData *)coverImageDataAtURL:(nullable NSURL *)url;
 /// Checks for a FORM IFRS header.
