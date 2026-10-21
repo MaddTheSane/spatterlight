@@ -1,17 +1,17 @@
 #import <Cocoa/Cocoa.h>
 
-extern NSArray *gGameFileTypes;
-extern NSArray *gDocFileTypes;
-extern NSArray *gSaveFileTypes;
-extern NSArray *gGridStyleNames;
-extern NSArray *gBufferStyleNames;
+extern NSArray<NSString*> *const gGameFileTypes;
+extern NSArray<NSString*> *const gDocFileTypes;
+extern NSArray<NSString*> *const gSaveFileTypes;
+extern NSArray<NSString*> *const gGridStyleNames;
+extern NSArray<NSString*> *const gBufferStyleNames;
 
 extern NSPasteboardType PasteboardFileURLPromise,
-PasteboardFilePromiseContent,
-PasteboardFilePasteLocation;
+PasteboardFilePromiseContent;
+extern NSPasteboardType const PasteboardFilePasteLocation;
 
-extern NSDictionary *gExtMap;
-extern NSDictionary *gFormatMap;
+extern NSDictionary<NSString*,NSString*> *const gExtMap;
+extern NSDictionary<NSString*,NSString*> *const gFormatMap;
 
 // NSUserDefaults keys used in more than one place. Defaults.plist has the
 // default values of most of them.

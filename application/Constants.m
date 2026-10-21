@@ -7,19 +7,74 @@
 
 #import "Constants.h"
 
-NSArray *gGameFileTypes;
-NSArray *gDocFileTypes;
-NSArray *gSaveFileTypes;
+NSArray *const gGameFileTypes = @[
+    @"d$$", @"dat", @"sna",  @"z80",  @"tap",   @"tzx",   @"advsys",
+    @"l9",  @"mag", @"a3c",  @"acd",  @"agx",   @"gam",   @"t3",
+    @"hex", @"taf", @"z1",   @"z2",   @"z3",    @"z4",    @"z5",
+    @"z6",  @"z7",  @"z8",   @"cas",  @"asl",   @"saga",  @"jacl",
+    @"j2",  @"ulx", @"blb",  @"zlb",  @"blorb", @"glb",   @"gblorb",
+    @"d64", @"t64", @"fiad", @"dsk",  @"quill", @"zblorb",@"atr",
+    @"st",  @"msa", @"woz",  @"sag",  @"plus",  @"plu",   @"tay",
+    @"taylor", @"rpk", @"cart", @"zip", @"acx", @"exe",
+    @"quest", @"aslx"
+];
+NSArray *const gDocFileTypes = @[@"rtf", @"rtfd", @"html", @"doc", @"docx", @"odt", @"xml", @"webarchive", @"txt"];
+NSArray *const gSaveFileTypes = @[@"glksave", @"sav", @"qut", @"qzl"];
 
-NSArray *gBufferStyleNames;
-NSArray *gGridStyleNames;
+// To map the Glk style indices onto our Core Data relation names
+NSArray *const gBufferStyleNames = @[
+    @"bufferNormal",
+    @"bufEmph",
+    @"bufPre",
+    @"bufHead",
+    @"bufSubH",
+    @"bufAlert",
+    @"bufNote",
+    @"bufBlock",
+    @"bufInput",
+    @"bufUsr1",
+    @"bufUsr2",
+    ];
+NSArray *const gGridStyleNames = @[
+    @"gridNormal",
+    @"gridEmph",
+    @"gridPre",
+    @"gridHead",
+    @"gridSubH",
+    @"gridAlert",
+    @"gridNote",
+    @"gridBlock",
+    @"gridInput",
+    @"gridUsr1",
+    @"gridUsr2",
+    ];
 
-NSDictionary *gExtMap;
-NSDictionary *gFormatMap;
+NSDictionary *const gExtMap = @{@"acd" : @"alan2", @"a3c" : @"alan3", @"d$$" : @"agility"};
+NSDictionary *const gFormatMap = @{
+    @"adrift" : @"scarier",
+    @"advsys" : @"advsys",
+    @"agt" : @"agility",
+    @"archetype" : @"archetype",
+    @"comprehend" : @"comprehend",
+    @"glulx" : @"glulxe",
+    @"hugo" : @"hugo",
+    @"level9" : @"level9",
+    @"magscrolls" : @"magnetic",
+    @"quill" : @"unquill",
+    @"tads2" : @"tadsr",
+    @"tads3" : @"tadsr",
+    @"zcode" : @"bocfel",
+    @"quest4" : @"question",
+    @"quest5" : @"question",
+    @"jacl" : @"jacl",
+    @"sagaplus" : @"plus",
+    @"scott" : @"scott",
+    @"taylor" : @"taylor"
+    };
 
 NSPasteboardType PasteboardFileURLPromise,
-PasteboardFilePromiseContent,
-PasteboardFilePasteLocation;
+PasteboardFilePromiseContent;
+NSPasteboardType const PasteboardFilePasteLocation = @"com.apple.pastelocation";
 
 NSString * const kShowThemePreviewKey = @"ShowThemePreview";
 NSString * const kThemeNameKey = @"themeName";
@@ -50,76 +105,6 @@ NSArray<NSString *> *AlertSuppressionKeys(void) {
 }
 
 void InitializeConstants(void) {
-    gGameFileTypes = @[
-        @"d$$", @"dat", @"sna",  @"z80",  @"tap",   @"tzx",   @"advsys",
-        @"l9",  @"mag", @"a3c",  @"acd",  @"agx",   @"gam",   @"t3",
-        @"hex", @"taf", @"z1",   @"z2",   @"z3",    @"z4",    @"z5",
-        @"z6",  @"z7",  @"z8",   @"cas",  @"asl",   @"saga",  @"jacl",
-        @"j2",  @"ulx", @"blb",  @"zlb",  @"blorb", @"glb",   @"gblorb",
-        @"d64", @"t64", @"fiad", @"dsk",  @"quill", @"zblorb",@"atr",
-        @"st",  @"msa", @"woz",  @"sag",  @"plus",  @"plu",   @"tay",
-        @"taylor", @"rpk", @"cart", @"zip", @"acx", @"exe",
-        @"quest", @"aslx"
-    ];
-
-    gDocFileTypes = @[@"rtf", @"rtfd", @"html", @"doc", @"docx", @"odt", @"xml", @"webarchive", @"txt"];
-
-    gSaveFileTypes = @[@"glksave", @"sav", @"qut", @"qzl"];
-
-    // To map the Glk style indices onto our Core Data relation names
-    gBufferStyleNames = @[
-                       @"bufferNormal",
-                       @"bufEmph",
-                       @"bufPre",
-                       @"bufHead",
-                       @"bufSubH",
-                       @"bufAlert",
-                       @"bufNote",
-                       @"bufBlock",
-                       @"bufInput",
-                       @"bufUsr1",
-                       @"bufUsr2",
-                       ];
-
-    gGridStyleNames = @[
-                       @"gridNormal",
-                       @"gridEmph",
-                       @"gridPre",
-                       @"gridHead",
-                       @"gridSubH",
-                       @"gridAlert",
-                       @"gridNote",
-                       @"gridBlock",
-                       @"gridInput",
-                       @"gridUsr1",
-                       @"gridUsr2",
-                       ];
-
-    gExtMap = @{@"acd" : @"alan2", @"a3c" : @"alan3", @"d$$" : @"agility"};
-
-    gFormatMap = @{
-                   @"adrift" : @"scarier",
-                   @"advsys" : @"advsys",
-                   @"agt" : @"agility",
-                   @"archetype" : @"archetype",
-                   @"comprehend" : @"comprehend",
-                   @"glulx" : @"glulxe",
-                   @"hugo" : @"hugo",
-                   @"level9" : @"level9",
-                   @"magscrolls" : @"magnetic",
-                   @"quill" : @"unquill",
-                   @"tads2" : @"tadsr",
-                   @"tads3" : @"tadsr",
-                   @"zcode" : @"bocfel",
-                   @"quest4" : @"question",
-                   @"quest5" : @"question",
-                   @"jacl" : @"jacl",
-                   @"sagaplus" : @"plus",
-                   @"scott" : @"scott",
-                   @"taylor" : @"taylor"
-                   };
-
     PasteboardFileURLPromise = (NSPasteboardType)kPasteboardTypeFileURLPromise;
     PasteboardFilePromiseContent = (NSPasteboardType)kPasteboardTypeFilePromiseContent;
-    PasteboardFilePasteLocation = (NSPasteboardType)@"com.apple.pastelocation";
 }
