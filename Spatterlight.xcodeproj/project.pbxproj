@@ -436,7 +436,6 @@
 		96A9BBA40A0668EB001B5B9B /* GameWindow.xib in Resources */ = {isa = PBXBuildFile; fileRef = 96A9BBA30A0668EB001B5B9B /* GameWindow.xib */; };
 		96A9BBDA0A066F41001B5B9B /* libbabel.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 96A9BA790A06558F001B5B9B /* libbabel.a */; };
 		96A9C0F00A07AE17001B5B9B /* LibController.m in Sources */ = {isa = PBXBuildFile; fileRef = 96A9C0EF0A07AE17001B5B9B /* LibController.m */; };
-		96B6FE6F0A0E4E0200E62E4D /* Question.png in Resources */ = {isa = PBXBuildFile; fileRef = 96B6FE6E0A0E4E0200E62E4D /* Question.png */; };
 		96E6B9430AC4081600DCBE8B /* glulxe in Copy Interpreter Files */ = {isa = PBXBuildFile; fileRef = 9650385409F2AF280083E64E /* glulxe */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		96FBD8F00A094E30002F6087 /* InfoPanel.xib in Resources */ = {isa = PBXBuildFile; fileRef = 96FBD8EF0A094E2F002F6087 /* InfoPanel.xib */; };
 		96FBD8F70A0950EA002F6087 /* InfoController.m in Sources */ = {isa = PBXBuildFile; fileRef = 96FBD8F50A0950EA002F6087 /* InfoController.m */; };
@@ -3222,7 +3221,6 @@
 		96A9BBA30A0668EB001B5B9B /* GameWindow.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = GameWindow.xib; sourceTree = "<group>"; };
 		96A9C0EF0A07AE17001B5B9B /* LibController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; lineEnding = 0; path = LibController.m; sourceTree = "<group>"; };
 		96A9C0F10A07AE31001B5B9B /* LibController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = LibController.h; sourceTree = "<group>"; };
-		96B6FE6E0A0E4E0200E62E4D /* Question.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Question.png; sourceTree = "<group>"; };
 		96FBD8EF0A094E2F002F6087 /* InfoPanel.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = InfoPanel.xib; sourceTree = "<group>"; };
 		96FBD8F40A0950EA002F6087 /* InfoController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InfoController.h; sourceTree = "<group>"; };
 		96FBD8F50A0950EA002F6087 /* InfoController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = InfoController.m; sourceTree = "<group>"; };
@@ -5263,7 +5261,6 @@
 				966EFA7709F635D400FA7F19 /* Defaults.plist */,
 				961CCF2409F2940F00528FF9 /* IconApp.icns */,
 				961CCF2509F2940F00528FF9 /* IconGame.icns */,
-				96B6FE6E0A0E4E0200E62E4D /* Question.png */,
 				961CCF2C09F2940F00528FF9 /* MainMenu.xib */,
 				961CCF2D09F2940F00528FF9 /* PrefsWindow.xib */,
 				C38BE432263AEAA60091B17A /* ParagraphPopOver.xib */,
@@ -8528,7 +8525,6 @@
 				96A80EFD09F5821400CC75F4 /* InfoPlist.strings in Resources */,
 				C301D30D25D35E9300DC4A2B /* Media.xcassets in Resources */,
 				966EFA7809F635D400FA7F19 /* Defaults.plist in Resources */,
-				96B6FE6F0A0E4E0200E62E4D /* Question.png in Resources */,
 				C3853E7129679175002D4A27 /* SplitView.storyboard in Resources */,
 				C38BE433263AEAA60091B17A /* ParagraphPopOver.xib in Resources */,
 				C38784F626582AE200B4D886 /* ImageCompareViewController.xib in Resources */,
