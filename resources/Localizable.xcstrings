@@ -70,12 +70,12 @@
         }
       }
     },
-    "%@ %@ also in this folder." : {
+    "%@ are also in this folder." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ %2$@ also in this folder."
+            "state" : "translated",
+            "value" : "%@ are also in this folder."
           }
         }
       }
@@ -96,6 +96,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ have individual theme settings."
+          }
+        }
+      }
+    },
+    "%@ is also in this folder." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ is also in this folder."
           }
         }
       }
@@ -458,16 +468,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Apply Theme"
-          }
-        }
-      }
-    },
-    "are" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "are"
           }
         }
       }
@@ -1021,12 +1021,22 @@
         }
       }
     },
-    "Do you want to update %@ as well?" : {
+    "Do you want to update it as well?" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Do you want to update %@ as well?"
+            "value" : "Do you want to update it as well?"
+          }
+        }
+      }
+    },
+    "Do you want to update them as well?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Do you want to update them as well?"
           }
         }
       }
@@ -1417,16 +1427,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Interactive Fiction Metadata.iFiction"
-          }
-        }
-      }
-    },
-    "is" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "is"
           }
         }
       }

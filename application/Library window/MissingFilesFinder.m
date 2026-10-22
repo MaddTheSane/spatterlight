@@ -234,8 +234,8 @@
         NSArray *matchedIfids = filenames.allValues;
 
         if (filenames.count > 0) {
-            NSAlert *alert = [NSAlert alertWithMessage:[NSString stringWithFormat:NSLocalizedString(@"%@ %@ also in this folder.", nil), [NSString stringWithSummaryOfGames:matchedIfids], (matchedIfids.count > 1) ? NSLocalizedString(@"are", nil) : NSLocalizedString(@"is", nil)]
-                                                  info:[NSString stringWithFormat:NSLocalizedString(@"Do you want to update %@ as well?", nil), (matchedIfids.count > 1) ? @"them" : @"it"]
+            NSAlert *alert = [NSAlert alertWithMessage:[NSString stringWithFormat:(matchedIfids.count > 1) ? NSLocalizedString(@"%@ are also in this folder.", nil) : NSLocalizedString(@"%@ is also in this folder.", nil), [NSString stringWithSummaryOfGames:matchedIfids]]
+                                                  info:(matchedIfids.count > 1) ? NSLocalizedString(@"Do you want to update them as well?", nil) : NSLocalizedString(@"Do you want to update it as well?", nil)
                                                buttons:@[NSLocalizedString(@"Yes", nil), NSLocalizedString(@"Cancel", nil)]];
             alert.alertStyle = NSAlertStyleInformational;
 
