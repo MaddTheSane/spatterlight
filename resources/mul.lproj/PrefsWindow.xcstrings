@@ -1,0 +1,3534 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "0EW-on-Nny.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Grid\"; ObjectID = \"0EW-on-Nny\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Grid"
+          }
+        }
+      }
+    },
+    "0Ko-qM-Bbf.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Rebuild Default Themes\"; ObjectID = \"0Ko-qM-Bbf\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Rebuild Default Themes"
+          }
+        }
+      }
+    },
+    "0KP-8P-5Uv.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Speak the command entered by the player when pressing enter, when VoiceOver is active.\"; ObjectID = \"0KP-8P-5Uv\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Speak the command entered by the player when pressing enter, when VoiceOver is active."
+          }
+        }
+      }
+    },
+    "0Oi-cg-BFS.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"250\"; ObjectID = \"0Oi-cg-BFS\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "250"
+          }
+        }
+      }
+    },
+    "0QR-ab-KZI.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Fancy quote boxes\"; ObjectID = \"0QR-ab-KZI\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Fancy quote boxes"
+          }
+        }
+      }
+    },
+    "0SI-L5-3sn.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Some games pause for dramatic effect. Turn it off here.\"; ObjectID = \"0SI-L5-3sn\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Some games pause for dramatic effect. Turn it off here."
+          }
+        }
+      }
+    },
+    "1gC-LN-mBb.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Use for Light Mode\"; ObjectID = \"1gC-LN-mBb\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Use for Light Mode"
+          }
+        }
+      }
+    },
+    "1hm-f4-d6s.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Always use this theme in Light mode\"; ObjectID = \"1hm-f4-d6s\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Always use this theme in Light mode"
+          }
+        }
+      }
+    },
+    "1mI-8g-AD5.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Input\"; ObjectID = \"1mI-8g-AD5\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Input"
+          }
+        }
+      }
+    },
+    "1wD-85-3q3.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"4\"; ObjectID = \"1wD-85-3q3\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "4"
+          }
+        }
+      }
+    },
+    "1Yj-ev-c7r.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Paper\"; ObjectID = \"1Yj-ev-c7r\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Paper"
+          }
+        }
+      }
+    },
+    "2et-qG-p4n.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"lines\"; ObjectID = \"2et-qG-p4n\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "lines"
+          }
+        }
+      }
+    },
+    "2kX-tw-OLe.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Show bezel notifications\"; ObjectID = \"2kX-tw-OLe\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Show bezel notifications"
+          }
+        }
+      }
+    },
+    "2V6-Ao-CWB.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Header\"; ObjectID = \"2V6-Ao-CWB\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Header"
+          }
+        }
+      }
+    },
+    "3lM-Qi-nfu.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSTextField\"; ibShadowedToolTip = \"Margin inside buffer windows.\"; ObjectID = \"3lM-Qi-nfu\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Margin inside buffer windows."
+          }
+        }
+      }
+    },
+    "3mV-s8-XLW.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Horizontal\"; ObjectID = \"3mV-s8-XLW\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Horizontal"
+          }
+        }
+      }
+    },
+    "4AK-pT-gl4.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Delays\"; ObjectID = \"4AK-pT-gl4\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Delays"
+          }
+        }
+      }
+    },
+    "4g9-3e-qzJ.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Pop\"; ObjectID = \"4g9-3e-qzJ\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Pop"
+          }
+        }
+      }
+    },
+    "4j9-rg-AAp.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Use for Dark Mode\"; ObjectID = \"4j9-rg-AAp\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Use for Dark Mode"
+          }
+        }
+      }
+    },
+    "4UF-Gk-2lF.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"8. Commodore 64\"; ObjectID = \"4UF-Gk-2lF\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "8. Commodore 64"
+          }
+        }
+      }
+    },
+    "4uq-cs-Wof.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Image palette:\"; ObjectID = \"4uq-cs-Wof\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Image palette:"
+          }
+        }
+      }
+    },
+    "5B0-qp-U8g.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Changing this option will not affect graphis already drawn or not drawn on-screen.\"; ObjectID = \"5B0-qp-U8g\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Changing this option will not affect graphis already drawn or not drawn on-screen."
+          }
+        }
+      }
+    },
+    "5Ph-if-zsd.placeholderString" : {
+      "comment" : "Class = \"NSTextFieldCell\"; placeholderString = \"0\"; ObjectID = \"5Ph-if-zsd\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "0"
+          }
+        }
+      }
+    },
+    "5xf-qh-Vim.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSPopUpButton\"; ibShadowedToolTip = \"Whether to show inventory in the status window. Required for some TI-99/4A games.\"; ObjectID = \"5xf-qh-Vim\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Whether to show inventory in the status window. Required for some TI-99/4A games."
+          }
+        }
+      }
+    },
+    "6B5-IO-e9W.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSTextField\"; ibShadowedToolTip = \"Version letter used by Z-code interpreters. Games will sometimes print this, otherwise it has no effect.\"; ObjectID = \"6B5-IO-e9W\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Version letter used by Z-code interpreters. Games will sometimes print this, otherwise it has no effect."
+          }
+        }
+      }
+    },
+    "6De-b0-cB0.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSPopUpButton\"; ibShadowedToolTip = \"Sets the Z-code interpreter type reported to the game. Most modern games ignore this setting, but this can change the behaviour of some Infocom games.\"; ObjectID = \"6De-b0-cB0\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Sets the Z-code interpreter type reported to the game. Most modern games ignore this setting, but this can change the behaviour of some Infocom games."
+          }
+        }
+      }
+    },
+    "6df-MX-F1g.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Monospaced:\"; ObjectID = \"6df-MX-F1g\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Monospaced:"
+          }
+        }
+      }
+    },
+    "6jz-d7-HkH.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Games can set colors and styles\"; ObjectID = \"6jz-d7-HkH\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Games can set colors and styles"
+          }
+        }
+      }
+    },
+    "6KL-qU-Iho.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Speak images:\"; ObjectID = \"6KL-qU-Iho\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Speak images:"
+          }
+        }
+      }
+    },
+    "6w4-Os-R0N.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Purr\"; ObjectID = \"6w4-Os-R0N\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Purr"
+          }
+        }
+      }
+    },
+    "7gD-4q-P7R.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Blorb\"; ObjectID = \"7gD-4q-P7R\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Blorb"
+          }
+        }
+      }
+    },
+    "7s0-F8-Zmo.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Glass\"; ObjectID = \"7s0-F8-Zmo\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Glass"
+          }
+        }
+      }
+    },
+    "7v6-uP-5dQ.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Whether games will be automatically added to the library when they are opened from the Open menu or by double clicking the game file.\"; ObjectID = \"7v6-uP-5dQ\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Whether games will be automatically added to the library when they are opened from the Open menu or by double clicking the game file."
+          }
+        }
+      }
+    },
+    "7vj-fD-nWF.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Choose…\"; ObjectID = \"7vj-fD-nWF\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Choose…"
+          }
+        }
+      }
+    },
+    "8fs-jm-Zp7.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Make monochrome graphics  match the text colors (and possibly the original hardware.)\"; ObjectID = \"8fs-jm-Zp7\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Make monochrome graphics  match the text colors (and possibly the original hardware.)"
+          }
+        }
+      }
+    },
+    "8lf-M7-6Go.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Hide Preview\"; ObjectID = \"8lf-M7-6Go\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Hide Preview"
+          }
+        }
+      }
+    },
+    "8lk-zD-Gh4.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"High system beep:\"; ObjectID = \"8lk-zD-Gh4\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "High system beep:"
+          }
+        }
+      }
+    },
+    "8m5-Y3-tnq.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Swap ink and paper colors.\"; ObjectID = \"8m5-Y3-tnq\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Swap ink and paper colors."
+          }
+        }
+      }
+    },
+    "8mf-fK-4Wu.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Preformatted\"; ObjectID = \"8mf-fK-4Wu\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Preformatted"
+          }
+        }
+      }
+    },
+    "9eb-hZ-4g7.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"0\"; ObjectID = \"9eb-hZ-4g7\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "0"
+          }
+        }
+      }
+    },
+    "9h6-bj-hSw.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Show and fade\"; ObjectID = \"9h6-bj-hSw\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Show and fade"
+          }
+        }
+      }
+    },
+    "9k2-sN-HVU.alternateTitle" : {
+      "comment" : "Class = \"NSButtonCell\"; alternateTitle = \"Set Grid Font\"; ObjectID = \"9k2-sN-HVU\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Set Grid Font"
+          }
+        }
+      }
+    },
+    "9k2-sN-HVU.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Monaco 10.0\"; ObjectID = \"9k2-sN-HVU\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Monaco 10.0"
+          }
+        }
+      }
+    },
+    "9mZ-cN-L2R.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSTextField\"; ibShadowedToolTip = \"Adjust the graphic font height to avoid gaps and make diagonal lines smoother. Useful in Beyond Zork.\"; ObjectID = \"9mZ-cN-L2R\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Adjust the graphic font height to avoid gaps and make diagonal lines smoother. Useful in Beyond Zork."
+          }
+        }
+      }
+    },
+    "9R5-Wd-dpk.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Select Games Using Theme\"; ObjectID = \"9R5-Wd-dpk\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Select Games Using Theme"
+          }
+        }
+      }
+    },
+    "9vW-A3-dqZ.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Determinism\"; ObjectID = \"9vW-A3-dqZ\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Determinism"
+          }
+        }
+      }
+    },
+    "9wO-C1-Hqh.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Whether to show the library window no other windows are open. If this is off, a file picker dialog is shown instead.\"; ObjectID = \"9wO-C1-Hqh\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Whether to show the library window no other windows are open. If this is off, a file picker dialog is shown instead."
+          }
+        }
+      }
+    },
+    "31X-CD-5xp.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Show and wait for key\"; ObjectID = \"31X-CD-5xp\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Show and wait for key"
+          }
+        }
+      }
+    },
+    "89X-cz-XWr.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"10\"; ObjectID = \"89X-cz-XWr\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "10"
+          }
+        }
+      }
+    },
+    "95c-aF-apm.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Silent\"; ObjectID = \"95c-aF-apm\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Silent"
+          }
+        }
+      }
+    },
+    "261-Ff-hjz.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Enable sound\"; ObjectID = \"261-Ff-hjz\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Enable sound"
+          }
+        }
+      }
+    },
+    "407.title" : {
+      "comment" : "Class = \"NSWindow\"; title = \"Preferences\"; ObjectID = \"407\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Preferences"
+          }
+        }
+      }
+    },
+    "786-bS-86a.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Pop\"; ObjectID = \"786-bS-86a\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Pop"
+          }
+        }
+      }
+    },
+    "aA8-0R-Xot.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Z\"; ObjectID = \"aA8-0R-Xot\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Z"
+          }
+        }
+      }
+    },
+    "AdZ-1F-ake.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Automatic\"; ObjectID = \"AdZ-1F-ake\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Automatic"
+          }
+        }
+      }
+    },
+    "aJF-tD-oFn.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"per second\"; ObjectID = \"aJF-tD-oFn\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "per second"
+          }
+        }
+      }
+    },
+    "aUU-IN-zWc.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Slow vector drawing\"; ObjectID = \"aUU-IN-zWc\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Slow vector drawing"
+          }
+        }
+      }
+    },
+    "b2m-qv-1JV.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSMenuItem\"; ibShadowedToolTip = \"Don't try to detect menus at all.\"; ObjectID = \"b2m-qv-1JV\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Don't try to detect menus at all."
+          }
+        }
+      }
+    },
+    "b2m-qv-1JV.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Don't detect menus\"; ObjectID = \"b2m-qv-1JV\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Don't detect menus"
+          }
+        }
+      }
+    },
+    "B13-Oy-cLd.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"When the OS is in Light Mode, all games will switch to this theme. This will override all other theme settings.\"; ObjectID = \"B13-Oy-cLd\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "When the OS is in Light Mode, all games will switch to this theme. This will override all other theme settings."
+          }
+        }
+      }
+    },
+    "ba4-FL-aqa.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Adjust window size when changing theme\"; ObjectID = \"ba4-FL-aqa\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Adjust window size when changing theme"
+          }
+        }
+      }
+    },
+    "BC6-aI-HCu.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"9. Apple IIc\"; ObjectID = \"BC6-aI-HCu\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "9. Apple IIc"
+          }
+        }
+      }
+    },
+    "bCm-aX-v3z.alternateTitle" : {
+      "comment" : "Class = \"NSButtonCell\"; alternateTitle = \"Set Buffer Font\"; ObjectID = \"bCm-aX-v3z\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Set Buffer Font"
+          }
+        }
+      }
+    },
+    "bCm-aX-v3z.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Times 12.0\"; ObjectID = \"bCm-aX-v3z\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Times 12.0"
+          }
+        }
+      }
+    },
+    "bcX-4D-hla.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Note\"; ObjectID = \"bcX-4D-hla\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Note"
+          }
+        }
+      }
+    },
+    "bF4-Pc-mdc.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Blow\"; ObjectID = \"bF4-Pc-mdc\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Blow"
+          }
+        }
+      }
+    },
+    "bHi-ab-cfQ.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Automatic\"; ObjectID = \"bHi-ab-cfQ\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Automatic"
+          }
+        }
+      }
+    },
+    "BKN-OD-Jn0.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Speak the last move when game window moves to front, to prevent VoiceOver from reading all the game text from the start. Does not work reliably.\"; ObjectID = \"BKN-OD-Jn0\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Speak the last move when game window moves to front, to prevent VoiceOver from reading all the game text from the start. Does not work reliably."
+          }
+        }
+      }
+    },
+    "bNO-Qq-xke.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Bottle\"; ObjectID = \"bNO-Qq-xke\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Bottle"
+          }
+        }
+      }
+    },
+    "BP6-Gs-Mhw.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"characters\"; ObjectID = \"BP6-Gs-Mhw\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "characters"
+          }
+        }
+      }
+    },
+    "bPr-fp-M7T.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Show separate horizontal and vertical margin settings.\"; ObjectID = \"bPr-fp-M7T\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Show separate horizontal and vertical margin settings."
+          }
+        }
+      }
+    },
+    "br4-cn-dxJ.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \" Max timer frequency\"; ObjectID = \"br4-cn-dxJ\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : " Max timer frequency"
+          }
+        }
+      }
+    },
+    "BSC-DS-iIl.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Ping\"; ObjectID = \"BSC-DS-iIl\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Ping"
+          }
+        }
+      }
+    },
+    "bsv-bP-kmD.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Settings for theme Default\"; ObjectID = \"bsv-bP-kmD\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Settings for theme Default"
+          }
+        }
+      }
+    },
+    "c6B-jA-wap.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSMenuItem\"; ibShadowedToolTip = \"⌘↑ and ⌘↓ are used where the original uses ↑ and ↓. ↑ and ↓ step through command history like in other games.\"; ObjectID = \"c6B-jA-wap\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "⌘↑ and ⌘↓ are used where the original uses ↑ and ↓. ↑ and ↓ step through command history like in other games."
+          }
+        }
+      }
+    },
+    "c6B-jA-wap.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Replaced by ⌘↑ and ⌘↓\"; ObjectID = \"c6B-jA-wap\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Replaced by ⌘↑ and ⌘↓"
+          }
+        }
+      }
+    },
+    "cAG-dj-bI0.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Low system beep:\"; ObjectID = \"cAG-dj-bI0\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Low system beep:"
+          }
+        }
+      }
+    },
+    "cFf-OI-7lG.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Slow down vector graphics drawing to simulate the look on the original machines.\"; ObjectID = \"cFf-OI-7lG\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Slow down vector graphics drawing to simulate the look on the original machines."
+          }
+        }
+      }
+    },
+    "CFG-J7-71R.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"CGA\"; ObjectID = \"CFG-J7-71R\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "CGA"
+          }
+        }
+      }
+    },
+    "cGf-Uz-tR1.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Interrupt VoiceOver when appropriate\"; ObjectID = \"cGf-Uz-tR1\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Interrupt VoiceOver when appropriate"
+          }
+        }
+      }
+    },
+    "CJo-Tg-RUP.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSTextField\"; ibShadowedToolTip = \"Main window margin.\"; ObjectID = \"CJo-Tg-RUP\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Main window margin."
+          }
+        }
+      }
+    },
+    "cPR-Gx-j7K.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSPopUpButton\"; ibShadowedToolTip = \"Use more colors (PCjr or DHGR) or keep the original lower-color (CGA or HGR) renderer.\"; ObjectID = \"cPR-Gx-j7K\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Use more colors (PCjr or DHGR) or keep the original lower-color (CGA or HGR) renderer."
+          }
+        }
+      }
+    },
+    "cvV-kA-9Eg.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Funk\"; ObjectID = \"cvV-kA-9Eg\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Funk"
+          }
+        }
+      }
+    },
+    "CYp-WS-1Kb.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Frog\"; ObjectID = \"CYp-WS-1Kb\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Frog"
+          }
+        }
+      }
+    },
+    "d5h-NP-1Hh.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Show paragraph settings. Grid window problems may be fixed by adjusting these for the Grid Normal style.\"; ObjectID = \"d5h-NP-1Hh\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Show paragraph settings. Grid window problems may be fixed by adjusting these for the Grid Normal style."
+          }
+        }
+      }
+    },
+    "dck-5P-tWf.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Un-customize styles\"; ObjectID = \"dck-5P-tWf\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Un-customize styles"
+          }
+        }
+      }
+    },
+    "dfX-Cv-GKp.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"minutes\"; ObjectID = \"dfX-Cv-GKp\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "minutes"
+          }
+        }
+      }
+    },
+    "DH4-ha-fed.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Reset \\\"Don't ask again\\\" warnings\"; ObjectID = \"DH4-ha-fed\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Reset \"Don't ask again\" warnings"
+          }
+        }
+      }
+    },
+    "dP2-po-lsF.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Underline hyperlinks:\"; ObjectID = \"dP2-po-lsF\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Underline hyperlinks:"
+          }
+        }
+      }
+    },
+    "Dud-1G-HPn.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Location: \"; ObjectID = \"Dud-1G-HPn\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Location: "
+          }
+        }
+      }
+    },
+    "dWn-Ew-6ZN.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Frog\"; ObjectID = \"dWn-Ew-6ZN\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Frog"
+          }
+        }
+      }
+    },
+    "E3q-y7-t26.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Morse\"; ObjectID = \"E3q-y7-t26\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Morse"
+          }
+        }
+      }
+    },
+    "e8w-xX-ZXY.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Arrow key usage:\"; ObjectID = \"e8w-xX-ZXY\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Arrow key usage:"
+          }
+        }
+      }
+    },
+    "eAE-Aw-FL4.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Bottle\"; ObjectID = \"eAE-Aw-FL4\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Bottle"
+          }
+        }
+      }
+    },
+    "Ed1-sq-zwH.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"VGA\"; ObjectID = \"Ed1-sq-zwH\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "VGA"
+          }
+        }
+      }
+    },
+    "eh9-fW-CHJ.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Aways use this theme in Dark mode\"; ObjectID = \"eh9-fW-CHJ\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Aways use this theme in Dark mode"
+          }
+        }
+      }
+    },
+    "eiT-pj-jjZ.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"80\"; ObjectID = \"eiT-pj-jjZ\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "80"
+          }
+        }
+      }
+    },
+    "eOQ-Jv-UVE.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Grid\"; ObjectID = \"eOQ-Jv-UVE\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Grid"
+          }
+        }
+      }
+    },
+    "EOs-e5-4bz.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Amiga/Mac Color\"; ObjectID = \"EOs-e5-4bz\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Amiga/Mac Color"
+          }
+        }
+      }
+    },
+    "EvJ-bs-zkC.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSMenuItem\"; ibShadowedToolTip = \"Only speak the text of the menu line.\"; ObjectID = \"EvJ-bs-zkC\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Only speak the text of the menu line."
+          }
+        }
+      }
+    },
+    "EvJ-bs-zkC.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Text only\"; ObjectID = \"EvJ-bs-zkC\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Text only"
+          }
+        }
+      }
+    },
+    "eYM-m0-SCx.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Rename\"; ObjectID = \"eYM-m0-SCx\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Rename"
+          }
+        }
+      }
+    },
+    "F47-2f-hYn.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Proportional:\"; ObjectID = \"F47-2f-hYn\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Proportional:"
+          }
+        }
+      }
+    },
+    "FBK-Pc-ef7.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Apply to Selected Games\"; ObjectID = \"FBK-Pc-ef7\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Apply to Selected Games"
+          }
+        }
+      }
+    },
+    "FC7-pa-Rgw.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Show quote boxes as floating, fading windows.\"; ObjectID = \"FC7-pa-Rgw\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Show quote boxes as floating, fading windows."
+          }
+        }
+      }
+    },
+    "fGi-Ga-kml.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Settings for theme Default\"; ObjectID = \"fGi-Ga-kml\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Settings for theme Default"
+          }
+        }
+      }
+    },
+    "fhq-jO-WXN.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"6. IBM PC\"; ObjectID = \"fhq-jO-WXN\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "6. IBM PC"
+          }
+        }
+      }
+    },
+    "fnL-vj-KNo.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Apple II\"; ObjectID = \"fnL-vj-KNo\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Apple II"
+          }
+        }
+      }
+    },
+    "fOb-mm-Uja.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSPopUpButton\"; ibShadowedToolTip = \"Resolve the conflict between later Infocom games' usage of the arrow keys and the standard behavior to step through command history and edit with them.\"; ObjectID = \"fOb-mm-Uja\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Resolve the conflict between later Infocom games' usage of the arrow keys and the standard behavior to step through command history and edit with them."
+          }
+        }
+      }
+    },
+    "fOm-nF-5oT.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Basso\"; ObjectID = \"fOm-nF-5oT\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Basso"
+          }
+        }
+      }
+    },
+    "fw9-TN-HtJ.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSMenuItem\"; ibShadowedToolTip = \"Only speak custom descriptions of images that have them.\"; ObjectID = \"fw9-TN-HtJ\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Only speak custom descriptions of images that have them."
+          }
+        }
+      }
+    },
+    "fw9-TN-HtJ.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"With descriptions\"; ObjectID = \"fw9-TN-HtJ\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "With descriptions"
+          }
+        }
+      }
+    },
+    "G3d-Qy-8lV.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Autosave on timer events\"; ObjectID = \"G3d-Qy-8lV\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Autosave on timer events"
+          }
+        }
+      }
+    },
+    "G6N-ub-g0w.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Autosave on every turn. Removes the need to save manually. Can sometimes affect performance. Only available for Glulx and Z-code games.\"; ObjectID = \"G6N-ub-g0w\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Autosave on every turn. Removes the need to save manually. Can sometimes affect performance. Only available for Glulx and Z-code games."
+          }
+        }
+      }
+    },
+    "GcX-bB-pYh.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Show errors\"; ObjectID = \"GcX-bB-pYh\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Show errors"
+          }
+        }
+      }
+    },
+    "gPR-Kk-wPd.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSTextField\"; ibShadowedToolTip = \"Adjust the graphic font height to avoid gaps and make diagonal lines smoother. Useful in Beyond Zork.\"; ObjectID = \"gPR-Kk-wPd\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Adjust the graphic font height to avoid gaps and make diagonal lines smoother. Useful in Beyond Zork."
+          }
+        }
+      }
+    },
+    "GQ0-dI-BSS.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSPopUpButton\"; ibShadowedToolTip = \"Try to make the colors look like on one of the original machines.\"; ObjectID = \"GQ0-dI-BSS\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Try to make the colors look like on one of the original machines."
+          }
+        }
+      }
+    },
+    "gYU-OF-3YE.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Interruption delay\"; ObjectID = \"gYU-OF-3YE\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Interruption delay"
+          }
+        }
+      }
+    },
+    "h4M-xz-Mgx.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"No double spaces\"; ObjectID = \"h4M-xz-Mgx\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "No double spaces"
+          }
+        }
+      }
+    },
+    "h6d-0M-qN1.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Normal\"; ObjectID = \"h6d-0M-qN1\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Normal"
+          }
+        }
+      }
+    },
+    "h7a-MT-Bfz.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Interpreter version:\"; ObjectID = \"h7a-MT-Bfz\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Interpreter version:"
+          }
+        }
+      }
+    },
+    "HbI-tR-r0z.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Alert\"; ObjectID = \"HbI-tR-r0z\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Alert"
+          }
+        }
+      }
+    },
+    "Hd9-ZE-F9G.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"In grid windows\"; ObjectID = \"Hd9-ZE-F9G\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "In grid windows"
+          }
+        }
+      }
+    },
+    "Hes-dz-WNN.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Font\"; ObjectID = \"Hes-dz-WNN\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Font"
+          }
+        }
+      }
+    },
+    "hhd-nX-YS1.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Specific to Scott Adams style games\"; ObjectID = \"hhd-nX-YS1\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Specific to Scott Adams style games"
+          }
+        }
+      }
+    },
+    "HKy-2t-KPg.placeholderString" : {
+      "comment" : "Class = \"NSTextFieldCell\"; placeholderString = \"0\"; ObjectID = \"HKy-2t-KPg\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "0"
+          }
+        }
+      }
+    },
+    "hoz-iF-dx3.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Tink\"; ObjectID = \"hoz-iF-dx3\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Tink"
+          }
+        }
+      }
+    },
+    "hPD-zs-auO.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Adapt the window size when changing settings to keep the width in characters constant.\"; ObjectID = \"hPD-zs-auO\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Adapt the window size when changing settings to keep the width in characters constant."
+          }
+        }
+      }
+    },
+    "Hr7-HF-wGJ.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSPopUpButton\"; ibShadowedToolTip = \"When VoiceOver is active, Spatterlight tries to detect some types of menus, unless disabled here. This setting also determines how detected menu lines are spoken.\"; ObjectID = \"Hr7-HF-wGJ\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "When VoiceOver is active, Spatterlight tries to detect some types of menus, unless disabled here. This setting also determines how detected menu lines are spoken."
+          }
+        }
+      }
+    },
+    "hur-vJ-DJu.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSMenuItem\"; ibShadowedToolTip = \"Mention all images, even those without descriptions.\"; ObjectID = \"hur-vJ-DJu\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Mention all images, even those without descriptions."
+          }
+        }
+      }
+    },
+    "hur-vJ-DJu.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"All\"; ObjectID = \"hur-vJ-DJu\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "All"
+          }
+        }
+      }
+    },
+    "IAF-M9-b0B.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"In buffer windows\"; ObjectID = \"IAF-M9-b0B\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "In buffer windows"
+          }
+        }
+      }
+    },
+    "IAz-Z3-Tr3.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Flicker\"; ObjectID = \"IAz-Z3-Tr3\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Flicker"
+          }
+        }
+      }
+    },
+    "ib2-wg-acs.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Off\"; ObjectID = \"ib2-wg-acs\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Off"
+          }
+        }
+      }
+    },
+    "Ib9-a4-dvq.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"User 1\"; ObjectID = \"Ib9-a4-dvq\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "User 1"
+          }
+        }
+      }
+    },
+    "IEr-Ry-p1h.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Smart quotes\"; ObjectID = \"IEr-Ry-p1h\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Smart quotes"
+          }
+        }
+      }
+    },
+    "ih4-B8-jJ4.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"points\"; ObjectID = \"ih4-B8-jJ4\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "points"
+          }
+        }
+      }
+    },
+    "IMN-UD-GtK.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Speak commands\"; ObjectID = \"IMN-UD-GtK\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Speak commands"
+          }
+        }
+      }
+    },
+    "imX-e5-G2g.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"1. DECSystem-20\"; ObjectID = \"imX-e5-G2g\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "1. DECSystem-20"
+          }
+        }
+      }
+    },
+    "is5-dA-QbR.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSSlider\"; ibShadowedToolTip = \"How long to wait until interrupting VoiceOver.\"; ObjectID = \"is5-dA-QbR\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "How long to wait until interrupting VoiceOver."
+          }
+        }
+      }
+    },
+    "IUV-AF-qjZ.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Colorize 1-bit graphics\"; ObjectID = \"IUV-AF-qjZ\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Colorize 1-bit graphics"
+          }
+        }
+      }
+    },
+    "ixm-pk-PTZ.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Add games to library when opened\"; ObjectID = \"ixm-pk-PTZ\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Add games to library when opened"
+          }
+        }
+      }
+    },
+    "iz4-Aj-xEL.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Submarine\"; ObjectID = \"iz4-Aj-xEL\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Submarine"
+          }
+        }
+      }
+    },
+    "iZ7-pD-bxT.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"7. Commodore 128\"; ObjectID = \"iZ7-pD-bxT\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "7. Commodore 128"
+          }
+        }
+      }
+    },
+    "j2r-ik-gqE.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Mac B/W\"; ObjectID = \"j2r-ik-gqE\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Mac B/W"
+          }
+        }
+      }
+    },
+    "J7f-RX-ZW4.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Clear all \\\"Remember this choice\\\" and \\\"Don't show again\\\" check boxes in alert dialogs.\"; ObjectID = \"J7f-RX-ZW4\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Clear all \"Remember this choice\" and \"Don't show again\" check boxes in alert dialogs."
+          }
+        }
+      }
+    },
+    "j8h-ea-Ado.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Blockquote\"; ObjectID = \"j8h-ea-Ado\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Blockquote"
+          }
+        }
+      }
+    },
+    "jc4-hf-9c1.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Ink\"; ObjectID = \"jc4-hf-9c1\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Ink"
+          }
+        }
+      }
+    },
+    "Jha-mh-yUf.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Save to game directory\"; ObjectID = \"Jha-mh-yUf\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Save to game directory"
+          }
+        }
+      }
+    },
+    "JI9-kV-iCg.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSMenuItem\"; ibShadowedToolTip = \"Speak the index of the line in the menu.\"; ObjectID = \"JI9-kV-iCg\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Speak the index of the line in the menu."
+          }
+        }
+      }
+    },
+    "JI9-kV-iCg.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Text and index\"; ObjectID = \"JI9-kV-iCg\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Text and index"
+          }
+        }
+      }
+    },
+    "Jl5-j7-i1B.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSTextField\"; ibShadowedToolTip = \"Some games use timers for real-time effects. Setting this to a low value may improve performance and autosave reliability in some games, but may also cause glitches.\"; ObjectID = \"Jl5-j7-i1B\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Some games use timers for real-time effects. Setting this to a low value may improve performance and autosave reliability in some games, but may also cause glitches."
+          }
+        }
+      }
+    },
+    "Jlb-Ic-bPy.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Margins\"; ObjectID = \"Jlb-Ic-bPy\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Margins"
+          }
+        }
+      }
+    },
+    "jLj-ua-c2M.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSTextField\"; ibShadowedToolTip = \"Default width in characters.\"; ObjectID = \"jLj-ua-c2M\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Default width in characters."
+          }
+        }
+      }
+    },
+    "jp0-kw-P7b.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"EGA\"; ObjectID = \"jp0-kw-P7b\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "EGA"
+          }
+        }
+      }
+    },
+    "Jrs-OK-CF6.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"On\"; ObjectID = \"Jrs-OK-CF6\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "On"
+          }
+        }
+      }
+    },
+    "jUl-fP-1Kk.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSColorWell\"; ibShadowedToolTip = \"Text color of this style.\"; ObjectID = \"jUl-fP-1Kk\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Text color of this style."
+          }
+        }
+      }
+    },
+    "JwM-hE-tZD.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"5. Atari ST\"; ObjectID = \"JwM-hE-tZD\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "5. Atari ST"
+          }
+        }
+      }
+    },
+    "Jxm-9E-Ync.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSPopUpButton\"; ibShadowedToolTip = \"Whether the settings on this line applies to the proportionally-spaced scrolling buffer windows or to monospaced grid windows.\"; ObjectID = \"Jxm-9E-Ync\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Whether the settings on this line applies to the proportionally-spaced scrolling buffer windows or to monospaced grid windows."
+          }
+        }
+      }
+    },
+    "kFW-u2-bVp.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"The room description will flicker at certain places like some original interpreters.\"; ObjectID = \"kFW-u2-bVp\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "The room description will flicker at certain places like some original interpreters."
+          }
+        }
+      }
+    },
+    "KH9-ue-JpB.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Border color:\"; ObjectID = \"KH9-ue-JpB\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Border color:"
+          }
+        }
+      }
+    },
+    "KMF-vt-Jom.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Make random functions always return the same numbers in the same order. Useful for debugging.\"; ObjectID = \"KMF-vt-Jom\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Make random functions always return the same numbers in the same order. Useful for debugging."
+          }
+        }
+      }
+    },
+    "kul-5n-eXQ.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSTextField\"; ibShadowedToolTip = \"Margin inside grid windows.\"; ObjectID = \"kul-5n-eXQ\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Margin inside grid windows."
+          }
+        }
+      }
+    },
+    "KVL-ud-zfg.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"500\"; ObjectID = \"KVL-ud-zfg\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "500"
+          }
+        }
+      }
+    },
+    "kwD-C7-CWw.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Ping\"; ObjectID = \"kwD-C7-CWw\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Ping"
+          }
+        }
+      }
+    },
+    "kXa-3P-bsd.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Fewer colors\"; ObjectID = \"kXa-3P-bsd\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Fewer colors"
+          }
+        }
+      }
+    },
+    "L7C-1N-JAu.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Dark mode override:\"; ObjectID = \"L7C-1N-JAu\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Dark mode override:"
+          }
+        }
+      }
+    },
+    "l66-NN-F50.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Settings for theme Default\"; ObjectID = \"l66-NN-F50\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Settings for theme Default"
+          }
+        }
+      }
+    },
+    "LAW-kM-ryd.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Swap ink and paper colors.\"; ObjectID = \"LAW-kM-ryd\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Swap ink and paper colors."
+          }
+        }
+      }
+    },
+    "LJ9-B6-TDh.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Animate scrolling\"; ObjectID = \"LJ9-B6-TDh\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Animate scrolling"
+          }
+        }
+      }
+    },
+    "LkK-Rn-yFJ.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Ask about images\"; ObjectID = \"LkK-Rn-yFJ\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Ask about images"
+          }
+        }
+      }
+    },
+    "lmd-19-mjS.placeholderString" : {
+      "comment" : "Class = \"NSTextFieldCell\"; placeholderString = \"0\"; ObjectID = \"lmd-19-mjS\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "0"
+          }
+        }
+      }
+    },
+    "m3f-S1-epU.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"When importing data:\"; ObjectID = \"m3f-S1-epU\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "When importing data:"
+          }
+        }
+      }
+    },
+    "mgM-r8-mmm.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Turn on and off smooth text scrolling.\"; ObjectID = \"mgM-r8-mmm\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Turn on and off smooth text scrolling."
+          }
+        }
+      }
+    },
+    "mig-vD-S0l.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Ignore errors\"; ObjectID = \"mig-vD-S0l\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Ignore errors"
+          }
+        }
+      }
+    },
+    "MmQ-qE-fmy.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"ZX Spectrum\"; ObjectID = \"MmQ-qE-fmy\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "ZX Spectrum"
+          }
+        }
+      }
+    },
+    "mN5-t3-RsP.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"24\"; ObjectID = \"mN5-t3-RsP\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "24"
+          }
+        }
+      }
+    },
+    "N5l-l3-5SU.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Enable graphics\"; ObjectID = \"N5l-l3-5SU\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Enable graphics"
+          }
+        }
+      }
+    },
+    "N52-GG-l7u.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Redirect text to main window\"; ObjectID = \"N52-GG-l7u\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Redirect text to main window"
+          }
+        }
+      }
+    },
+    "NaI-RY-1U1.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Buffer\"; ObjectID = \"NaI-RY-1U1\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Buffer"
+          }
+        }
+      }
+    },
+    "NbE-Ta-Bvm.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Delete the current theme. Any games using it will be assigned the theme it is based on.\"; ObjectID = \"NbE-Ta-Bvm\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Delete the current theme. Any games using it will be assigned the theme it is based on."
+          }
+        }
+      }
+    },
+    "Nbr-Od-Iwa.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Check the library in the background to see if all game files are still there. May affect performance if the library is large and spread across external disks or network volumes.\"; ObjectID = \"Nbr-Od-Iwa\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Check the library in the background to see if all game files are still there. May affect performance if the library is large and spread across external disks or network volumes."
+          }
+        }
+      }
+    },
+    "NhQ-ew-Hcx.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"10. Apple IIgs\"; ObjectID = \"NhQ-ew-Hcx\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "10. Apple IIgs"
+          }
+        }
+      }
+    },
+    "nVw-f0-6lI.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Changes apply to all games in library\"; ObjectID = \"nVw-f0-6lI\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Changes apply to all games in library"
+          }
+        }
+      }
+    },
+    "obr-HI-d0a.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Submarine\"; ObjectID = \"obr-HI-d0a\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Submarine"
+          }
+        }
+      }
+    },
+    "OfE-dQ-obU.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Speak menu lines:\"; ObjectID = \"OfE-dQ-obU\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Speak menu lines:"
+          }
+        }
+      }
+    },
+    "oHn-Og-t2c.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Silent\"; ObjectID = \"oHn-Og-t2c\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Silent"
+          }
+        }
+      }
+    },
+    "Oi5-6P-dD9.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"3. Macintosh\"; ObjectID = \"Oi5-6P-dD9\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "3. Macintosh"
+          }
+        }
+      }
+    },
+    "oIP-mr-bpC.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSMenuItem\"; ibShadowedToolTip = \"↑ and ↓ navigate menus and status windows.  ⌘↑ and ⌘↓ step through command history.\"; ObjectID = \"oIP-mr-bpC\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "↑ and ↓ navigate menus and status windows.  ⌘↑ and ⌘↓ step through command history."
+          }
+        }
+      }
+    },
+    "oIP-mr-bpC.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"↑ and ↓ work as in original\"; ObjectID = \"oIP-mr-bpC\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "↑ and ↓ work as in original"
+          }
+        }
+      }
+    },
+    "okU-os-Ch7.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Margin\"; ObjectID = \"okU-os-Ch7\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Margin"
+          }
+        }
+      }
+    },
+    "oSL-gf-gET.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Do not detect which game is running or change behavior to avoid its known bugs. Useful for debugging, but disables some game-specific settings and functions.\"; ObjectID = \"oSL-gf-gET\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Do not detect which game is running or change behavior to avoid its known bugs. Useful for debugging, but disables some game-specific settings and functions."
+          }
+        }
+      }
+    },
+    "osq-ka-iEx.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Blow\"; ObjectID = \"osq-ka-iEx\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Blow"
+          }
+        }
+      }
+    },
+    "ovp-vO-s5a.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Font used by the style set to the left.\"; ObjectID = \"ovp-vO-s5a\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Font used by the style set to the left."
+          }
+        }
+      }
+    },
+    "oW2-8u-Xqr.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Error handling:\"; ObjectID = \"oW2-8u-Xqr\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Error handling:"
+          }
+        }
+      }
+    },
+    "OX6-Me-WFt.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Theme setting for all games\"; ObjectID = \"OX6-Me-WFt\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Theme setting for all games"
+          }
+        }
+      }
+    },
+    "Oxw-Jg-Jsg.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"750\"; ObjectID = \"Oxw-Jg-Jsg\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "750"
+          }
+        }
+      }
+    },
+    "p1B-r9-FN7.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"4\"; ObjectID = \"p1B-r9-FN7\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "4"
+          }
+        }
+      }
+    },
+    "PBj-x3-gro.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"8\"; ObjectID = \"PBj-x3-gro\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "8"
+          }
+        }
+      }
+    },
+    "Pbn-dN-9hx.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Cover image:\"; ObjectID = \"Pbn-dN-9hx\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Cover image:"
+          }
+        }
+      }
+    },
+    "pCq-4d-Rmw.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Specific to Comprehend games\"; ObjectID = \"pCq-4d-Rmw\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Specific to Comprehend games"
+          }
+        }
+      }
+    },
+    "pEQ-Lz-dz3.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Whether to show fading alerts such as Game Over.\"; ObjectID = \"pEQ-Lz-dz3\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Whether to show fading alerts such as Game Over."
+          }
+        }
+      }
+    },
+    "PGd-Hc-M3L.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"~/Library/Application Support/Spatterlight/Library\"; ObjectID = \"PGd-Hc-M3L\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "~/Library/Application Support/Spatterlight/Library"
+          }
+        }
+      }
+    },
+    "pGd-xy-4dU.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"15\"; ObjectID = \"pGd-xy-4dU\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "15"
+          }
+        }
+      }
+    },
+    "PKR-S1-jTu.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Glass\"; ObjectID = \"PKR-S1-jTu\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Glass"
+          }
+        }
+      }
+    },
+    "pr1-vn-eiU.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"These settings apply to all themes \"; ObjectID = \"pr1-vn-eiU\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "These settings apply to all themes "
+          }
+        }
+      }
+    },
+    "PS2-v3-apX.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Hero\"; ObjectID = \"PS2-v3-apX\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Hero"
+          }
+        }
+      }
+    },
+    "pUC-Po-vac.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"4. Amiga\"; ObjectID = \"pUC-Po-vac\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "4. Amiga"
+          }
+        }
+      }
+    },
+    "q2A-r7-Oue.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSPopUpButton\"; ibShadowedToolTip = \"This sound is used in some Infocom games to announce warnings or errors.\"; ObjectID = \"q2A-r7-Oue\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "This sound is used in some Infocom games to announce warnings or errors."
+          }
+        }
+      }
+    },
+    "q9V-JA-J9c.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Remove double spaces.\"; ObjectID = \"q9V-JA-J9c\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Remove double spaces."
+          }
+        }
+      }
+    },
+    "qB8-xe-jaE.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Purr\"; ObjectID = \"qB8-xe-jaE\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Purr"
+          }
+        }
+      }
+    },
+    "qeb-aO-SGW.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Show as bezel\"; ObjectID = \"qeb-aO-SGW\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Show as bezel"
+          }
+        }
+      }
+    },
+    "Qha-Oz-Hei.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSPopUpButton\"; ibShadowedToolTip = \"Errors can be switched on for debugging purposes. Only implemented for Z-code and Glulx games.\"; ObjectID = \"Qha-Oz-Hei\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Errors can be switched on for debugging purposes. Only implemented for Z-code and Glulx games."
+          }
+        }
+      }
+    },
+    "QKR-gA-Brv.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Choose where the library folder should live. Leave as the default to keep it inside Spatterlight's own storage.\"; ObjectID = \"QKR-gA-Brv\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Choose where the library folder should live. Leave as the default to keep it inside Spatterlight's own storage."
+          }
+        }
+      }
+    },
+    "qnD-Dg-nVa.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"When on, newly imported games are copied into a central library folder, arranged by group and title. Turning this off leaves games where they are.\"; ObjectID = \"qnD-Dg-nVa\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "When on, newly imported games are copied into a central library folder, arranged by group and title. Turning this off leaves games where they are."
+          }
+        }
+      }
+    },
+    "qPb-A4-DsI.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"11. Tandy Color\"; ObjectID = \"qPb-A4-DsI\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "11. Tandy Color"
+          }
+        }
+      }
+    },
+    "QRm-I1-aoK.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Funk\"; ObjectID = \"QRm-I1-aoK\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Funk"
+          }
+        }
+      }
+    },
+    "qTs-9E-UVc.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Preferred graphics:\"; ObjectID = \"qTs-9E-UVc\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Preferred graphics:"
+          }
+        }
+      }
+    },
+    "qyg-oQ-DFE.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Font used in status bar and other grid windows.\"; ObjectID = \"qyg-oQ-DFE\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Font used in status bar and other grid windows."
+          }
+        }
+      }
+    },
+    "QZE-7T-mZB.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Upper window inventory:\"; ObjectID = \"QZE-7T-mZB\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Upper window inventory:"
+          }
+        }
+      }
+    },
+    "r0q-14-d14.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSPopUpButton\"; ibShadowedToolTip = \"VoiceOver can mention images embedded in the text, and describe those that have accessibility descriptions.\"; ObjectID = \"r0q-14-d14\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "VoiceOver can mention images embedded in the text, and describe those that have accessibility descriptions."
+          }
+        }
+      }
+    },
+    "r1L-CL-umy.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"When this is off, some error messages will be printed to a separate error window.\"; ObjectID = \"r1L-CL-umy\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "When this is off, some error messages will be printed to a separate error window."
+          }
+        }
+      }
+    },
+    "rCd-rg-3Mx.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Clear overrides:\"; ObjectID = \"rCd-rg-3Mx\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Clear overrides:"
+          }
+        }
+      }
+    },
+    "Rdc-9n-6zG.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSMenuItem\"; ibShadowedToolTip = \"Speak the index of the menu line and the total number of lines.\"; ObjectID = \"Rdc-9n-6zG\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Speak the index of the menu line and the total number of lines."
+          }
+        }
+      }
+    },
+    "Rdc-9n-6zG.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Text, index, and total\"; ObjectID = \"Rdc-9n-6zG\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Text, index, and total"
+          }
+        }
+      }
+    },
+    "RnM-Qw-IeP.alternateTitle" : {
+      "comment" : "Class = \"NSButtonCell\"; alternateTitle = \"Set Input Font\"; ObjectID = \"RnM-Qw-IeP\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Set Input Font"
+          }
+        }
+      }
+    },
+    "RnM-Qw-IeP.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Times Bold 12.0\"; ObjectID = \"RnM-Qw-IeP\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Times Bold 12.0"
+          }
+        }
+      }
+    },
+    "RS0-mI-tLG.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Keep games organised\"; ObjectID = \"RS0-mI-tLG\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Keep games organised"
+          }
+        }
+      }
+    },
+    "RYT-TV-kfB.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Default window width:\"; ObjectID = \"RYT-TV-kfB\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Default window width:"
+          }
+        }
+      }
+    },
+    "rZq-5a-a7o.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Morse\"; ObjectID = \"rZq-5a-a7o\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Morse"
+          }
+        }
+      }
+    },
+    "Sc1-La-cel.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Scrollback limit:\"; ObjectID = \"Sc1-La-cel\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Scrollback limit:"
+          }
+        }
+      }
+    },
+    "Sc2-Tf-cel.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"30 000\"; ObjectID = \"Sc2-Tf-cel\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "30 000"
+          }
+        }
+      }
+    },
+    "Sc2-Tf-ie2.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSTextField\"; ibShadowedToolTip = \"Maximum number of characters kept in each scrolling text window before the oldest text is trimmed. Set per theme. Set to 0 for unlimited scrollback (no trimming).\"; ObjectID = \"Sc2-Tf-ie2\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Maximum number of characters kept in each scrolling text window before the oldest text is trimmed. Set per theme. Set to 0 for unlimited scrollback (no trimming)."
+          }
+        }
+      }
+    },
+    "Sc3-St-ep3.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSStepper\"; ibShadowedToolTip = \"Step down to 0 for unlimited scrollback (no trimming).\"; ObjectID = \"Sc3-St-ep3\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Step down to 0 for unlimited scrollback (no trimming)."
+          }
+        }
+      }
+    },
+    "Sc4-La-cel.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"characters\"; ObjectID = \"Sc4-La-cel\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "characters"
+          }
+        }
+      }
+    },
+    "sH0-Tu-r5O.placeholderString" : {
+      "comment" : "Class = \"NSTextFieldCell\"; placeholderString = \"0\"; ObjectID = \"sH0-Tu-r5O\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "0"
+          }
+        }
+      }
+    },
+    "sVS-tm-rPD.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Turn this off to set your own border color.\"; ObjectID = \"sVS-tm-rPD\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Turn this off to set your own border color."
+          }
+        }
+      }
+    },
+    "sYd-Yt-slv.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Commodore 64\"; ObjectID = \"sYd-Yt-slv\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Commodore 64"
+          }
+        }
+      }
+    },
+    "SZ2-3Q-arA.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Sosumi\"; ObjectID = \"SZ2-3Q-arA\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Sosumi"
+          }
+        }
+      }
+    },
+    "T1t-GG-6QD.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Turning this off may improve performance and autosave reliability in games with high timer frequency, but can cause glitches like stuck sounds.\"; ObjectID = \"T1t-GG-6QD\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Turning this off may improve performance and autosave reliability in games with high timer frequency, but can cause glitches like stuck sounds."
+          }
+        }
+      }
+    },
+    "TeO-g4-ts0.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Settings for theme Default\"; ObjectID = \"TeO-g4-ts0\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Settings for theme Default"
+          }
+        }
+      }
+    },
+    "TEv-pj-l2l.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Specific to Z-machine games\"; ObjectID = \"TEv-pj-l2l\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Specific to Z-machine games"
+          }
+        }
+      }
+    },
+    "tjH-43-p1e.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSTextField\"; ibShadowedToolTip = \"Default height in lines.\"; ObjectID = \"tjH-43-p1e\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Default height in lines."
+          }
+        }
+      }
+    },
+    "Twh-3N-orY.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Convert straight quotes to curly in output text.\"; ObjectID = \"Twh-3N-orY\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Convert straight quotes to curly in output text."
+          }
+        }
+      }
+    },
+    "U5T-ED-N6P.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Vertical\"; ObjectID = \"U5T-ED-N6P\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Vertical"
+          }
+        }
+      }
+    },
+    "U8u-8w-Vs5.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Dialog warnings:\"; ObjectID = \"U8u-8w-Vs5\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Dialog warnings:"
+          }
+        }
+      }
+    },
+    "UGW-UT-Fhm.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"seconds\"; ObjectID = \"UGW-UT-Fhm\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "seconds"
+          }
+        }
+      }
+    },
+    "uhj-Tu-tfI.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"User 2\"; ObjectID = \"uhj-Tu-tfI\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "User 2"
+          }
+        }
+      }
+    },
+    "uka-0i-ita.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Buffer\"; ObjectID = \"uka-0i-ita\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Buffer"
+          }
+        }
+      }
+    },
+    "uLU-6T-Z1Y.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Don't replace images\"; ObjectID = \"uLU-6T-Z1Y\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Don't replace images"
+          }
+        }
+      }
+    },
+    "UqG-mC-PqY.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Allow games to override your style settings.\"; ObjectID = \"UqG-mC-PqY\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Allow games to override your style settings."
+          }
+        }
+      }
+    },
+    "UsB-aG-Hnm.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSMenuItem\"; ibShadowedToolTip = \"Don't mention images at all.\"; ObjectID = \"UsB-aG-Hnm\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Don't mention images at all."
+          }
+        }
+      }
+    },
+    "UsB-aG-Hnm.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"None\"; ObjectID = \"UsB-aG-Hnm\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "None"
+          }
+        }
+      }
+    },
+    "uwM-Lf-NrX.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Preferred graphics:\"; ObjectID = \"uwM-Lf-NrX\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Preferred graphics:"
+          }
+        }
+      }
+    },
+    "UWX-2G-zRw.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"2. Apple IIe\"; ObjectID = \"UWX-2G-zRw\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "2. Apple IIe"
+          }
+        }
+      }
+    },
+    "uXF-Wm-yEH.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Check for missing games every\"; ObjectID = \"uXF-Wm-yEH\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Check for missing games every"
+          }
+        }
+      }
+    },
+    "V3j-WI-FuK.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Quit on errors\"; ObjectID = \"V3j-WI-FuK\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Quit on errors"
+          }
+        }
+      }
+    },
+    "V4c-7r-qmI.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Create a new theme based on the current theme and assign it to the current game, if there is one, or to all games, if \\\"Changes apply to all…\\\" is checked.\"; ObjectID = \"V4c-7r-qmI\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Create a new theme based on the current theme and assign it to the current game, if there is one, or to all games, if \"Changes apply to all…\" is checked."
+          }
+        }
+      }
+    },
+    "V8Y-71-Gfs.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Max\"; ObjectID = \"V8Y-71-Gfs\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Max"
+          }
+        }
+      }
+    },
+    "VBI-Lr-YZa.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"15\"; ObjectID = \"VBI-Lr-YZa\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "15"
+          }
+        }
+      }
+    },
+    "Vgi-vE-t9F.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSMenuItem\"; ibShadowedToolTip = \"↑ and ↓ navigate menus and status windows.  ⌘↑ and ⌘↓ step through command history. ← and → don't do anything.\"; ObjectID = \"Vgi-vE-t9F\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "↑ and ↓ navigate menus and status windows.  ⌘↑ and ⌘↓ step through command history. ← and → don't do anything."
+          }
+        }
+      }
+    },
+    "Vgi-vE-t9F.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"↑↓ and ←→ as in original\"; ObjectID = \"Vgi-vE-t9F\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "↑↓ and ←→ as in original"
+          }
+        }
+      }
+    },
+    "vke-lQ-eza.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Sosumi\"; ObjectID = \"vke-lQ-eza\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Sosumi"
+          }
+        }
+      }
+    },
+    "VrB-gs-vFa.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Graphic font vertical stretch:\"; ObjectID = \"VrB-gs-vFa\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Graphic font vertical stretch:"
+          }
+        }
+      }
+    },
+    "vrL-ME-hbi.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSPopUpButton\"; ibShadowedToolTip = \"Whether to replace any existing cover images when downloading new metadata.\"; ObjectID = \"vrL-ME-hbi\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Whether to replace any existing cover images when downloading new metadata."
+          }
+        }
+      }
+    },
+    "w8g-Dy-PDd.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"200\"; ObjectID = \"w8g-Dy-PDd\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "200"
+          }
+        }
+      }
+    },
+    "WgP-tf-pQY.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Tink\"; ObjectID = \"WgP-tf-pQY\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Tink"
+          }
+        }
+      }
+    },
+    "wiU-oz-0CK.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Subheader\"; ObjectID = \"wiU-oz-0CK\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Subheader"
+          }
+        }
+      }
+    },
+    "wKL-gP-zkE.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Automatic\"; ObjectID = \"wKL-gP-zkE\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Automatic"
+          }
+        }
+      }
+    },
+    "wL9-Yt-fZm.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"More colors\"; ObjectID = \"wL9-Yt-fZm\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "More colors"
+          }
+        }
+      }
+    },
+    "Wn0-9F-1j4.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Show library window automatically\"; ObjectID = \"Wn0-9F-1j4\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Show library window automatically"
+          }
+        }
+      }
+    },
+    "wnQ-WB-I4l.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Hero\"; ObjectID = \"wnQ-WB-I4l\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Hero"
+          }
+        }
+      }
+    },
+    "wPT-dg-hjZ.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Window border size:\"; ObjectID = \"wPT-dg-hjZ\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Window border size:"
+          }
+        }
+      }
+    },
+    "WTM-jr-6NO.placeholderString" : {
+      "comment" : "Class = \"NSTextFieldCell\"; placeholderString = \"30\"; ObjectID = \"WTM-jr-6NO\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "30"
+          }
+        }
+      }
+    },
+    "Wye-ED-rI1.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Delete All User Themes\"; ObjectID = \"Wye-ED-rI1\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Delete All User Themes"
+          }
+        }
+      }
+    },
+    "X1d-wB-x3J.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"24\"; ObjectID = \"X1d-wB-x3J\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "24"
+          }
+        }
+      }
+    },
+    "X1l-fq-rvt.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Open save dialogs initially in the same location as the game file. When this is off, save dialogs default to the Documents folder.\"; ObjectID = \"X1l-fq-rvt\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Open save dialogs initially in the same location as the game file. When this is off, save dialogs default to the Documents folder."
+          }
+        }
+      }
+    },
+    "xeV-t7-YSa.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Overwrite all custom styles with autogenerated ones based on the Normal style. Does not affect the grid or buffer Normal styles.\"; ObjectID = \"xeV-t7-YSa\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Overwrite all custom styles with autogenerated ones based on the Normal style. Does not affect the grid or buffer Normal styles."
+          }
+        }
+      }
+    },
+    "xFN-x6-cZa.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Height:\"; ObjectID = \"xFN-x6-cZa\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Height:"
+          }
+        }
+      }
+    },
+    "xGf-ml-Mg5.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Font used in the main scroll view and other text buffer windows.\"; ObjectID = \"xGf-ml-Mg5\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Font used in the main scroll view and other text buffer windows."
+          }
+        }
+      }
+    },
+    "xjd-Qt-fD8.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Emphasized\"; ObjectID = \"xjd-Qt-fD8\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Emphasized"
+          }
+        }
+      }
+    },
+    "Xn5-Jd-cfb.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Clear Light/Dark overrides\"; ObjectID = \"Xn5-Jd-cfb\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Clear Light/Dark overrides"
+          }
+        }
+      }
+    },
+    "XqL-Ta-baA.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Don't show\"; ObjectID = \"XqL-Ta-baA\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Don't show"
+          }
+        }
+      }
+    },
+    "y1b-tO-MEY.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Glk style hints:\"; ObjectID = \"y1b-tO-MEY\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Glk style hints:"
+          }
+        }
+      }
+    },
+    "Y6e-Ph-Nbw.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Basso\"; ObjectID = \"Y6e-Ph-Nbw\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Basso"
+          }
+        }
+      }
+    },
+    "yLG-H9-M4i.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"1\"; ObjectID = \"yLG-H9-M4i\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "1"
+          }
+        }
+      }
+    },
+    "YlM-je-Ts8.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSPopUpButton\"; ibShadowedToolTip = \"Which style the settings to the right apply to. Most text will likely use Normal.\"; ObjectID = \"YlM-je-Ts8\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Which style the settings to the right apply to. Most text will likely use Normal."
+          }
+        }
+      }
+    },
+    "YSn-hK-Iig.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Always replace images\"; ObjectID = \"YSn-hK-Iig\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Always replace images"
+          }
+        }
+      }
+    },
+    "YtP-Ck-tIs.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Autosave and autorestore\"; ObjectID = \"YtP-Ck-tIs\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Autosave and autorestore"
+          }
+        }
+      }
+    },
+    "Yz6-b8-Qh7.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Light mode override:\"; ObjectID = \"Yz6-b8-Qh7\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Light mode override:"
+          }
+        }
+      }
+    },
+    "zGf-Ud-SAQ.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Settings for theme Default\"; ObjectID = \"zGf-Ud-SAQ\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Settings for theme Default"
+          }
+        }
+      }
+    },
+    "zGt-lq-6r6.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Disable game-specific hacks\"; ObjectID = \"zGt-lq-6r6\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Disable game-specific hacks"
+          }
+        }
+      }
+    },
+    "ZgZ-KI-sE8.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSPopUpButton\"; ibShadowedToolTip = \"This sound is used in some Infocom games when the score goes up.\"; ObjectID = \"ZgZ-KI-sE8\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "This sound is used in some Infocom games when the score goes up."
+          }
+        }
+      }
+    },
+    "Zi8-OE-eTE.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"When the OS is in Dark Mode, all games will switch to this mode. This will override all other theme settings.\"; ObjectID = \"Zi8-OE-eTE\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "When the OS is in Dark Mode, all games will switch to this mode. This will override all other theme settings."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.3"
+}

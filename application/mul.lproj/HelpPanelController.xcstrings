@@ -1,0 +1,30 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "33.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Copy to Clipboard\"; ObjectID = \"33\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Copy to Clipboard"
+          }
+        }
+      }
+    },
+    "38.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Understood\"; ObjectID = \"38\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Understood"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.3"
+}

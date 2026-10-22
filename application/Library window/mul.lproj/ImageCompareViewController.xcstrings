@@ -1,0 +1,42 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "iCS-Lz-Arq.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"with this?\"; ObjectID = \"iCS-Lz-Arq\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "with this?"
+          }
+        }
+      }
+    },
+    "mFI-TC-7hZ.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Always use this choice.\"; ObjectID = \"mFI-TC-7hZ\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Always use this choice."
+          }
+        }
+      }
+    },
+    "SN0-0h-wri.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Replace this cover image\"; ObjectID = \"SN0-0h-wri\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Replace this cover image"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.3"
+}

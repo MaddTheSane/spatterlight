@@ -63,6 +63,12 @@
 		55368B77272BF24700740A0A /* questionfile.cc in Sources */ = {isa = PBXBuildFile; fileRef = 55368B6B272BF24700740A0A /* questionfile.cc */; };
 		55368B78272BF24700740A0A /* question-runner.cc in Sources */ = {isa = PBXBuildFile; fileRef = 55368B70272BF24700740A0A /* question-runner.cc */; };
 		55368B79272BF27D00740A0A /* question in Copy Interpreter Files */ = {isa = PBXBuildFile; fileRef = 55368B5B272BF1C500740A0A /* question */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		55754FA1308AAB1E003AA520 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 55754FA0308AAB1E003AA520 /* MainMenu.xib */; };
+		55754FA5308AAB28003AA520 /* PrefsWindow.xib in Resources */ = {isa = PBXBuildFile; fileRef = 55754FA4308AAB28003AA520 /* PrefsWindow.xib */; };
+		55754FA9308AAB37003AA520 /* ParagraphPopOver.xib in Resources */ = {isa = PBXBuildFile; fileRef = 55754FA8308AAB37003AA520 /* ParagraphPopOver.xib */; };
+		55754FAD308AAB49003AA520 /* SplitView.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 55754FAC308AAB49003AA520 /* SplitView.storyboard */; };
+		55754FB1308AAB81003AA520 /* HelpPanelController.xib in Resources */ = {isa = PBXBuildFile; fileRef = 55754FB0308AAB81003AA520 /* HelpPanelController.xib */; };
+		55754FB5308AABA4003AA520 /* ImageCompareViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = 55754FB4308AABA4003AA520 /* ImageCompareViewController.xib */; };
 		559BE460270F7BD800B93F2C /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6D79B0D9223262CA008C9CB7 /* Cocoa.framework */; };
 		55A01EDD2B189325003D7C18 /* BlorbResource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55A01EDC2B189325003D7C18 /* BlorbResource.swift */; };
 		55A01EE02B1898E9003D7C18 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6D79B0DE223262CA008C9CB7 /* Foundation.framework */; };
@@ -153,7 +159,6 @@
 		6D79CFD9222AA71100363B08 /* TempWindow.m in Sources */ = {isa = PBXBuildFile; fileRef = 6D79CFD6222AA71100363B08 /* TempWindow.m */; };
 		6D79CFE6222D408700363B08 /* TempSChannel.m in Sources */ = {isa = PBXBuildFile; fileRef = 6D79CFE4222D408700363B08 /* TempSChannel.m */; };
 		6D85C897218BD6E10088D849 /* HelpPanelController.m in Sources */ = {isa = PBXBuildFile; fileRef = 6D85C895218BD6E00088D849 /* HelpPanelController.m */; };
-		6D85C898218BD6E10088D849 /* HelpPanelController.xib in Resources */ = {isa = PBXBuildFile; fileRef = 6D85C896218BD6E00088D849 /* HelpPanelController.xib */; };
 		6D85C899218BE4AC0088D849 /* Glulxe License.rtf in Copy Documentation Files */ = {isa = PBXBuildFile; fileRef = 6D70DA7E218B3EFC0022E13B /* Glulxe License.rtf */; };
 		6DB6B51A219E31BF0039D2D7 /* fileref.m in Sources */ = {isa = PBXBuildFile; fileRef = 6DB6B519219E31BF0039D2D7 /* fileref.m */; };
 		6DB774C02458B9B300EDC671 /* blorb.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6DB774AB2458B9B300EDC671 /* blorb.cpp */; };
@@ -319,8 +324,6 @@
 		961CCEF509F23A0000528FF9 /* GlkTextBufferWindow.m in Sources */ = {isa = PBXBuildFile; fileRef = 961CCEE609F239E700528FF9 /* GlkTextBufferWindow.m */; };
 		961CCEF609F23A0000528FF9 /* GlkTextGridWindow.m in Sources */ = {isa = PBXBuildFile; fileRef = 961CCEE809F239E700528FF9 /* GlkTextGridWindow.m */; };
 		961CCEF709F23A0000528FF9 /* GlkWindow.m in Sources */ = {isa = PBXBuildFile; fileRef = 961CCEEA09F239E700528FF9 /* GlkWindow.m */; };
-		961CCF3D09F2946700528FF9 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 961CCF2C09F2940F00528FF9 /* MainMenu.xib */; };
-		961CCF3E09F2946700528FF9 /* PrefsWindow.xib in Resources */ = {isa = PBXBuildFile; fileRef = 961CCF2D09F2940F00528FF9 /* PrefsWindow.xib */; };
 		961CCF4009F2946F00528FF9 /* Credits.rtf in Resources */ = {isa = PBXBuildFile; fileRef = 961CCF2309F2940F00528FF9 /* Credits.rtf */; };
 		961CCF4509F2947700528FF9 /* GNU Public License.rtf in Copy Documentation Files */ = {isa = PBXBuildFile; fileRef = 961CCF2909F2940F00528FF9 /* GNU Public License.rtf */; };
 		961CCF4609F2947700528FF9 /* Hugo License.rtf in Copy Documentation Files */ = {isa = PBXBuildFile; fileRef = 961CCF2A09F2940F00528FF9 /* Hugo License.rtf */; };
@@ -880,14 +883,11 @@
 		C384A68B2C6EB64E0081FC50 /* libz.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = C384A68A2C6EB64E0081FC50 /* libz.tbd */; };
 		C384A68E2C6F480C0081FC50 /* JourneyMenuHandler.m in Sources */ = {isa = PBXBuildFile; fileRef = C384A68D2C6F480C0081FC50 /* JourneyMenuHandler.m */; };
 		C3853E5F29676561002D4A27 /* SplitViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = C3853E5E29676561002D4A27 /* SplitViewController.m */; };
-		C3853E7129679175002D4A27 /* SplitView.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = C3853E7029679175002D4A27 /* SplitView.storyboard */; };
 		C385B8B62757DFF700FE9AB3 /* vmuni_cs.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C385B8B52757DFF700FE9AB3 /* vmuni_cs.cpp */; };
 		C386D530263F55930066BF5B /* ParagraphPopOver.m in Sources */ = {isa = PBXBuildFile; fileRef = C386D52E263F55920066BF5B /* ParagraphPopOver.m */; };
-		C38784F626582AE200B4D886 /* ImageCompareViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = C38784F426582AE200B4D886 /* ImageCompareViewController.xib */; };
 		C38784F826582BE300B4D886 /* ImageCompareViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = C38784F326582AE200B4D886 /* ImageCompareViewController.m */; };
 		C38938ED2F84FC02007A6D48 /* TerpEtude command script.txt in Resources */ = {isa = PBXBuildFile; fileRef = C321419E26CECD9000B49504 /* TerpEtude command script.txt */; };
 		C38A881327D2092500AE917E /* ringbuffer.c in Sources */ = {isa = PBXBuildFile; fileRef = C38A881227D2092500AE917E /* ringbuffer.c */; };
-		C38BE433263AEAA60091B17A /* ParagraphPopOver.xib in Resources */ = {isa = PBXBuildFile; fileRef = C38BE432263AEAA60091B17A /* ParagraphPopOver.xib */; };
 		C38D6ECE27CFCC5400328B12 /* line_drawing.c in Sources */ = {isa = PBXBuildFile; fileRef = C38D6ECD27CFCC5400328B12 /* line_drawing.c */; };
 		C38E7BAF171D86446D535171 /* GlkTextGridWindow+Styles.m in Sources */ = {isa = PBXBuildFile; fileRef = C30FF7157B3B7105366EB15E /* GlkTextGridWindow+Styles.m */; };
 		C39147442974C41D00692B9E /* SideViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = C39147432974C41D00692B9E /* SideViewController.m */; };
@@ -1980,6 +1980,18 @@
 		55368B6F272BF24700740A0A /* reserved_words.hh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = reserved_words.hh; sourceTree = "<group>"; };
 		55368B70272BF24700740A0A /* question-runner.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "question-runner.cc"; sourceTree = "<group>"; };
 		5543540277974C1585C839AB /* os_glk_status.cpp */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.cpp.cpp; path = os_glk_status.cpp; sourceTree = "<group>"; };
+		55754F9F308AAB1E003AA520 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/MainMenu.xib; sourceTree = "<group>"; };
+		55754FA2308AAB1E003AA520 /* mul */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; name = mul; path = mul.lproj/MainMenu.xcstrings; sourceTree = "<group>"; };
+		55754FA3308AAB28003AA520 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/PrefsWindow.xib; sourceTree = "<group>"; };
+		55754FA6308AAB28003AA520 /* mul */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; name = mul; path = mul.lproj/PrefsWindow.xcstrings; sourceTree = "<group>"; };
+		55754FA7308AAB37003AA520 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/ParagraphPopOver.xib; sourceTree = "<group>"; };
+		55754FAA308AAB37003AA520 /* mul */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; name = mul; path = mul.lproj/ParagraphPopOver.xcstrings; sourceTree = "<group>"; };
+		55754FAB308AAB49003AA520 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/SplitView.storyboard; sourceTree = "<group>"; };
+		55754FAE308AAB49003AA520 /* mul */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; name = mul; path = mul.lproj/SplitView.xcstrings; sourceTree = "<group>"; };
+		55754FAF308AAB81003AA520 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/HelpPanelController.xib; sourceTree = "<group>"; };
+		55754FB2308AAB81003AA520 /* mul */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; name = mul; path = mul.lproj/HelpPanelController.xcstrings; sourceTree = "<group>"; };
+		55754FB3308AABA4003AA520 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/ImageCompareViewController.xib; sourceTree = "<group>"; };
+		55754FB6308AABA4003AA520 /* mul */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; name = mul; path = mul.lproj/ImageCompareViewController.xcstrings; sourceTree = "<group>"; };
 		55A01EDA2B188142003D7C18 /* md5.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = md5.h; sourceTree = "<group>"; };
 		55A01EDB2B188178003D7C18 /* sha2.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = sha2.h; sourceTree = "<group>"; };
 		55A01EDC2B189325003D7C18 /* BlorbResource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlorbResource.swift; sourceTree = "<group>"; };
@@ -2110,7 +2122,6 @@
 		6D79CFE4222D408700363B08 /* TempSChannel.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TempSChannel.m; sourceTree = "<group>"; };
 		6D85C894218BD6E00088D849 /* HelpPanelController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = HelpPanelController.h; sourceTree = "<group>"; };
 		6D85C895218BD6E00088D849 /* HelpPanelController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = HelpPanelController.m; sourceTree = "<group>"; };
-		6D85C896218BD6E00088D849 /* HelpPanelController.xib */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.xib; name = HelpPanelController.xib; path = ../application/HelpPanelController.xib; sourceTree = "<group>"; };
 		6DB6B519219E31BF0039D2D7 /* fileref.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = fileref.m; sourceTree = "<group>"; };
 		6DB6B51B219E38870039D2D7 /* fileref.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = fileref.h; sourceTree = "<group>"; };
 		6DB774A22458B95E00EDC671 /* bocfel */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = bocfel; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -2608,8 +2619,6 @@
 		961CCF2509F2940F00528FF9 /* IconGame.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = IconGame.icns; sourceTree = "<group>"; };
 		961CCF2909F2940F00528FF9 /* GNU Public License.rtf */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.rtf; path = "GNU Public License.rtf"; sourceTree = "<group>"; };
 		961CCF2A09F2940F00528FF9 /* Hugo License.rtf */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.rtf; path = "Hugo License.rtf"; sourceTree = "<group>"; };
-		961CCF2C09F2940F00528FF9 /* MainMenu.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = MainMenu.xib; sourceTree = "<group>"; };
-		961CCF2D09F2940F00528FF9 /* PrefsWindow.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = PrefsWindow.xib; sourceTree = "<group>"; };
 		961DC9360A108DE10044A0D4 /* quill.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = quill.c; sourceTree = "<group>"; };
 		961DC9630A1093C90044A0D4 /* babel_rev7.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = babel_rev7.txt; sourceTree = "<group>"; };
 		96264AC30A494A5D0093569C /* cgunicod.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = cgunicod.c; sourceTree = "<group>"; };
@@ -3663,14 +3672,12 @@
 		C384A68D2C6F480C0081FC50 /* JourneyMenuHandler.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = JourneyMenuHandler.m; sourceTree = "<group>"; };
 		C3853E5D29676561002D4A27 /* SplitViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SplitViewController.h; sourceTree = "<group>"; };
 		C3853E5E29676561002D4A27 /* SplitViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SplitViewController.m; sourceTree = "<group>"; };
-		C3853E7029679175002D4A27 /* SplitView.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = SplitView.storyboard; sourceTree = "<group>"; };
 		C385B8B32757C35000FE9AB3 /* osstzprs.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = osstzprs.h; sourceTree = "<group>"; };
 		C385B8B52757DFF700FE9AB3 /* vmuni_cs.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = vmuni_cs.cpp; path = glk/vmuni_cs.cpp; sourceTree = "<group>"; };
 		C386D52E263F55920066BF5B /* ParagraphPopOver.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ParagraphPopOver.m; sourceTree = "<group>"; };
 		C386D52F263F55930066BF5B /* ParagraphPopOver.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ParagraphPopOver.h; sourceTree = "<group>"; };
 		C38784F226582AE200B4D886 /* ImageCompareViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ImageCompareViewController.h; sourceTree = "<group>"; };
 		C38784F326582AE200B4D886 /* ImageCompareViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ImageCompareViewController.m; sourceTree = "<group>"; };
-		C38784F426582AE200B4D886 /* ImageCompareViewController.xib */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.xib; path = ImageCompareViewController.xib; sourceTree = "<group>"; };
 		C3893A092F857FC1007A6D48 /* glkautosave.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = glkautosave.h; sourceTree = "<group>"; };
 		C38974EF275336DA00876AF1 /* nodoc.htm */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = nodoc.htm; sourceTree = "<group>"; };
 		C38974F0275336DA00876AF1 /* t3changes.htm */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = t3changes.htm; sourceTree = "<group>"; };
@@ -3682,7 +3689,6 @@
 		C38974F6275336DB00876AF1 /* index.htm */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = index.htm; sourceTree = "<group>"; };
 		C38A881127D2092500AE917E /* ringbuffer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ringbuffer.h; sourceTree = "<group>"; };
 		C38A881227D2092500AE917E /* ringbuffer.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ringbuffer.c; sourceTree = "<group>"; };
-		C38BE432263AEAA60091B17A /* ParagraphPopOver.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = ParagraphPopOver.xib; sourceTree = "<group>"; };
 		C38C226025CC7EB3004C4D68 /* QuickLook.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuickLook.framework; path = System/Library/Frameworks/QuickLook.framework; sourceTree = SDKROOT; };
 		C38D6ECD27CFCC5400328B12 /* line_drawing.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = line_drawing.c; sourceTree = "<group>"; };
 		C390F30D2FBA9497000F14D3 /* player.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = player.h; sourceTree = "<group>"; };
@@ -5289,13 +5295,13 @@
 				966EFA7709F635D400FA7F19 /* Defaults.plist */,
 				961CCF2409F2940F00528FF9 /* IconApp.icns */,
 				961CCF2509F2940F00528FF9 /* IconGame.icns */,
-				961CCF2C09F2940F00528FF9 /* MainMenu.xib */,
-				961CCF2D09F2940F00528FF9 /* PrefsWindow.xib */,
-				C38BE432263AEAA60091B17A /* ParagraphPopOver.xib */,
+				55754FA0308AAB1E003AA520 /* MainMenu.xib */,
+				55754FA4308AAB28003AA520 /* PrefsWindow.xib */,
+				55754FA8308AAB37003AA520 /* ParagraphPopOver.xib */,
 				96A9BBA30A0668EB001B5B9B /* GameWindow.xib */,
-				C3853E7029679175002D4A27 /* SplitView.storyboard */,
+				55754FAC308AAB49003AA520 /* SplitView.storyboard */,
 				96FBD8EF0A094E2F002F6087 /* InfoPanel.xib */,
-				6D85C896218BD6E00088D849 /* HelpPanelController.xib */,
+				55754FB0308AAB81003AA520 /* HelpPanelController.xib */,
 				C3F709152756127B00CAD227 /* DownloadButton.xib */,
 				6DCDF488244CD97100EB5D3B /* Spatterlight.xcdatamodeld */,
 				55A059363089612400A6EC07 /* Localizable.xcstrings */,
@@ -6788,7 +6794,7 @@
 				C338CF492F71BE1000BCBD18 /* GameLauncher.m */,
 				C38784F226582AE200B4D886 /* ImageCompareViewController.h */,
 				C38784F326582AE200B4D886 /* ImageCompareViewController.m */,
-				C38784F426582AE200B4D886 /* ImageCompareViewController.xib */,
+				55754FB4308AABA4003AA520 /* ImageCompareViewController.xib */,
 				C3F9D88A2675FCF70076EAFB /* ImageSimilarity.h */,
 				C3F9D8892675FCF70076EAFB /* ImageSimilarity.m */,
 				C36B3896271F718300756D94 /* ImageView.h */,
@@ -8556,18 +8562,18 @@
 				96A80EFD09F5821400CC75F4 /* InfoPlist.strings in Resources */,
 				C301D30D25D35E9300DC4A2B /* Media.xcassets in Resources */,
 				966EFA7809F635D400FA7F19 /* Defaults.plist in Resources */,
-				C3853E7129679175002D4A27 /* SplitView.storyboard in Resources */,
-				C38BE433263AEAA60091B17A /* ParagraphPopOver.xib in Resources */,
-				C38784F626582AE200B4D886 /* ImageCompareViewController.xib in Resources */,
-				961CCF3D09F2946700528FF9 /* MainMenu.xib in Resources */,
-				961CCF3E09F2946700528FF9 /* PrefsWindow.xib in Resources */,
+				55754FAD308AAB49003AA520 /* SplitView.storyboard in Resources */,
+				55754FA9308AAB37003AA520 /* ParagraphPopOver.xib in Resources */,
+				55754FB5308AABA4003AA520 /* ImageCompareViewController.xib in Resources */,
+				55754FA1308AAB1E003AA520 /* MainMenu.xib in Resources */,
+				55754FA5308AAB28003AA520 /* PrefsWindow.xib in Resources */,
 				96A9BBA40A0668EB001B5B9B /* GameWindow.xib in Resources */,
 				96FBD8F00A094E30002F6087 /* InfoPanel.xib in Resources */,
 				6D5494441EAC1BC4003DA5C4 /* LICENSE in Resources */,
 				55A059373089612400A6EC07 /* Localizable.xcstrings in Resources */,
 				C3F709162756127B00CAD227 /* DownloadButton.xib in Resources */,
 				6D54944C1EAC1BC4003DA5C4 /* README.md in Resources */,
-				6D85C898218BD6E10088D849 /* HelpPanelController.xib in Resources */,
+				55754FB1308AAB81003AA520 /* HelpPanelController.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -10325,6 +10331,61 @@
 /* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
+		55754FA0308AAB1E003AA520 /* MainMenu.xib */ = {
+			isa = PBXVariantGroup;
+			children = (
+				55754F9F308AAB1E003AA520 /* Base */,
+				55754FA2308AAB1E003AA520 /* mul */,
+			);
+			name = MainMenu.xib;
+			sourceTree = "<group>";
+		};
+		55754FA4308AAB28003AA520 /* PrefsWindow.xib */ = {
+			isa = PBXVariantGroup;
+			children = (
+				55754FA3308AAB28003AA520 /* Base */,
+				55754FA6308AAB28003AA520 /* mul */,
+			);
+			name = PrefsWindow.xib;
+			sourceTree = "<group>";
+		};
+		55754FA8308AAB37003AA520 /* ParagraphPopOver.xib */ = {
+			isa = PBXVariantGroup;
+			children = (
+				55754FA7308AAB37003AA520 /* Base */,
+				55754FAA308AAB37003AA520 /* mul */,
+			);
+			name = ParagraphPopOver.xib;
+			sourceTree = "<group>";
+		};
+		55754FAC308AAB49003AA520 /* SplitView.storyboard */ = {
+			isa = PBXVariantGroup;
+			children = (
+				55754FAB308AAB49003AA520 /* Base */,
+				55754FAE308AAB49003AA520 /* mul */,
+			);
+			name = SplitView.storyboard;
+			sourceTree = "<group>";
+		};
+		55754FB0308AAB81003AA520 /* HelpPanelController.xib */ = {
+			isa = PBXVariantGroup;
+			children = (
+				55754FAF308AAB81003AA520 /* Base */,
+				55754FB2308AAB81003AA520 /* mul */,
+			);
+			name = HelpPanelController.xib;
+			path = ../application;
+			sourceTree = "<group>";
+		};
+		55754FB4308AABA4003AA520 /* ImageCompareViewController.xib */ = {
+			isa = PBXVariantGroup;
+			children = (
+				55754FB3308AABA4003AA520 /* Base */,
+				55754FB6308AABA4003AA520 /* mul */,
+			);
+			name = ImageCompareViewController.xib;
+			sourceTree = "<group>";
+		};
 		C311DEFC25C472E500484639 /* PreviewViewController.xib */ = {
 			isa = PBXVariantGroup;
 			children = (

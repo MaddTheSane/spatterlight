@@ -1,0 +1,846 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "0Zs-cO-SSI.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSMenuItem\"; ibShadowedToolTip = \"Entries for the games in the library.\"; ObjectID = \"0Zs-cO-SSI\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Entries for the games in the library."
+          }
+        }
+      }
+    },
+    "0Zs-cO-SSI.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Games in Library\"; ObjectID = \"0Zs-cO-SSI\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Games in Library"
+          }
+        }
+      }
+    },
+    "1Nd-PE-yGy.headerCell.title" : {
+      "comment" : "Class = \"NSTableColumn\"; headerCell.title = \"Genre\"; ObjectID = \"1Nd-PE-yGy\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Genre"
+          }
+        }
+      }
+    },
+    "2nx-gE-KMp.headerCell.title" : {
+      "comment" : "Class = \"NSTableColumn\"; headerCell.title = \"Ifdb rating\"; ObjectID = \"2nx-gE-KMp\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Ifdb rating"
+          }
+        }
+      }
+    },
+    "2WF-Vt-GB0.headerCell.title" : {
+      "comment" : "Class = \"NSTableColumn\"; headerCell.title = \"Last modified\"; ObjectID = \"2WF-Vt-GB0\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Last modified"
+          }
+        }
+      }
+    },
+    "2XE-5v-lig.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Polite\"; ObjectID = \"2XE-5v-lig\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Polite"
+          }
+        }
+      }
+    },
+    "4jH-Gy-XWC.headerCell.title" : {
+      "comment" : "Class = \"NSTableColumn\"; headerCell.title = \"Last played\"; ObjectID = \"4jH-Gy-XWC\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Last played"
+          }
+        }
+      }
+    },
+    "5cQ-yA-euP.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"None\"; ObjectID = \"5cQ-yA-euP\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "None"
+          }
+        }
+      }
+    },
+    "5J1-eL-foW.headerCell.title" : {
+      "comment" : "Class = \"NSTableColumn\"; headerCell.title = \"Title\"; ObjectID = \"5J1-eL-foW\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Title"
+          }
+        }
+      }
+    },
+    "14p-VN-aGX.headerCell.title" : {
+      "comment" : "Class = \"NSTableColumn\"; headerCell.title = \"Language\"; ObjectID = \"14p-VN-aGX\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Language"
+          }
+        }
+      }
+    },
+    "41M-0X-E04.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Like\"; ObjectID = \"41M-0X-E04\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Like"
+          }
+        }
+      }
+    },
+    "54G-y5-WVT.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Ifdb rating\"; ObjectID = \"54G-y5-WVT\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Ifdb rating"
+          }
+        }
+      }
+    },
+    "211-JF-Ghd.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSPopUpButton\"; ibShadowedToolTip = \"All entries in the database, regardless of whether the game is in the library or not.\"; ObjectID = \"211-JF-Ghd\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "All entries in the database, regardless of whether the game is in the library or not."
+          }
+        }
+      }
+    },
+    "a1b-gz-AaC.headerCell.title" : {
+      "comment" : "Class = \"NSTableColumn\"; headerCell.title = \"Index in series\"; ObjectID = \"a1b-gz-AaC\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Index in series"
+          }
+        }
+      }
+    },
+    "aSe-ep-mVa.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Format\"; ObjectID = \"aSe-ep-mVa\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Format"
+          }
+        }
+      }
+    },
+    "aWO-B9-PUN.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Status\"; ObjectID = \"aWO-B9-PUN\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Status"
+          }
+        }
+      }
+    },
+    "aXS-Ow-oNo.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Merciful\"; ObjectID = \"aXS-Ow-oNo\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Merciful"
+          }
+        }
+      }
+    },
+    "azv-db-vut.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSButton\"; ibShadowedToolTip = \"Check the library in the background to see if all game files are still there. May affect performance if the library is large and spread across external disks or network volumes.\"; ObjectID = \"azv-db-vut\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Check the library in the background to see if all game files are still there. May affect performance if the library is large and spread across external disks or network volumes."
+          }
+        }
+      }
+    },
+    "B1n-qb-5ma.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Open Ifdb page\"; ObjectID = \"B1n-qb-5ma\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Open Ifdb page"
+          }
+        }
+      }
+    },
+    "b83-Cm-98m.headerCell.title" : {
+      "comment" : "Class = \"NSTableColumn\"; headerCell.title = \"Added\"; ObjectID = \"b83-Cm-98m\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Added"
+          }
+        }
+      }
+    },
+    "BfN-Uo-Zaj.headerCell.title" : {
+      "comment" : "Class = \"NSTableColumn\"; headerCell.title = \"Author\"; ObjectID = \"BfN-Uo-Zaj\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Author"
+          }
+        }
+      }
+    },
+    "BjU-Jx-TsO.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Force quit running games and delete them.\"; ObjectID = \"BjU-Jx-TsO\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Force quit running games and delete them."
+          }
+        }
+      }
+    },
+    "c3d-7S-qG3.title" : {
+      "comment" : "Class = \"NSWindow\"; title = \"Interactive Fiction\"; ObjectID = \"c3d-7S-qG3\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Interactive Fiction"
+          }
+        }
+      }
+    },
+    "c7W-SF-f1H.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Remove missing games from library\"; ObjectID = \"c7W-SF-f1H\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Remove missing games from library"
+          }
+        }
+      }
+    },
+    "cbb-30-51T.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSMenuItem\"; ibShadowedToolTip = \"Only entries that have been manually changed.\"; ObjectID = \"cbb-30-51T\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Only entries that have been manually changed."
+          }
+        }
+      }
+    },
+    "cbb-30-51T.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Edited Entries\"; ObjectID = \"cbb-30-51T\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Edited Entries"
+          }
+        }
+      }
+    },
+    "eij-X4-ldK.headerCell.title" : {
+      "comment" : "Class = \"NSTableColumn\"; headerCell.title = \"Year\"; ObjectID = \"eij-X4-ldK\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Year"
+          }
+        }
+      }
+    },
+    "fb0-JH-JaK.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Apply Theme\"; ObjectID = \"fb0-JH-JaK\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Apply Theme"
+          }
+        }
+      }
+    },
+    "fdw-oF-o6Z.headerCell.title" : {
+      "comment" : "Class = \"NSTableColumn\"; headerCell.title = \"Format\"; ObjectID = \"fdw-oF-o6Z\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Format"
+          }
+        }
+      }
+    },
+    "fHL-If-y7y.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Show Info\"; ObjectID = \"fHL-If-y7y\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Show Info"
+          }
+        }
+      }
+    },
+    "fz6-WB-tVK.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Tough\"; ObjectID = \"fz6-WB-tVK\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Tough"
+          }
+        }
+      }
+    },
+    "GSa-cj-KBs.placeholderString" : {
+      "comment" : "Class = \"NSTextFieldCell\"; placeholderString = \"30\"; ObjectID = \"GSa-cj-KBs\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "30"
+          }
+        }
+      }
+    },
+    "hCW-Ea-2UN.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Look for cover image files (slow)\"; ObjectID = \"hCW-Ea-2UN\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Look for cover image files (slow)"
+          }
+        }
+      }
+    },
+    "hg4-Cn-Hh9.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Export:\"; ObjectID = \"hg4-Cn-Hh9\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Export:"
+          }
+        }
+      }
+    },
+    "Iax-dW-mkG.headerCell.title" : {
+      "comment" : "Class = \"NSTableColumn\"; headerCell.title = \"Forgiveness\"; ObjectID = \"Iax-dW-mkG\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Forgiveness"
+          }
+        }
+      }
+    },
+    "icI-tW-JDm.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Add to library\"; ObjectID = \"icI-tW-JDm\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Add to library"
+          }
+        }
+      }
+    },
+    "IGN-eP-2wr.headerCell.title" : {
+      "comment" : "Class = \"NSTableColumn\"; headerCell.title = \"♡\"; ObjectID = \"IGN-eP-2wr\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "♡"
+          }
+        }
+      }
+    },
+    "J5B-mV-ZnY.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Genre\"; ObjectID = \"J5B-mV-ZnY\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Genre"
+          }
+        }
+      }
+    },
+    "j7U-aA-n0e.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Language\"; ObjectID = \"j7U-aA-n0e\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Language"
+          }
+        }
+      }
+    },
+    "jeO-Yo-vTD.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Forgiveness\"; ObjectID = \"jeO-Yo-vTD\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Forgiveness"
+          }
+        }
+      }
+    },
+    "jEp-Eb-s0M.headerCell.title" : {
+      "comment" : "Class = \"NSTableColumn\"; headerCell.title = \"My rating\"; ObjectID = \"jEp-Eb-s0M\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "My rating"
+          }
+        }
+      }
+    },
+    "jtI-bq-fTu.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Reveal in Finder\"; ObjectID = \"jtI-bq-fTu\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Reveal in Finder"
+          }
+        }
+      }
+    },
+    "jXw-TM-aYH.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Last played\"; ObjectID = \"jXw-TM-aYH\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Last played"
+          }
+        }
+      }
+    },
+    "k0a-Om-UZ7.ibExternalAccessibilityDescription" : {
+      "comment" : "Class = \"NSTableView\"; ibExternalAccessibilityDescription = \"Games\"; ObjectID = \"k0a-Om-UZ7\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Games"
+          }
+        }
+      }
+    },
+    "kvc-93-R0b.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Play\"; ObjectID = \"kvc-93-R0b\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Play"
+          }
+        }
+      }
+    },
+    "lOq-LY-yLH.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Year\"; ObjectID = \"lOq-LY-yLH\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Year"
+          }
+        }
+      }
+    },
+    "LuN-Zw-W9a.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Download Info\"; ObjectID = \"LuN-Zw-W9a\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Download Info"
+          }
+        }
+      }
+    },
+    "mA7-W4-Oqa.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Delete Autosaves\"; ObjectID = \"mA7-W4-Oqa\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Delete Autosaves"
+          }
+        }
+      }
+    },
+    "NAH-1h-Cgk.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Author\"; ObjectID = \"NAH-1h-Cgk\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Author"
+          }
+        }
+      }
+    },
+    "oeI-au-IYy.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Download game info (slower)\"; ObjectID = \"oeI-au-IYy\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Download game info (slower)"
+          }
+        }
+      }
+    },
+    "OP0-sy-2Qg.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Select Same Theme\"; ObjectID = \"OP0-sy-2Qg\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Select Same Theme"
+          }
+        }
+      }
+    },
+    "org-mP-nXU.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Cruel\"; ObjectID = \"org-mP-nXU\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Cruel"
+          }
+        }
+      }
+    },
+    "Q6B-QA-0xN.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Re-check for missing files every\"; ObjectID = \"Q6B-QA-0xN\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Re-check for missing files every"
+          }
+        }
+      }
+    },
+    "qZD-5l-gqN.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"My rating\"; ObjectID = \"qZD-5l-gqN\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "My rating"
+          }
+        }
+      }
+    },
+    "rR1-MD-Hly.headerCell.title" : {
+      "comment" : "Class = \"NSTableColumn\"; headerCell.title = \"Group\"; ObjectID = \"rR1-MD-Hly\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Group"
+          }
+        }
+      }
+    },
+    "SBm-Io-wpg.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Series\"; ObjectID = \"SBm-Io-wpg\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Series"
+          }
+        }
+      }
+    },
+    "sc4-bo-T0Z.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"minutes\"; ObjectID = \"sc4-bo-T0Z\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "minutes"
+          }
+        }
+      }
+    },
+    "sgw-8H-W5B.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Series Index\"; ObjectID = \"sgw-8H-W5B\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Series Index"
+          }
+        }
+      }
+    },
+    "tm9-D3-ugG.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Group\"; ObjectID = \"tm9-D3-ugG\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Group"
+          }
+        }
+      }
+    },
+    "TVj-dA-8LE.ibShadowedDateFormat" : {
+      "comment" : "Class = \"NSDateFormatter\"; ibShadowedDateFormat = \"y\"; ObjectID = \"TVj-dA-8LE\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "y"
+          }
+        }
+      }
+    },
+    "tZk-mz-tMk.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Dislike\"; ObjectID = \"tZk-mz-tMk\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Dislike"
+          }
+        }
+      }
+    },
+    "vJR-x9-rYD.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Complete Database\"; ObjectID = \"vJR-x9-rYD\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Complete Database"
+          }
+        }
+      }
+    },
+    "vYg-oB-vDG.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Added\"; ObjectID = \"vYg-oB-vDG\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Added"
+          }
+        }
+      }
+    },
+    "waM-6a-H7S.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Last modified\"; ObjectID = \"waM-6a-H7S\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Last modified"
+          }
+        }
+      }
+    },
+    "xfJ-Zj-qDU.headerCell.title" : {
+      "comment" : "Class = \"NSTableColumn\"; headerCell.title = \"Series\"; ObjectID = \"xfJ-Zj-qDU\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Series"
+          }
+        }
+      }
+    },
+    "Y02-aO-ZvW.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Delete Game\"; ObjectID = \"Y02-aO-ZvW\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Delete Game"
+          }
+        }
+      }
+    },
+    "Y66-Cx-wWj.ibShadowedDateFormat" : {
+      "comment" : "Class = \"NSDateFormatter\"; ibShadowedDateFormat = \"y\"; ObjectID = \"Y66-Cx-wWj\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "y"
+          }
+        }
+      }
+    },
+    "YLr-hu-1Gd.ibExternalAccessibilityDescription" : {
+      "comment" : "Class = \"NSButton\"; ibExternalAccessibilityDescription = \"Like\"; ObjectID = \"YLr-hu-1Gd\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Like"
+          }
+        }
+      }
+    },
+    "zPz-FG-7HL.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Like\"; ObjectID = \"zPz-FG-7HL\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Like"
+          }
+        }
+      }
+    },
+    "zUi-ah-4Fe.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Nasty\"; ObjectID = \"zUi-ah-4Fe\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Nasty"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.3"
+}

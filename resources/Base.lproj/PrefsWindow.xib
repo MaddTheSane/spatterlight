@@ -132,7 +132,7 @@
             <windowStyleMask key="styleMask" titled="YES" closable="YES" resizable="YES"/>
             <windowPositionMask key="initialPositionMask" leftStrut="YES" topStrut="YES"/>
             <rect key="contentRect" x="155" y="449" width="560" height="355"/>
-            <rect key="screenRect" x="0.0" y="0.0" width="1512" height="944"/>
+            <rect key="screenRect" x="0.0" y="0.0" width="1512" height="949"/>
             <value key="minSize" type="size" width="560" height="165"/>
             <value key="maxSize" type="size" width="560" height="10000"/>
             <view key="contentView" id="408">
@@ -516,7 +516,7 @@
                                 </textFieldCell>
                             </textField>
                             <button toolTip="Swap ink and paper colors." tag="14" imageHugsTitle="YES" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="8m5-Y3-tnq" userLabel="Swap Mono Colors Button">
-                                <rect key="frame" x="331" y="122" width="12.5" height="14"/>
+                                <rect key="frame" x="331" y="122.5" width="12.5" height="14"/>
                                 <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                                 <buttonCell key="cell" type="recessed" bezelStyle="recessed" imagePosition="only" alignment="left" tag="14" imageScaling="proportionallyUpOrDown" inset="2" id="HJ4-4n-x3g">
                                     <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
@@ -603,7 +603,7 @@
                                 </connections>
                             </colorWell>
                             <button toolTip="Swap ink and paper colors." tag="14" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="LAW-kM-ryd" userLabel="Swap Prop Colors Button">
-                                <rect key="frame" x="331" y="91" width="12.5" height="14"/>
+                                <rect key="frame" x="331" y="91.5" width="12.5" height="14"/>
                                 <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                                 <buttonCell key="cell" type="recessed" bezelStyle="recessed" imagePosition="only" alignment="left" tag="14" imageScaling="proportionallyUpOrDown" inset="2" id="Bmm-oP-coZ">
                                     <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>

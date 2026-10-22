@@ -1,0 +1,438 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "1zh-Qn-lc1.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Baseline offset\"; ObjectID = \"1zh-Qn-lc1\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Baseline offset"
+          }
+        }
+      }
+    },
+    "5jE-hM-0Y2.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Right\"; ObjectID = \"5jE-hM-0Y2\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Right"
+          }
+        }
+      }
+    },
+    "6hR-5d-Cto.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Line multiple\"; ObjectID = \"6hR-5d-Cto\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Line multiple"
+          }
+        }
+      }
+    },
+    "7yc-Ss-FjM.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Max line height\"; ObjectID = \"7yc-Ss-FjM\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Max line height"
+          }
+        }
+      }
+    },
+    "8EZ-ye-rjH.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Indent\"; ObjectID = \"8EZ-ye-rjH\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Indent"
+          }
+        }
+      }
+    },
+    "a9f-CP-Nae.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSStepper\"; ibShadowedToolTip = \"The closer this is to 1, the more words will be hyphenated. Will always use system language.\"; ObjectID = \"a9f-CP-Nae\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "The closer this is to 1, the more words will be hyphenated. Will always use system language."
+          }
+        }
+      }
+    },
+    "BdS-q0-Jpf.placeholderString" : {
+      "comment" : "Class = \"NSTextFieldCell\"; placeholderString = \"0\"; ObjectID = \"BdS-q0-Jpf\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "0"
+          }
+        }
+      }
+    },
+    "CcL-je-sl9.placeholderString" : {
+      "comment" : "Class = \"NSTextFieldCell\"; placeholderString = \"0\"; ObjectID = \"CcL-je-sl9\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "0"
+          }
+        }
+      }
+    },
+    "DCD-tP-ccA.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Justified\"; ObjectID = \"DCD-tP-ccA\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Justified"
+          }
+        }
+      }
+    },
+    "DQ4-Zk-u2P.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"First line\"; ObjectID = \"DQ4-Zk-u2P\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "First line"
+          }
+        }
+      }
+    },
+    "gcM-ks-WFb.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSTextField\"; ibShadowedToolTip = \"Can be negative. Any value other than 0 will disable ligatures.\"; ObjectID = \"gcM-ks-WFb\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Can be negative. Any value other than 0 will disable ligatures."
+          }
+        }
+      }
+    },
+    "gd0-AZ-vPg.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Line spacing\"; ObjectID = \"gd0-AZ-vPg\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Line spacing"
+          }
+        }
+      }
+    },
+    "hko-6n-M1N.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Alignment\"; ObjectID = \"hko-6n-M1N\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Alignment"
+          }
+        }
+      }
+    },
+    "it7-KW-wUd.placeholderString" : {
+      "comment" : "Class = \"NSTextFieldCell\"; placeholderString = \"0\"; ObjectID = \"it7-KW-wUd\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "0"
+          }
+        }
+      }
+    },
+    "jRg-xx-eme.placeholderString" : {
+      "comment" : "Class = \"NSTextFieldCell\"; placeholderString = \"0\"; ObjectID = \"jRg-xx-eme\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "0"
+          }
+        }
+      }
+    },
+    "JsI-5x-6mx.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Center\"; ObjectID = \"JsI-5x-6mx\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Center"
+          }
+        }
+      }
+    },
+    "KHQ-Tn-Qpx.placeholderString" : {
+      "comment" : "Class = \"NSTextFieldCell\"; placeholderString = \"0\"; ObjectID = \"KHQ-Tn-Qpx\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "0"
+          }
+        }
+      }
+    },
+    "mqO-zD-cpg.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Hyphenation factor\"; ObjectID = \"mqO-zD-cpg\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Hyphenation factor"
+          }
+        }
+      }
+    },
+    "n7j-SN-Pu5.placeholderString" : {
+      "comment" : "Class = \"NSTextFieldCell\"; placeholderString = \"0\"; ObjectID = \"n7j-SN-Pu5\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "0"
+          }
+        }
+      }
+    },
+    "NcV-D0-9D5.placeholderString" : {
+      "comment" : "Class = \"NSTextFieldCell\"; placeholderString = \"0\"; ObjectID = \"NcV-D0-9D5\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "0"
+          }
+        }
+      }
+    },
+    "nfF-ni-Tcs.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Paragraph spacing\"; ObjectID = \"nfF-ni-Tcs\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Paragraph spacing"
+          }
+        }
+      }
+    },
+    "nGC-Ii-aoc.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSTextField\"; ibShadowedToolTip = \"The closer this is to 1, the more words will be hyphenated. Will always use system language.\"; ObjectID = \"nGC-Ii-aoc\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "The closer this is to 1, the more words will be hyphenated. Will always use system language."
+          }
+        }
+      }
+    },
+    "oHj-wH-jfm.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Min line height\"; ObjectID = \"oHj-wH-jfm\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Min line height"
+          }
+        }
+      }
+    },
+    "one-l1-e4B.placeholderString" : {
+      "comment" : "Class = \"NSTextFieldCell\"; placeholderString = \"0\"; ObjectID = \"one-l1-e4B\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "0"
+          }
+        }
+      }
+    },
+    "pFF-ib-dZn.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSStepper\"; ibShadowedToolTip = \"Can be negative. Any value other than 0 will disable ligatures.\"; ObjectID = \"pFF-ib-dZn\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Can be negative. Any value other than 0 will disable ligatures."
+          }
+        }
+      }
+    },
+    "PgC-EQ-HLd.placeholderString" : {
+      "comment" : "Class = \"NSTextFieldCell\"; placeholderString = \"0\"; ObjectID = \"PgC-EQ-HLd\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "0"
+          }
+        }
+      }
+    },
+    "Ppv-ah-pFF.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Head\"; ObjectID = \"Ppv-ah-pFF\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Head"
+          }
+        }
+      }
+    },
+    "S8k-cA-iAy.title" : {
+      "comment" : "Class = \"NSButtonCell\"; title = \"Left\"; ObjectID = \"S8k-cA-iAy\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Left"
+          }
+        }
+      }
+    },
+    "sG7-qL-Hda.placeholderString" : {
+      "comment" : "Class = \"NSTextFieldCell\"; placeholderString = \"0\"; ObjectID = \"sG7-qL-Hda\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "0"
+          }
+        }
+      }
+    },
+    "Uua-CD-YUt.placeholderString" : {
+      "comment" : "Class = \"NSTextFieldCell\"; placeholderString = \"0\"; ObjectID = \"Uua-CD-YUt\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "0"
+          }
+        }
+      }
+    },
+    "vXg-bD-RuN.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Before\"; ObjectID = \"vXg-bD-RuN\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Before"
+          }
+        }
+      }
+    },
+    "WVh-nc-2dC.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Character spacing\"; ObjectID = \"WVh-nc-2dC\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Character spacing"
+          }
+        }
+      }
+    },
+    "wW9-Yr-4ko.ibShadowedToolTip" : {
+      "comment" : "Class = \"NSTextField\"; ibShadowedToolTip = \"Line spacing expressed as number of lines. Double spacing = 2 etc.\"; ObjectID = \"wW9-Yr-4ko\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Line spacing expressed as number of lines. Double spacing = 2 etc."
+          }
+        }
+      }
+    },
+    "xie-DQ-rZ9.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Tail\"; ObjectID = \"xie-DQ-rZ9\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Tail"
+          }
+        }
+      }
+    },
+    "YLp-Hp-iwC.placeholderString" : {
+      "comment" : "Class = \"NSTextFieldCell\"; placeholderString = \"0\"; ObjectID = \"YLp-Hp-iwC\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "0"
+          }
+        }
+      }
+    },
+    "ZUU-zU-Gvw.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"After\"; ObjectID = \"ZUU-zU-Gvw\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "After"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.3"
+}
