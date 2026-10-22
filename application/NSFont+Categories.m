@@ -86,7 +86,7 @@
         return NO;
 
     NSNumber *cached = cache[name];
-    if (cached)
+    if (cached != nil)
         return cached.boolValue;
 
     unichar character = 0xa0;

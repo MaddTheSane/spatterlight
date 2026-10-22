@@ -970,7 +970,7 @@
         [self addInfoLine:[NSString stringWithFormat:@"Last modified: %@", [InfoView formattedStringFromDate:modificationDate]] attributes:attrDict linebreak:YES];
         NSNumber *fileSizeObj = (NSNumber *)fileAttributes[NSFileSize];
         NSInteger fileSize = 0;
-        if (fileSizeObj)
+        if (fileSizeObj != nil)
             fileSize = fileSizeObj.integerValue;
         NSString *fileSizeString = [PreviewViewController unitStringFromBytes:fileSize];
         _metaDict[@"fileSize"] = fileSizeString;
