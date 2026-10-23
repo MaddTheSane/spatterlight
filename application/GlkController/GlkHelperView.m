@@ -9,13 +9,13 @@
 
 @implementation GlkHelperView
 
-// Use top-left origin to match Glk's coordinate system.
+//! Use top-left origin to match Glk's coordinate system.
 - (BOOL)isFlipped {
     return YES;
 }
 
-// Notify the controller when the frame changes programmatically (not during
-// a live resize drag, which is handled separately to avoid excessive events).
+//! Notify the controller when the frame changes programmatically (not during
+//! a live resize drag, which is handled separately to avoid excessive events).
 - (void)setFrame:(NSRect)frame {
     super.frame = frame;
     GlkController *glkctl = _glkctrl;
@@ -25,8 +25,8 @@
     }
 }
 
-// Capture scroll offsets before a user-initiated live resize begins,
-// so they can be restored afterward to prevent text from jumping around.
+//! Capture scroll offsets before a user-initiated live resize begins,
+//! so they can be restored afterward to prevent text from jumping around.
 - (void)viewWillStartLiveResize {
     GlkController *glkctl = _glkctrl;
     if (!glkctl.isInSystemFullscreen && !glkctl.ignoreResizes) {
@@ -34,8 +34,8 @@
     }
 }
 
-// After the user finishes dragging to resize, send the final content size
-// to the controller and restore the previously saved scroll offsets.
+//! After the user finishes dragging to resize, send the final content size
+//! to the controller and restore the previously saved scroll offsets.
 - (void)viewDidEndLiveResize {
     GlkController *glkctl = _glkctrl;
     // We use a custom fullscreen width, so don't resize to full screen width

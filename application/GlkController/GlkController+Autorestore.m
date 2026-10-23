@@ -46,10 +46,12 @@ NSString * const kAutosaveGlkSaveTmpFile = @"autosave-tmp.glksave";
 NSString * const kAutosaveGUIFile = @"autosave-GUI.plist";
 NSString * const kAutosaveGUILateFile = @"autosave-GUI-late.plist";
 
-// TempLibrary is a lightweight shim used solely to peek at the autosaveTag
-// stored in interpreter autosave files, without needing to fully deserialize
-// the interpreter library state. This lets us compare tags between the GUI
-// and interpreter autosave files to verify they are in sync.
+//! `TempLibrary` is a lightweight shim used solely to peek at the `autosaveTag`
+//! stored in interpreter autosave files, without needing to fully deserialize
+//! the interpreter library state.
+//!
+//! This lets us compare tags between the GUI
+//! and interpreter autosave files to verify they are in sync.
 @interface TempLibrary : NSObject
 @property glui32 autosaveTag;
 @end
@@ -74,7 +76,7 @@ NSString * const kAutosaveGUILateFile = @"autosave-GUI-late.plist";
 
 @implementation GlkController (Autorestore)
 
-// Depth-first search of theView and its subviews for a grid window.
+//! Depth-first search of theView and its subviews for a grid window.
 - (GlkTextGridWindow *)findGridWindowIn:(NSView *)theView {
     if ([theView isKindOfClass:[GlkTextGridWindow class]])
         return (GlkTextGridWindow *)theView;
@@ -92,11 +94,13 @@ NSString * const kAutosaveGUILateFile = @"autosave-GUI-late.plist";
 
 #pragma mark Autorestore at launch
 
-// Attempt to restore a previously autosaved game session. This involves:
-// 1. Deserializing the GUI state from autosave-GUI.plist (window layout, text, scroll positions)
-// 2. Optionally deserializing a "late" GUI state captured after the interpreter finished processing
-// 3. Verifying that the GUI and interpreter autosave files are in sync via autosaveTag comparison
-// 4. Handling edge cases like version mismatches, missing files, and dead (finished) games
+//! Attempt to restore a previously autosaved game session.
+//!
+//! This involves:
+//! 1. Deserializing the GUI state from autosave-GUI.plist (window layout, text, scroll positions)
+//! 2. Optionally deserializing a "late" GUI state captured after the interpreter finished processing
+//! 3. Verifying that the GUI and interpreter autosave files are in sync via autosaveTag comparison
+//! 4. Handling edge cases like version mismatches, missing files, and dead (finished) games
 - (void)runTerpWithAutorestore {
     autorestoring = YES;
     [self loadRestoredControllers];
@@ -167,10 +171,10 @@ NSString * const kAutosaveGUILateFile = @"autosave-GUI-late.plist";
     // when the interpreter reaches the appropriate NEXTEVENT.
 }
 
-// Read the GUI autosave and the late GUI autosave into restoredController
-// and restoredControllerLate, and settle on a consistent pair: either may
-// stand in for the other when it is missing, older or tagged differently.
-// restoredController is left nil if neither is usable.
+//! Read the GUI autosave and the late GUI autosave into `restoredController`
+//! and `restoredControllerLate`, and settle on a consistent pair: either may
+//! stand in for the other when it is missing, older or tagged differently.
+//! restoredController is left nil if neither is usable.
 - (void)loadRestoredControllers {
     restoredController = [self unarchiveAutosaveFile:self.autosaveFileGUI];
 
@@ -228,13 +232,13 @@ NSString * const kAutosaveGUILateFile = @"autosave-GUI-late.plist";
     }
 }
 
-// If the interpreter's autosave file exists, verify its tag matches the
-// GUI autosave tag to ensure they represent the same game state. A mismatch
-// means one was saved at a different point than the other, so we try falling
-// back to a backup terp save or limiting restoration to UI-only.
-//
-// Sets restoreUIOnly. Returns NO if the game should start normally instead
-// (autosave off, or the user chose never to autorestore).
+//! If the interpreter's autosave file exists, verify its tag matches the
+//! GUI autosave tag to ensure they represent the same game state. A mismatch
+//! means one was saved at a different point than the other, so we try falling
+//! back to a backup terp save or limiting restoration to UI-only.
+//!
+//! Sets `restoreUIOnly`. Returns `NO` if the game should start normally instead
+//! (autosave off, or the user chose never to autorestore).
 - (BOOL)checkTerpAutosave {
     if (![[NSFileManager defaultManager] fileExistsAtPath:self.autosaveFileTerp]) {
         NSLog(@"No interpreter autorestore file exists");
@@ -297,9 +301,9 @@ NSString * const kAutosaveGUILateFile = @"autosave-GUI-late.plist";
     return YES;
 }
 
-// The interpreter autosave does not match the GUI one. If the backup
-// interpreter autosave (-bak) does, move the backup pair into place.
-// Returns YES if it did.
+//! The interpreter autosave does not match the GUI one. If the backup
+//! interpreter autosave (-bak) does, move the backup pair into place.
+//! Returns `YES` if it did.
 - (BOOL)usePreviousTerpAutosave {
     NSString *oldAutosaveFileTerp = [self appSupportFile:kAutosaveTerpBakFile];
     TempLibrary *tempLib = [self unarchiveAutosaveFile:oldAutosaveFileTerp];
@@ -343,9 +347,9 @@ NSString * const kAutosaveGUILateFile = @"autosave-GUI-late.plist";
     return usedPrevious;
 }
 
-// Temporarily switch to the theme that was active when the autosave was
-// created, so the restored UI renders correctly. The original theme is
-// stashed and will be restored after the autorestore process completes.
+//! Temporarily switch to the theme that was active when the autosave was
+//! created, so the restored UI renders correctly. The original theme is
+//! stashed and will be restored after the autorestore process completes.
 - (void)adoptRestoredTheme {
     Theme *theme = self.theme;
     self.stashedTheme = theme;
@@ -368,9 +372,9 @@ NSString * const kAutosaveGUILateFile = @"autosave-GUI-late.plist";
     }
 }
 
-// If this is not a window restoration done by the system, we re-enter
-// fullscreen manually if the game was closed in fullscreen mode. Otherwise
-// put the window back where it was.
+//! If this is not a window restoration done by the system, we re-enter
+//! fullscreen manually if the game was closed in fullscreen mode. Otherwise
+//! put the window back where it was.
 - (void)adoptRestoredWindowFrame {
     if (!windowRestoredBySystem && self.inFullscreen
         && !self.isInSystemFullscreen) {
@@ -391,7 +395,7 @@ NSString * const kAutosaveGUILateFile = @"autosave-GUI-late.plist";
         self.gameView.autoresizingMask = kResizeFill;
 }
 
-// Take over a quote box from the restored controller, attached to bufwin.
+//! Take over a quote box from the restored controller, attached to bufwin.
 - (void)adoptQuoteBox:(GlkTextGridWindow *)quotebox
       forBufferWindow:(GlkTextBufferWindow *)bufwin
            addedOnPAC:(NSInteger)pac {
@@ -477,10 +481,10 @@ NSString * const kAutosaveGUILateFile = @"autosave-GUI-late.plist";
     [self performSelector:@selector(postRestoreArrange:) withObject:nil afterDelay:0];
 }
 
-// Pick which archived controller restoreUI copies from. A UI-only restore
-// always uses the late one. Otherwise, a command script that was running
-// either had its last command handled (drop it) or continues from the late
-// controller's state.
+//! Pick which archived controller restoreUI copies from. A UI-only restore
+//! always uses the late one. Otherwise, a command script that was running
+//! either had its last command handled (drop it) or continues from the late
+//! controller's state.
 - (void)chooseRestoredControllerForCommandScript {
     if (restoreUIOnly) {
         restoredController = restoredControllerLate;
@@ -520,8 +524,8 @@ NSString * const kAutosaveGUILateFile = @"autosave-GUI-late.plist";
     [self.soundHandler restartAll];
 }
 
-// Copy all views and GlkWindow objects from the restored controller (or, in
-// a UI-only restore, keep our own windows and only take their frames).
+//! Copy all views and GlkWindow objects from the restored controller (or, in
+//! a UI-only restore, keep our own windows and only take their frames).
 - (void)adoptRestoredWindows {
     // Re-add the subviews in ascending window-name order, which is the order
     // the windows were originally created in (names are sequential creation
@@ -558,7 +562,7 @@ NSString * const kAutosaveGUILateFile = @"autosave-GUI-late.plist";
     }
 }
 
-// Replace our window named key (if any) with the restored one.
+//! Replace our window named key (if any) with the restored one.
 - (GlkWindow *)adoptRestoredWindow:(NSNumber *)key {
     [self.gwindows[key] removeFromSuperview];
 
@@ -609,8 +613,8 @@ NSString * const kAutosaveGUILateFile = @"autosave-GUI-late.plist";
     [self.journeyMenuHandler showMenus];
 }
 
-// Restore scroll positions etc., focus the window that had it, and resend
-// the command a running command script was in the middle of.
+//! Restore scroll positions etc., focus the window that had it, and resend
+//! the command a running command script was in the middle of.
 - (void)finishRestoredWindows {
     GlkWindow *winToGrabFocus = nil;
 
@@ -664,11 +668,13 @@ NSString * const kAutosaveGUILateFile = @"autosave-GUI-late.plist";
 }
 
 
-// The per-game signature used to name the autosave directory. Falls back to
-// the hash stored in the library when the game file itself cannot be read,
-// e.g. an evicted iCloud file. This value is also passed to the interpreter
-// process (which has no library to fall back on) so that both processes
-// always agree on the directory.
+//! The per-game signature used to name the autosave directory.
+//!
+//! Falls back to
+//! the hash stored in the library when the game file itself cannot be read,
+//! e.g. an evicted iCloud file. This value is also passed to the interpreter
+//! process (which has no library to fall back on) so that both processes
+//! always agree on the directory.
 - (NSString *)gameSignature {
     NSString *signature = self.gamefile.signatureFromFile;
     if (signature.length == 0)
@@ -803,15 +809,15 @@ NSString * const kAutosaveGUILateFile = @"autosave-GUI-late.plist";
     return appSupportURL.path;
 }
 
-// If there exists an autosave dir using the old hashing method,
-// copy any files from it to the new one, unless there are newer
-// equivalents in the new-style autosave directory. Then delete the
-// old files and the old directory.
-
-// Migration shim: autosaves used to live in a directory named after the
-// game's old file signature. Move anything found there into the current
-// directory (unless a newer file of the same name is already there) and
-// remove the old directory.
+//! If there exists an autosave dir using the old hashing method,
+//! copy any files from it to the new one, unless there are newer
+//! equivalents in the new-style autosave directory. Then delete the
+//! old files and the old directory.
+//!
+//! Migration shim: autosaves used to live in a directory named after the
+//! game's old file signature. Move anything found there into the current
+//! directory (unless a newer file of the same name is already there) and
+//! remove the old directory.
 - (void)dealWithOldFormatAutosaveDir {
     NSFileManager *fileManager = [NSFileManager defaultManager];
     NSError *error = nil;
@@ -846,9 +852,9 @@ NSString * const kAutosaveGUILateFile = @"autosave-GUI-late.plist";
     }
 }
 
-// Copy one file from the old autosave directory into newDirURL, unless a file
-// of the same name created later is already there, then delete the original.
-// The original is kept if the copy fails.
+//! Copy one file from the old autosave directory into `newDirURL`, unless a file
+//! of the same name created later is already there, then delete the original.
+//! The original is kept if the copy fails.
 - (void)migrateOldFormatAutosaveFile:(NSURL *)url toDirectory:(NSURL *)newDirURL {
     NSFileManager *fileManager = [NSFileManager defaultManager];
     NSError *error = nil;
@@ -918,9 +924,9 @@ NSString * const kAutosaveGUILateFile = @"autosave-GUI-late.plist";
     return attrs[NSFileCreationDate];
 }
 
-// Unarchive an autosave plist. A truncated or malformed archive (one
-// half-written when the machine lost power) makes the unarchiver raise, so
-// catch that and return nil.
+//! Unarchive an autosave plist. A truncated or malformed archive (one
+//! half-written when the machine lost power) makes the unarchiver raise, so
+//! catch that and return nil.
 - (id)unarchiveAutosaveFile:(NSString *)path {
     NSError *error = nil;
     NSData *data = [NSData dataWithContentsOfFile:path options:0 error:&error];
@@ -941,7 +947,7 @@ NSString * const kAutosaveGUILateFile = @"autosave-GUI-late.plist";
     return result;
 }
 
-// TableViewController calls this to reset non-running games
+//! TableViewController calls this to reset non-running games
 - (void)deleteAutosaveFilesForGame:(Game *)aGame {
     self.gamefile = aGame.urlForBookmark.path;
     aGame.autosaved = NO;
@@ -955,8 +961,8 @@ NSString * const kAutosaveGUILateFile = @"autosave-GUI-late.plist";
     [self deleteAutosaveFilesKeepingLateGUI:NO];
 }
 
-// When the game has ended we keep the late GUI archive, so that the finished
-// game window can be shown again, but nothing that would restore the game.
+//! When the game has ended we keep the late GUI archive, so that the finished
+//! game window can be shown again, but nothing that would restore the game.
 - (void)deleteAutosaveFilesKeepingLateGUI:(BOOL)keepLate {
     if (self.appSupportDir.length == 0)
         return;
@@ -978,14 +984,16 @@ NSString * const kAutosaveGUILateFile = @"autosave-GUI-late.plist";
         [[NSFileManager defaultManager] removeItemAtURL:url error:nil];
 }
 
-// Ask the interpreter for one last autosave and wait for it, so that the
-// GUI archive autoSaveOnExit writes next matches an interpreter save taken
-// now. Glulxe paces its timer-driven saves, so without this the interpreter
-// side could be up to that interval behind the window at the moment it
-// closes, and an autorestore would run that interval of the game again.
-// The request can only go out while the interpreter is waiting in
-// glk_select; if it is mid-turn we read its output until it asks for an
-// event. The wait is bounded so a busy game cannot hold the window open.
+//! Ask the interpreter for one last autosave and wait for it, so that the
+//! GUI archive autoSaveOnExit writes next matches an interpreter save taken
+//! now.
+//!
+//! Glulxe paces its timer-driven saves, so without this the interpreter
+//! side could be up to that interval behind the window at the moment it
+//! closes, and an autorestore would run that interval of the game again.
+//! The request can only go out while the interpreter is waiting in
+//! `glk_select`; if it is mid-turn we read its output until it asks for an
+//! event. The wait is bounded so a busy game cannot hold the window open.
 - (void)requestFinalAutosave {
     if (!self.supportsAutorestore || !self.theme.autosave || dead || !task || !task.isRunning)
         return;
@@ -1016,7 +1024,7 @@ NSString * const kAutosaveGUILateFile = @"autosave-GUI-late.plist";
     NSLog(@"requestFinalAutosave: interpreter did not answer in time (request %s)", sent ? "sent" : "not sent");
 }
 
-// Archive the GUI state to path. Returns NO if archiving or writing failed.
+//! Archive the GUI state to path. Returns `NO` if archiving or writing failed.
 - (BOOL)writeGUIAutosaveToFile:(NSString *)path {
     NSError *error = nil;
     NSData *data = [NSKeyedArchiver archivedDataWithRootObject:self requiringSecureCoding:NO error:&error];

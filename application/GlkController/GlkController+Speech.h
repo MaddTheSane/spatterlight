@@ -5,7 +5,7 @@
 
 // Accessibility
 - (BOOL)isAccessibilityElement;
-@property (NS_NONATOMIC_IOSONLY, readonly, copy) NSArray *accessibilityCustomActions;
+@property (NS_NONATOMIC_IOSONLY, readonly, copy) NSArray<NSAccessibilityCustomAction*> *accessibilityCustomActions;
 - (IBAction)saveAsRTF:(id)sender;
 
 // ZMenu
@@ -44,7 +44,7 @@
 @property (NS_NONATOMIC_IOSONLY, readonly) NSArray<GlkWindow *> *windowsIncludingQuoteBox;
 
 // Custom rotors
-@property (NS_NONATOMIC_IOSONLY, readonly, copy) NSArray *createCustomRotors;
+@property (NS_NONATOMIC_IOSONLY, readonly, copy) NSArray<NSAccessibilityCustomRotor*> *createCustomRotors;
 - (NSString *)gameTitle;
 
 @end

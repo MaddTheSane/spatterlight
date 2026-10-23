@@ -36,8 +36,8 @@
 #import "DebugLog.h"
 #import "NSAlert+Spatterlight.h"
 
-// Answer a file prompt: OKAY carrying the chosen path, or an empty payload
-// if the user cancelled (path is NULL or "").
+//! Answer a file prompt: OKAY carrying the chosen path, or an empty payload
+//! if the user cancelled (path is `NULL` or `""`).
 static void sendFilenameReply(int fd, const char *path) {
     struct message reply = { .cmd = OKAY };
     reply.len = path ? strlen(path) : 0;
@@ -46,7 +46,7 @@ static void sendFilenameReply(int fd, const char *path) {
         write(fd, path, reply.len);
 }
 
-// Theme beep sounds. Stop first so a rapid repeat restarts the sound.
+//! Theme beep sounds. Stop first so a rapid repeat restarts the sound.
 static void playSoundNamed(NSString *name) {
     if (!name)
         return;
@@ -525,8 +525,8 @@ static void playSoundNamed(NSString *name) {
     gwindow.terminatorsPending = YES;
 }
 
-// SETTITLE and SHOWERROR send a UTF-8 string without a terminating NUL.
-// The request buffer has room for one (see protocol.h).
+//! SETTITLE and SHOWERROR send a UTF-8 string without a terminating `NUL`.
+//! The request buffer has room for one (see protocol.h).
 static NSString *stringFromPayload(char *buf, size_t len) {
     buf[len] = '\0';
     return @(buf);
@@ -616,9 +616,9 @@ static NSString *stringFromPayload(char *buf, size_t len) {
     return NO;
 }
 
-// The first window request after an autorestore rebuilds the UI from the
-// late GUI autosave. Returns YES if it did, so the caller can look up its
-// window again.
+//! The first window request after an autorestore rebuilds the UI from the
+//! late GUI autosave. Returns `YES` if it did, so the caller can look up its
+//! window again.
 - (BOOL)restoreUIIfNeeded {
     if (self.gwindows.count || !shouldRestoreUI)
         return NO;
@@ -627,8 +627,8 @@ static NSString *stringFromPayload(char *buf, size_t len) {
     return YES;
 }
 
-// A command script was running in the autosaved session. Step past the command that was being handled, or drop the script if that
-// was its last one.
+//! A command script was running in the autosaved session. Step past the command that was being handled, or drop the script if that
+//! was its last one.
 - (void)resumeRestoredCommandScript {
     CommandScriptHandler *handler = restoredController.commandScriptHandler;
     handler.commandIndex++;
@@ -645,15 +645,15 @@ static NSString *stringFromPayload(char *buf, size_t len) {
 
 #pragma mark Per-request handlers
 
-// The Glk window a request's a1 names, or nil.
+//! The Glk window a request's a1 names, or `nil`.
 - (GlkWindow *)windowForRequest:(struct message *)req {
     if (req->a1 >= 0 && req->a1 < kMaxGlkWindows)
         return self.gwindows[@(req->a1)];
     return nil;
 }
 
-// Fade out the oldest quote box once the game has printed or cleared past
-// the point where it was added, or as soon as a newer one appears.
+//! Fade out the oldest quote box once the game has printed or cleared past
+//! the point where it was added, or as soon as a newer one appears.
 - (void)dismissExpiredQuoteBox {
     if (!self.quoteBoxes.count)
         return;
@@ -681,9 +681,9 @@ static NSString *stringFromPayload(char *buf, size_t len) {
     }];
 }
 
-// Returns YES if the interpreter is now waiting for an event, so the caller
-// should stop reading. A queued event is written here directly; otherwise
-// an OKAY reply is set up when the interpreter asked not to wait (a1 == 0).
+//! Returns `YES` if the interpreter is now waiting for an event, so the caller
+//! should stop reading. A queued event is written here directly; otherwise
+//! an OKAY reply is set up when the interpreter asked not to wait (a1 == 0).
 - (BOOL)handleNextEvent:(struct message *)req reply:(struct message *)ans {
     if (self.windowsToRestore.count) {
         for (GlkWindow *win in self.windowsToRestore) {
@@ -829,8 +829,8 @@ static NSString *stringFromPayload(char *buf, size_t len) {
     windowdirty = YES;
 }
 
-// win == -1 is the border (the area outside all Glk windows); a negative
-// color means the theme's buffer background.
+//! `win == -1` is the border (the area outside all Glk windows); a negative
+//! color means the theme's buffer background.
 - (void)handleSetBackground:(GlkWindow *)reqWin window:(int)win color:(int)color {
     NSColor *bg = (color < 0) ? self.theme.bufferBackground : [NSColor colorFromInteger:color];
     if (win == -1) {
@@ -942,9 +942,9 @@ static NSString *stringFromPayload(char *buf, size_t len) {
     skipNextScriptCommand = NO;
 }
 
-// This updates an existing window on-the-fly with the styles that normally
-// would only be applied to a new window. It can also update any inline
-// images (xscale/yscale in thousandths; 0 leaves them alone).
+//! This updates an existing window on-the-fly with the styles that normally
+//! would only be applied to a new window. It can also update any inline
+//! images (xscale/yscale in thousandths; 0 leaves them alone).
 - (void)handleRefreshWindow:(GlkWindow *)reqWin xscale:(int)xscale yscale:(int)yscale {
     if ([reqWin isKindOfClass:[GlkTextBufferWindow class]]) {
         reqWin.styleHints = [GlkWindow deepCopyOfStyleHintsArray:self.bufferStyleHints];

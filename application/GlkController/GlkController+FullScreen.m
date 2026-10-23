@@ -71,13 +71,15 @@
         return nil;
 }
 
-// Called once the system has applied its own saved state to a window it is
-// restoring, which happens some time after we hand the window over through
-// the restoration handler. That state is written lazily, so after a crash or
-// a force quit it can disagree with our autosave: we restored the game as
-// being in fullscreen, in a window as large as the screen, and the system
-// then puts the window back as an ordinary one. Go with what the system did
-// and fit the game view to the window.
+//! Called once the system has applied its own saved state to a window it is
+//! restoring, which happens some time after we hand the window over through
+//! the restoration handler.
+//!
+//! That state is written lazily, so after a crash or
+//! a force quit it can disagree with our autosave: we restored the game as
+//! being in fullscreen, in a window as large as the screen, and the system
+//! then puts the window back as an ordinary one. Go with what the system did
+//! and fit the game view to the window.
 - (void)window:(NSWindow *)window didDecodeRestorableState:(NSCoder *)state {
     if (window != self.window || !self.inFullscreen || self.isInSystemFullscreen)
         return;
@@ -169,8 +171,8 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
     }
 }
 
-// The border view's frame once in fullscreen on screen. The size is
-// remembered (in borderFullScreenSize) the first time.
+//! The border view's frame once in fullscreen on screen. The size is
+//! remembered (in `borderFullScreenSize`) the first time.
 - (NSRect)fullScreenBorderFrameOnScreen:(NSScreen *)screen {
     if (NSEqualSizes(self.borderFullScreenSize, NSZeroSize))
         self.borderFullScreenSize = screen.frame.size;
@@ -179,11 +181,11 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
     return frame;
 }
 
-// Our own enter-fullscreen animation, in five steps, each started from the
-// previous one's completion handler: move the window (under the snapshot
-// window) to the center of the screen, enlarge it to full size, move the
-// still invisible game view into place, fade out the snapshot, and finally
-// extend the game view vertically.
+//! Our own enter-fullscreen animation, in five steps, each started from the
+//! previous one's completion handler: move the window (under the snapshot
+//! window) to the center of the screen, enlarge it to full size, move the
+//! still invisible game view into place, fade out the snapshot, and finally
+//! extend the game view vertically.
 - (void)enterFullScreenAnimationWithDuration:(NSTimeInterval)duration {
     NSWindow *window = self.window;
     NSWindow *snapshotWindow = snapshotController.window;
@@ -313,10 +315,10 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
     }];
 }
 
-// Like enterFullScreenAnimationWithDuration:, for a game autorestored in
-// fullscreen: there is no snapshot, and the game view is laid out by the
-// arrange event at the end. Two steps: move the window to the center of the
-// screen, then enlarge it.
+//! Like ``enterFullScreenAnimationWithDuration:``, for a game autorestored in
+//! fullscreen: there is no snapshot, and the game view is laid out by the
+//! arrange event at the end. Two steps: move the window to the center of the
+//! screen, then enlarge it.
 - (void)startGameInFullScreenAnimationWithDuration:(NSTimeInterval)duration {
 
     NSWindow *window = self.window;
@@ -355,8 +357,8 @@ startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
     }];
 }
 
-// Second step: enlarge the window to its full size, then lay out the game
-// for it and show the autorestore alert if one was held back.
+//! Second step: enlarge the window to its full size, then lay out the game
+//! for it and show the autorestore alert if one was held back.
 - (void)startGameInFullScreenEnlargeToFrame:(NSRect)borderFinalFrame
                                    duration:(NSTimeInterval)duration
                                   showAlert:(BOOL)showAlert {

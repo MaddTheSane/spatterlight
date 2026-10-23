@@ -229,7 +229,7 @@ static NSString *signalToName(NSTask *task) {
         [self queueEvent:redrawEvent];
 }
 
-// Write all of len bytes, retrying on short writes and EINTR.
+//! Write all of len bytes, retrying on short writes and `EINTR`.
 static BOOL writeAll(int fd, const void *data, size_t len) {
     const char *p = data;
     while (len > 0) {
@@ -273,9 +273,11 @@ static BOOL writeAll(int fd, const void *data, size_t len) {
     }
 }
 
-// Read one message (header and body) from the interpreter, handle it and
-// send any reply. Returns NO if nothing more should be read: the pipe
-// failed, or the handler asked us to stop.
+//! Read one message (header and body) from the interpreter, handle it and
+//! send any reply.
+//!
+//! Returns `NO` if nothing more should be read: the pipe
+//! failed, or the handler asked us to stop.
 - (BOOL)readAndHandleMessageFrom:(int)readfd replyTo:(int)sendfd {
     struct message request;
     struct message reply;

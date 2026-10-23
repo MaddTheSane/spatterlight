@@ -20,8 +20,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property NSURL *homepath;
 
 @property NSMutableArray<Game *> *gameTableModel;
-// The rows the table view last loaded, in order. Lets updateTableViews tell
-// a change of contents from a change of rows.
+//! The rows the table view last loaded, in order. Lets updateTableViews tell
+//! a change of contents from a change of rows.
 @property (nullable) NSArray<Game *> *displayedGames;
 
 @property BOOL currentlyAddingGames;
@@ -57,7 +57,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (strong) MetadataHandler *metadataHandler;
 @property (strong) GameLauncher *gameLauncher;
 
-// Methods that remain on the main class for backward compat / forwarding
+//! Methods that remain on the main class for backward compat / forwarding
 - (void)beginImporting;
 - (void)endImporting;
 
@@ -66,7 +66,7 @@ NS_ASSUME_NONNULL_BEGIN
 //! text and selection from the last run, which would hide or deselect them.
 + (BOOL)launchedWithTestGames;
 
-// Forwarding methods to GameLauncher
+//! Forwarding methods to GameLauncher
 - (void)releaseGlkControllerSoon:(GlkController *)glkctl;
 
 // Forwarding methods to MetadataHandler

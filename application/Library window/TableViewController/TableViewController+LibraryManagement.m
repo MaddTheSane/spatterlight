@@ -56,9 +56,9 @@
 }
 
 
-// The order in which games sharing a hashTag are ranked when all but one are
-// pruned: the survivor is the most recently played game (falling back to
-// visible, earliest-added for never-played duplicates).
+//! The order in which games sharing a hashTag are ranked when all but one are
+//! pruned: the survivor is the most recently played game (falling back to
+//! visible, earliest-added for never-played duplicates).
 static NSArray<NSSortDescriptor *> *duplicateSurvivorOrder(void) {
     return @[
         // Most recently played first; nil (never played) sorts last under descending.
@@ -91,11 +91,11 @@ static NSArray<NSSortDescriptor *> *duplicateSurvivorOrder(void) {
     }
 }
 
-// Single grouped pass over *every* Game (including hidden ones) that prunes
-// any games sharing a hashTag, keeping one survivor per hash. The fetch is
-// sorted by duplicateSurvivorOrder() within each hash group.
-// Games whose hashTag is in runningHashTags (currently playing) are never
-// deleted, so an active session is never affected.
+//! Single grouped pass over *every* Game (including hidden ones) that prunes
+//! any games sharing a hashTag, keeping one survivor per hash. The fetch is
+//! sorted by ``duplicateSurvivorOrder()`` within each hash group.
+//! Games whose hashTag is in runningHashTags (currently playing) are never
+//! deleted, so an active session is never affected.
 - (void)pruneDuplicateGamesInContext:(NSManagedObjectContext *)context sparing:(NSSet<NSString *> *)runningHashTags {
     NSError *error = nil;
     NSFetchRequest *fetchRequest = [Game fetchRequest];

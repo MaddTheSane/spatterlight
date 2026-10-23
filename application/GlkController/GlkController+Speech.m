@@ -17,7 +17,7 @@
 
 #import "DebugLog.h"
 
-// The window with the largest frame, or nil if none has any area.
+//! The window with the largest frame, or `nil` if none has any area.
 static GlkWindow *largestByFrameArea(NSArray<GlkWindow *> *windows) {
     GlkWindow *largest = nil;
     CGFloat largestSize = 0;
@@ -158,24 +158,28 @@ static GlkWindow *largestByFrameArea(NSArray<GlkWindow *> *windows) {
 
 #pragma mark Speak new text
 
-// How long (seconds) the UI must be free of layout churn before we let a
-// VoiceOver announcement fire. A full-screen graphic dismissal triggers a
-// border/status redraw (several window resizes) right after the new text is
-// printed; each frame change makes AppKit re-read the focused window, which
-// interrupts the announcement. Waiting for the churn to settle avoids that.
+//! How long (seconds) the UI must be free of layout churn before we let a
+//! VoiceOver announcement fire.
+//!
+//! A full-screen graphic dismissal triggers a
+//! border/status redraw (several window resizes) right after the new text is
+//! printed; each frame change makes AppKit re-read the focused window, which
+//! interrupts the announcement. Waiting for the churn to settle avoids that.
 static const NSTimeInterval kLayoutSettleInterval = 0.45;
 
-// (Re)schedule the new-text announcement. Called from flushDisplay; cancels any
-// previously scheduled announcement so repeated flushes coalesce into one. The
-// initial delay is computed by the caller (which has the journey-dialog ivar).
+//! (Re)schedule the new-text announcement. Called from flushDisplay; cancels any
+//! previously scheduled announcement so repeated flushes coalesce into one.
+//!
+//! The
+//! initial delay is computed by the caller (which has the journey-dialog ivar).
 - (void)scheduleSpeakNewTextAfterDelay:(CGFloat)delay {
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(fireSpeakNewText) object:nil];
     [self performSelector:@selector(fireSpeakNewText) withObject:nil afterDelay:delay];
 }
 
-// Fire the announcement, but if the UI is still churning (a window resized
-// within the last kLayoutSettleInterval) keep deferring until it settles, so
-// VoiceOver isn't interrupted mid-sentence.
+//! Fire the announcement, but if the UI is still churning (a window resized
+//! within the last kLayoutSettleInterval) keep deferring until it settles, so
+//! VoiceOver isn't interrupted mid-sentence.
 - (void)fireSpeakNewText {
     NSTimeInterval sinceChurn = NSProcessInfo.processInfo.systemUptime - self.lastLayoutChurnTimestamp;
     if (sinceChurn < kLayoutSettleInterval) {
@@ -259,7 +263,7 @@ static const NSTimeInterval kLayoutSettleInterval = 0.45;
 
 #pragma mark Speak previous moves
 
-// If sender == self, never announce "No last move to speak!"
+//! If `sender == self`, never announce "No last move to speak!"
 - (IBAction)speakMostRecent:(id)sender {
     id<VoiceOverMenu> menu = self.currentMenu;
     if (menu) {
@@ -364,7 +368,7 @@ static const NSTimeInterval kLayoutSettleInterval = 0.45;
     [self speakStringNow:[parts componentsJoinedByString:@"\n"]];
 }
 
-// Find the window acting as the status bar, or nil if there is none.
+//! Find the window acting as the status bar, or nil if there is none.
 - (nullable GlkWindow *)statusWindow {
     // Lazy heuristic to find a Tads 3 status window: if there is more than one
     // window and only one of them sits at the top, pick that one.
@@ -387,8 +391,8 @@ static const NSTimeInterval kLayoutSettleInterval = 0.45;
     return nil;
 }
 
-// The text a window contributes to the spoken status, or nil for windows with
-// no text (e.g. graphics windows).
+//! The text a window contributes to the spoken status, or `nil` for windows with
+//! no text (e.g. graphics windows).
 - (nullable NSString *)speakableStringForWindow:(nullable GlkWindow *)win {
     if ([win isKindOfClass:[GlkTextGridWindow class]])
         return ((GlkTextGridWindow *)win).speakableString;
@@ -498,8 +502,8 @@ static const NSTimeInterval kLayoutSettleInterval = 0.45;
     return largestByFrameArea(windowsWithMoves);
 }
 
-// Every Glk window plus the quote box currently shown, if any. Quote boxes
-// are not Glk windows, so they are not in gwindows.
+//! Every Glk window plus the quote box currently shown, if any. Quote boxes
+//! are not Glk windows, so they are not in gwindows.
 - (NSArray<GlkWindow *> *)windowsIncludingQuoteBox {
     NSArray<GlkWindow *> *windows = self.gwindows.allValues;
     if (self.quoteBoxes.count)

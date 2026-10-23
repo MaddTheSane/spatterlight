@@ -15,7 +15,7 @@
 
 @class Game, Theme, GlkEvent, GlkWindow, ZMenu, BureaucracyForm, GlkTextGridWindow, GlkSoundChannel, SoundHandler, ImageHandler, RotorHandler, CommandScriptHandler, CoverImageHandler, GlkController, InfocomV6MenuHandler;
 
-typedef enum kGameIdentity : NSUInteger {
+typedef NS_ENUM(NSUInteger, kGameIdentity) {
     kGameIsGeneric,
     kGameIsAdrianMole,
     kGameIsArthur,
@@ -34,12 +34,12 @@ typedef enum kGameIdentity : NSUInteger {
     kGameIsTrinity,
     kGameIsVespers,
     kGameIsZorkZero
-} kGameIdentity;
+};
 
-typedef enum kMinimumWindowSize : NSUInteger {
+typedef NS_ENUM(NSUInteger, kMinimumWindowSize) {
     kMinimumWindowWidth = 212,
     kMinimumWindowHeight = 100
-} kMinimumWindowSize;
+};
 
 @interface GlkController : NSWindowController <NSSecureCoding, NSDraggingDestination>
 
@@ -69,8 +69,8 @@ typedef enum kMinimumWindowSize : NSUInteger {
 @property BOOL startingInFullscreen;
 @property NSSize borderFullScreenSize;
 @property(readonly) BOOL inFullscreen;
-// Whether the window is in system fullscreen right now. inFullscreen is
-// our own record of it, which is archived with the autosave.
+//! Whether the window is in system fullscreen right now. ``inFullscreen`` is
+//! our own record of it, which is archived with the autosave.
 - (BOOL)isInSystemFullscreen;
 @property BOOL shouldStoreScrollOffset;
 
@@ -96,19 +96,19 @@ typedef enum kMinimumWindowSize : NSUInteger {
 @property NSColor *bgcolor;
 
 @property NSInteger eventcount;
-// Turns played in the game, carried over by autorestore.
+//! Turns played in the game, carried over by autorestore.
 @property NSInteger turns;
-// Turns since this launch, not autosaved.
+//! Turns since this launch, not autosaved.
 @property NSInteger turnsThisSession;
 
-// To fix scrolling in the Adrian Mole games
+//! To fix scrolling in the Adrian Mole games
 @property BOOL shouldScrollOnCharEvent;
 
 @property NSString *oldThemeName;
 
-// The whole game file, read into the heap for the session. Blorb pictures
-// are subdata views on it, not copies. Not mapped: a mapped file that is
-// replaced or truncated during play crashes with SIGBUS on the next touch.
+//! The whole game file, read into the heap for the session. Blorb pictures
+//! are subdata views on it, not copies. Not mapped: a mapped file that is
+//! replaced or truncated during play crashes with SIGBUS on the next touch.
 @property NSData *gameData;
 @property NSURL *gameFileURL;
 @property NSAlert *slowReadAlert;
@@ -133,31 +133,31 @@ typedef enum kMinimumWindowSize : NSUInteger {
 @property NSInteger numberOfPrintsAndClears;
 @property NSInteger printsAndClearsThisTurn;
 
-// shouldSpeakNewText only applies to the call to
-// speakNewText in flushDisplay.
-
-// Its purpose is mainly to avoid speaking the same
-// move several times in a row, but also to make
-// sure that new moves are spoken even if they
-// contain the exact same text as the last.
-
-// It is set to YES when the game starts and whenever
-// a new command is entered by the player
-// (including single-key presses and link mouseclicks.)
+//! shouldSpeakNewText only applies to the call to
+//! speakNewText in flushDisplay.
+//!
+//! Its purpose is mainly to avoid speaking the same
+//! move several times in a row, but also to make
+//! sure that new moves are spoken even if they
+//! contain the exact same text as the last.
+//!
+//! It is set to YES when the game starts and whenever
+//! a new command is entered by the player
+//! (including single-key presses and link mouseclicks.)
 @property BOOL shouldSpeakNewText;
 
-// mustBeQuiet will override shouldSpeakNewText
-// without changing its value. If an alert appears, or
-// the game is reset, or the game crashes or is closed,
-// we want VoiceOver to announce this without getting
-// interrupted by the announcement of a new move
-// in flushDisplay, but we also don't want to worry
-// about restoring the state of shouldSpeakNewText if we
-// set mustBeQuiet to YES and then back to NO.
-
-// mustBeQuiet also makes sure that this window won't
-// speak if VoiceOver is switched on when a different
-// window is key
+//! mustBeQuiet will override shouldSpeakNewText
+//! without changing its value. If an alert appears, or
+//! the game is reset, or the game crashes or is closed,
+//! we want VoiceOver to announce this without getting
+//! interrupted by the announcement of a new move
+//! in flushDisplay, but we also don't want to worry
+//! about restoring the state of `shouldSpeakNewText` if we
+//! set mustBeQuiet to `YES` and then back to `NO`.
+//!
+//! mustBeQuiet also makes sure that this window won't
+//! speak if VoiceOver is switched on when a different
+//! window is key
 @property BOOL mustBeQuiet;
 
 @property NSDate *speechTimeStamp;
@@ -180,14 +180,16 @@ typedef enum kMinimumWindowSize : NSUInteger {
 @property NSURL *secureBookmark;
 @property BOOL showingDialog;
 
-// Flag to prevent things from moving around
-// when adjusting content size and position after
-// border change
+//! Flag to prevent things from moving around
+//! when adjusting content size and position after
+//! border change
 @property BOOL movingBorder;
 
-// YES while a Glk timer is running, i.e. the game is producing unattended
-// timer-driven output (real-time/animated games). Used to pause auto-scroll
-// when the user scrolls up, the same way command-script playback does.
+//! `YES` while a Glk timer is running, i.e. the game is producing unattended
+//! timer-driven output (real-time/animated games).
+//!
+//! Used to pause auto-scroll
+//! when the user scrolls up, the same way command-script playback does.
 @property(readonly) BOOL timerActive;
 
 // Command scripts

@@ -15,10 +15,10 @@ static const NSUInteger kMaxInfoWindowsAtOnce = 20;
 
 @interface TableViewController ()
 
-// Private properties previously declared as ivars
+//! Private properties previously declared as ivars
 @property BOOL canEdit;
-// Bumped to cancel a click-and-wait rename that has been scheduled but has
-// not opened yet (a double click on the same row plays the game instead).
+//! Bumped to cancel a click-and-wait rename that has been scheduled but has
+//! not opened yet (a double click on the same row plays the game instead).
 @property NSUInteger pendingRenameToken;
 @property (nullable) NSString *searchString;
 @property (nullable) NSMenuItem *enabledThemeItem;
@@ -26,7 +26,7 @@ static const NSUInteger kMaxInfoWindowsAtOnce = 20;
 @property BOOL verifyIsCancelled;
 @property (nullable) NSTimer *verifyTimer;
 
-// Set by the first viewDidAppear; later ones only refresh the table.
+//! Set by the first viewDidAppear; later ones only refresh the table.
 @property BOOL didAppear;
 
 //! Posts UpdateSideView with the first (at most two) selected games.

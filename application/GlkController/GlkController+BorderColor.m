@@ -10,7 +10,7 @@
 
 #import "DebugLog.h"
 
-// The size a window has, or is about to get if a resize is pending.
+//! The size a window has, or is about to get if a resize is pending.
 static NSSize currentSizeOfWindow(GlkWindow *win) {
     return win.framePending ? win.pendingFrame.size : win.bounds.size;
 }

@@ -139,7 +139,7 @@ static NSInteger compareTitleStrings(NSString *a, NSString *b) {
     return [a localizedStandardCompare: b];
 }
 
-// Empty values sort last, whichever the direction.
+//! Empty values sort last, whichever the direction.
 static NSInteger compareStrings(NSString *a, NSString *b, BOOL ascending) {
     if (a.length == 0 && b.length == 0)
         return NSOrderedSame;
@@ -161,7 +161,7 @@ static NSInteger compareDates(NSDate *a, NSDate *b, BOOL ascending) {
     return [a compare:b];
 }
 
-// NSNotFound sorts last, whichever the direction.
+//! NSNotFound sorts last, whichever the direction.
 static NSInteger compareIntegers(NSInteger a, NSInteger b, BOOL ascending) {
     if (a == b)
         return NSOrderedSame;
@@ -174,8 +174,8 @@ static NSInteger seriesNumber(Metadata *meta) {
     return meta.seriesnumber ? meta.seriesnumber.integerValue : NSNotFound;
 }
 
-// Game.like is 0 (neither), 1 (liked) or 2 (disliked). Sort disliked
-// between the two, so that liked games come first in descending order.
+//! Game.like is 0 (neither), 1 (liked) or 2 (disliked). Sort disliked
+//! between the two, so that liked games come first in descending order.
 static NSInteger likeRank(NSInteger like) {
     if (like == 1)
         return 2;
@@ -363,8 +363,8 @@ static NSPredicate *searchPredicateForWord(NSString *word) {
 
 #pragma mark NSTableViewDelegate / DataSource
 
-// An SF Symbol on macOS 11 and later, an image of the same name from the
-// asset catalog before that.
+//! An SF Symbol on macOS 11 and later, an image of the same name from the
+//! asset catalog before that.
 static NSImage *symbolImage(NSString *name, NSString *description) {
     if (!name)
         return nil;
@@ -400,8 +400,8 @@ sortDescriptorsDidChange:(NSArray *)oldDescriptors {
     return 0;
 }
 
-// Pure: a game without a hash cannot have a session (they are keyed by
-// hash), so this does not compute one. The cell code does that.
+//! Pure: a game without a hash cannot have a session (they are keyed by
+//! hash), so this does not compute one. The cell code does that.
 - (NSString *)imageNameForGame:(Game *)game description:(NSString * __autoreleasing *)description {
     NSString *name;
     if (!game.found) {
@@ -646,7 +646,7 @@ static NSLocale *englishUSLocale(void) {
 }
 
 //! Matches a typed language name ("swedish") or code ("sv", "swe") to a
-//! language code, and sets *languageAsWord to its English name. A name
+//! language code, and sets `*languageAsWord` to its English name. A name
 //! that cannot be matched is kept as both code and name.
 static NSString *languageCodeForTypedLanguage(NSString *typed, NSString * __autoreleasing *languageAsWord) {
     static NSDictionary<NSString *, NSString *> *codesByName;
@@ -963,8 +963,7 @@ static NSString *forgivenessName(NSInteger value) {
     [self updateWindowSubtitle];
 }
 
-#pragma mark -
-#pragma mark Open game on double click, edit on click and wait
+#pragma mark - Open game on double click, edit on click and wait
 
 - (void)doClick:(id)sender {
     // Click and wait to rename, the way the Finder does it: the rename is
