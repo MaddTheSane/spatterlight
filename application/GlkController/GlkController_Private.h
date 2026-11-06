@@ -24,7 +24,7 @@ static const NSAutoresizingMaskOptions kResizeCenteredFullHeight = NSViewHeightS
 // Fixed size, centered horizontally, attached at the top:
 static const NSAutoresizingMaskOptions kResizeCenteredAtTop = NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin;
 
-// Wait up to milliseconds (0 = just poll) for fd to become readable.
+//! Wait up to milliseconds (0 = just poll) for fd to become readable.
 static inline BOOL waitForData(int fd, int milliseconds) {
     fd_set fdset;
     struct timeval tmout = { milliseconds / 1000, (milliseconds % 1000) * 1000 };
@@ -33,7 +33,7 @@ static inline BOOL waitForData(int fd, int milliseconds) {
     return (select(fd + 1, &fdset, NULL, NULL, &tmout) > 0);
 }
 
-// Run block on the main queue after the given number of seconds.
+//! Run block on the main queue after the given number of seconds.
 static inline void runOnMainAfterDelay(NSTimeInterval seconds, dispatch_block_t block) {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(seconds * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), block);

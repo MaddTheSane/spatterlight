@@ -46,8 +46,8 @@ extern NSString * const kImagePlaceholderDescription;
 
 @end
 
-// Image and Metadata are the entities MyCoreDataCoreSpotlightDelegate indexes,
-// keyed by the object ID's URI. Both call this from -willSave when deleted.
+//! Image and Metadata are the entities ``MyCoreDataCoreSpotlightDelegate`` indexes,
+//! keyed by the object ID's URI. Both call this from -willSave when deleted.
 @interface NSManagedObject (SpotlightRemoval)
 
 - (void)removeFromSpotlightIndex;

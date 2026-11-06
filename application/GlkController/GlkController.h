@@ -108,7 +108,7 @@ typedef NS_ENUM(NSUInteger, kMinimumWindowSize) {
 
 //! The whole game file, read into the heap for the session. Blorb pictures
 //! are subdata views on it, not copies. Not mapped: a mapped file that is
-//! replaced or truncated during play crashes with SIGBUS on the next touch.
+//! replaced or truncated during play crashes with `SIGBUS` on the next touch.
 @property NSData *gameData;
 @property NSURL *gameFileURL;
 @property NSAlert *slowReadAlert;
@@ -141,12 +141,12 @@ typedef NS_ENUM(NSUInteger, kMinimumWindowSize) {
 //! sure that new moves are spoken even if they
 //! contain the exact same text as the last.
 //!
-//! It is set to YES when the game starts and whenever
+//! It is set to `YES` when the game starts and whenever
 //! a new command is entered by the player
 //! (including single-key presses and link mouseclicks.)
 @property BOOL shouldSpeakNewText;
 
-//! mustBeQuiet will override shouldSpeakNewText
+//! mustBeQuiet will override ``shouldSpeakNewText``
 //! without changing its value. If an alert appears, or
 //! the game is reset, or the game crashes or is closed,
 //! we want VoiceOver to announce this without getting
